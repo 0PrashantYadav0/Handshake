@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+/* 08 section 1: the only palette. Tailwind utilities, the AG Grid theme and the Studio theme all read these. */
+:root {
+  --hs-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --hs-bg: #f7f6f3;
+  --hs-surface: #ffffff;
+  --hs-ink: #1c1917;
+  --hs-muted: #68625c;
+  --hs-border: #e5e1db;
+  --hs-accent: #0f766e;
+  /* status colour roles (08 section 2); each is >= 4.5:1 on white */
+  --hs-status-draft: #57534e;
+  --hs-status-terms_agreed: #44403c;
+  --hs-status-held: #0f766e;
+  --hs-status-proof_submitted: #0f766e;
+  --hs-status-in_review: #a16207;
+  --hs-status-captured: #15803d;
+  --hs-status-paid: #166534;
+  --hs-status-voided: #b91c1c;
+}
+
+body { font-family: var(--hs-font); }
+
+.hs-pill {
+  --c: var(--hs-status-draft);
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.1rem 0.6rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 500; line-height: 1.4;
+  color: var(--c); border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 10%, white);
+}
+.hs-pill::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 9999px; background: var(--c); }
+.hs-pill[data-status="terms_agreed"] { --c: var(--hs-status-terms_agreed); }
+.hs-pill[data-status="held"] { --c: var(--hs-status-held); }
+.hs-pill[data-status="proof_submitted"] { --c: var(--hs-status-proof_submitted); }
+.hs-pill[data-status="in_review"] { --c: var(--hs-status-in_review); }
+.hs-pill[data-status="captured"] { --c: var(--hs-status-captured); }
+.hs-pill[data-status="paid"] { --c: var(--hs-status-paid); color: white; background: var(--c); }
+.hs-pill[data-status="voided"] { --c: var(--hs-status-voided); }
+@media (prefers-reduced-motion: no-preference) {
+  .hs-pill[data-status="proof_submitted"]::before { animation: hs-pulse 1.2s ease-in-out infinite; }
+}
+@keyframes hs-pulse { 50% { opacity: 0.3; } }
+
+.hs-badge {
+  display: inline-block; padding: 0 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 500;
+  color: var(--hs-muted); border: 1px dashed var(--hs-border); background: var(--hs-bg);
+}
+.hs-btn, .hs-btn-secondary, .hs-chip {
+  display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;
+  border: 1px solid var(--hs-accent); background: var(--hs-accent); color: white;
+}
+.hs-btn:hover { filter: brightness(1.1); }
+.hs-btn-secondary { background: var(--hs-surface); color: var(--hs-accent); }
+.hs-btn-secondary:hover { background: var(--hs-bg); }
+.hs-chip { min-height: 2rem; padding: 0 0.75rem; border-radius: 9999px; border-color: var(--hs-border); background: var(--hs-surface); color: var(--hs-ink); }
+.hs-chip[aria-pressed="true"] { border-color: var(--hs-accent); background: color-mix(in srgb, var(--hs-accent) 12%, white); color: var(--hs-accent); }
+.hs-input {
+  min-height: 2.5rem; padding: 0 0.75rem; border-radius: 0.5rem; border: 1px solid var(--hs-border); background: var(--hs-surface);
+}
+.hs-input:focus, .hs-chip:focus-visible, .hs-btn:focus-visible, .hs-btn-secondary:focus-visible {
+  outline: 2px solid var(--hs-accent); outline-offset: 2px;
+}

@@ -10,7 +10,7 @@ export default defineConfig([
   {
     rules: {
       // dependencies.md trap 8: the Studio licence does not cover these outside Studio
-      "no-restricted-imports": ["error", { paths: ["ag-grid-enterprise", "ag-charts-enterprise"] }],
+      "no-restricted-imports": ["error", { paths: ["ag-grid-enterprise", "ag-charts-enterprise", "ag-charts-community"] }],
     },
   },
 ]);
