@@ -1,0 +1,21 @@
+{
+  "id": "48S239579N1696452",
+  "intent": "AUTHORIZE",
+  "status": "COMPLETED",
+  "purchase_units": [{
+    "reference_id": "default",
+    "custom_id": "HS-7K2Q",
+    "payments": { "authorizations": [{
+      "id": "0VF52814937998046",
+      "status": "PENDING",
+      "status_details": { "reason": "PENDING_REVIEW" },
+      "amount": { "currency_code": "USD", "value": "30.00" },
+      "custom_id": "HS-7K2Q",
+      "expiration_time": "2026-11-18T15:57:51Z",
+      "links": [{ "href": "https://api-m.sandbox.paypal.com/v2/payments/authorizations/0VF52814937998046", "rel": "self", "method": "GET" }],
+      "create_time": "2026-10-20T15:57:51Z",
+      "update_time": "2026-10-20T15:57:51Z"
+    }] }
+  }],
+  "links": [{ "href": "https://api-m.sandbox.paypal.com/v2/checkout/orders/48S239579N1696452", "rel": "self", "method": "GET" }]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "8MC585209K746392H",
+  "status": "DECLINED",
+  "status_details": { "reason": "DECLINED_BY_RISK_FRAUD_FILTERS" },
+  "amount": { "currency_code": "USD", "value": "30.00" },
+  "final_capture": true,
+  "custom_id": "HS-7K2Q",
+  "links": [{ "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/8MC585209K746392H", "rel": "self", "method": "GET" }],
+  "create_time": "2026-10-21T09:12:03Z",
+  "update_time": "2026-10-21T09:12:03Z"
+}

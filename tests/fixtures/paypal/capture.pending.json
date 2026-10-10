@@ -1,0 +1,11 @@
+{
+  "id": "2GG279541U471931P",
+  "status": "PENDING",
+  "status_details": { "reason": "PENDING_REVIEW" },
+  "amount": { "currency_code": "USD", "value": "30.00" },
+  "final_capture": true,
+  "custom_id": "HS-7K2Q",
+  "links": [{ "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/2GG279541U471931P", "rel": "self", "method": "GET" }],
+  "create_time": "2026-10-21T09:12:03Z",
+  "update_time": "2026-10-21T09:12:03Z"
+}

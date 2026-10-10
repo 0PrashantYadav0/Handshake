@@ -1,0 +1,7 @@
+{
+  "name": "ITEM_ALREADY_CANCELLED",
+  "message": "Item is already cancelled.",
+  "debug_id": "e8c0d2f41a6b3",
+  "information_link": "https://developer.paypal.com/docs/api/payments.payouts-batch/#errors",
+  "links": []
+}

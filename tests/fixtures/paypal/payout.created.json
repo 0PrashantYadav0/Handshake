@@ -1,0 +1,8 @@
+{
+  "batch_header": {
+    "payout_batch_id": "3TRXJ4Z8XJ8QY",
+    "batch_status": "PENDING",
+    "sender_batch_header": { "sender_batch_id": "payout-HS-7K2Q-1", "email_subject": "You have a payout from Handshake" }
+  },
+  "links": [{ "href": "https://api-m.sandbox.paypal.com/v1/payments/payouts/3TRXJ4Z8XJ8QY", "rel": "self", "method": "GET", "encType": "application/json" }]
+}

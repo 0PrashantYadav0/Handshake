@@ -1,0 +1,7 @@
+{
+  "name": "UNPROCESSABLE_ENTITY",
+  "message": "The requested action could not be performed, semantically incorrect, or failed business validation.",
+  "debug_id": "b6b9a374802ea",
+  "details": [{ "issue": "PREVIOUSLY_VOIDED", "description": "Authorization has been previously voided and hence cannot be voided again." }],
+  "links": [{ "href": "https://developer.paypal.com/api/rest/reference/orders/v2/errors/#PREVIOUSLY_VOIDED", "rel": "information_link", "method": "GET" }]
+}

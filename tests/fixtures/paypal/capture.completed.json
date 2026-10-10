@@ -1,0 +1,20 @@
+{
+  "id": "5KA38057EC136584R",
+  "status": "COMPLETED",
+  "amount": { "currency_code": "USD", "value": "30.00" },
+  "final_capture": true,
+  "custom_id": "HS-7K2Q",
+  "seller_protection": { "status": "ELIGIBLE", "dispute_categories": ["ITEM_NOT_RECEIVED", "UNAUTHORIZED_TRANSACTION"] },
+  "seller_receivable_breakdown": {
+    "gross_amount": { "currency_code": "USD", "value": "30.00" },
+    "paypal_fee": { "currency_code": "USD", "value": "1.36" },
+    "net_amount": { "currency_code": "USD", "value": "28.64" }
+  },
+  "links": [
+    { "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/5KA38057EC136584R", "rel": "self", "method": "GET" },
+    { "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/5KA38057EC136584R/refund", "rel": "refund", "method": "POST" },
+    { "href": "https://api-m.sandbox.paypal.com/v2/payments/authorizations/66P728836U784324A", "rel": "up", "method": "GET" }
+  ],
+  "create_time": "2026-10-21T09:12:03Z",
+  "update_time": "2026-10-21T09:12:03Z"
+}

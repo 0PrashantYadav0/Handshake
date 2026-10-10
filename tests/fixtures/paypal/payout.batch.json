@@ -1,0 +1,28 @@
+{
+  "batch_header": {
+    "payout_batch_id": "3TRXJ4Z8XJ8QY",
+    "batch_status": "SUCCESS",
+    "time_created": "2026-10-21T09:12:10Z",
+    "time_completed": "2026-10-21T09:12:14Z",
+    "sender_batch_header": { "sender_batch_id": "payout-HS-7K2Q-1", "email_subject": "You have a payout from Handshake" },
+    "amount": { "currency": "USD", "value": "30.00" },
+    "fees": { "currency": "USD", "value": "0.25" }
+  },
+  "items": [{
+    "payout_item_id": "G2A4L7B3F8JQW",
+    "transaction_id": "7HH75849GA6835631",
+    "transaction_status": "SUCCESS",
+    "payout_item_fee": { "currency": "USD", "value": "0.25" },
+    "payout_batch_id": "3TRXJ4Z8XJ8QY",
+    "payout_item": {
+      "recipient_type": "EMAIL",
+      "amount": { "currency": "USD", "value": "30.00" },
+      "note": "Deal HS-7K2Q",
+      "receiver": "sb-seller@personal.example.com",
+      "sender_item_id": "payout-HS-7K2Q-1"
+    },
+    "time_processed": "2026-10-21T09:12:14Z",
+    "links": [{ "href": "https://api-m.sandbox.paypal.com/v1/payments/payouts-item/G2A4L7B3F8JQW", "rel": "item", "method": "GET", "encType": "application/json" }]
+  }],
+  "links": [{ "href": "https://api-m.sandbox.paypal.com/v1/payments/payouts/3TRXJ4Z8XJ8QY?page_size=1000&page=1", "rel": "self", "method": "GET", "encType": "application/json" }]
+}

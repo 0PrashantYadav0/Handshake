@@ -3,9 +3,15 @@
 export const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const CODE_RE = /^HS-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/;
 
-/** A number in [0, 1) from crypto.getRandomValues. */
+/** A number in [0, 1) from crypto.getRandomValues, drawn 64 at a time. */
+const pool = new Uint32Array(64);
+let used = pool.length;
 export function secureRandom(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+  if (used === pool.length) {
+    crypto.getRandomValues(pool);
+    used = 0;
+  }
+  return pool[used++] / 2 ** 32;
 }
 
 /** random is injectable so a test can force a repeated code. */

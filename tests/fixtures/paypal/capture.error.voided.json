@@ -1,0 +1,7 @@
+{
+  "name": "UNPROCESSABLE_ENTITY",
+  "message": "The requested action could not be performed, semantically incorrect, or failed business validation.",
+  "debug_id": "c4ff2b36d1a07",
+  "details": [{ "issue": "AUTHORIZATION_VOIDED", "description": "A voided authorization cannot be captured or reauthorized." }],
+  "links": [{ "href": "https://developer.paypal.com/api/rest/reference/orders/v2/errors/#AUTHORIZATION_VOIDED", "rel": "information_link", "method": "GET" }]
+}
