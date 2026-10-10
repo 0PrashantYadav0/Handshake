@@ -1,0 +1,9 @@
+{
+  "group": "fixture",
+  "decision": "capture",
+  "results": {
+    "c1": "pass",
+    "c2": "pass",
+    "c3": "pass"
+  }
+}
