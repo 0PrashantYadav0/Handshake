@@ -1,0 +1,79 @@
+# render.yaml
+services:
+  - type: web
+    name: handshake
+    runtime: node
+    plan: 0.5c-512mb                       # $7/mo; never spins down
+    buildCommand: npm ci && npm run build  # build = prisma generate && next build
+    preDeployCommand: npx prisma migrate deploy
+    startCommand: npm run start            # next start; Render sets PORT=10000
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: handshake-db
+          property: connectionString
+      - key: APP_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: FILE_URL_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_API_BASE
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: NEXT_PUBLIC_PAYPAL_CLIENT_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: claude-sonnet-5-5
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "Handshake <onboarding@resend.dev>"
+      - key: PASS_THRESHOLD
+        value: "0.85"
+      - key: AUTO_CAPTURE_MAX_MINOR
+        value: "20000"
+      - key: DEMO_LOGIN
+        value: "true"
+      - key: DEMO_SELLER_PAYPAL_EMAIL
+        sync: false
+      - key: AG_GRID_LICENSE_KEY
+        sync: false
+
+  - type: cron
+    name: handshake-tick
+    runtime: node
+    plan: 0.5c-512mb                       # $1/mo minimum
+    schedule: "0 6 * * *"                  # 06:00 UTC daily (J2)
+    buildCommand: "true"
+    startCommand: >-
+      curl -fsS --max-time 120 --retry 3 -X POST
+      -H "Authorization: Bearer $CRON_SECRET"
+      "https://$APP_HOST/api/jobs/tick"
+    envVars:
+      - key: APP_HOST                      # UNVERIFIED: cross-service envVarKey to a built-in variable; see 3.4 step 4
+        fromService:
+          name: handshake
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: CRON_SECRET
+        fromService:
+          name: handshake
+          type: web
+          envVarKey: CRON_SECRET
+
+databases:
+  - name: handshake-db
+    plan: 0.1c-256mb                       # $6/mo, 100 connections
+    diskSizeGB: 5                          # omit it and Render gives 15 GB at $0.30/GB
+    postgresMajorVersion: "18"
