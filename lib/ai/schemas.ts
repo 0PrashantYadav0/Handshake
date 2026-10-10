@@ -72,3 +72,52 @@ export const ExtractZ = z.object({
   rejected: z.array(z.object({ text: z.string().trim(), suggestion: z.string().trim() })),
 });
 export type ExtractRaw = z.infer<typeof ExtractZ>;
+
+// 05 sections 4.5 and 4.6. Labels are stable (c1..c5, r1..r4, e1..e6, tracking, note) so one grammar serves every deal.
+export const CONDITION_IDS = ["c1", "c2", "c3", "c4", "c5"] as const;
+export const EVIDENCE_IDS = ["e1", "e2", "e3", "e4", "e5", "e6", "r1", "r2", "r3", "r4", "tracking", "note"] as const;
+
+export const VERDICT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdicts"],
+  properties: {
+    verdicts: {
+      type: "array",
+      minItems: 1,
+      description: "Exactly one verdict per condition id, in the order given.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["condition_id", "result", "confidence", "reason", "evidence_used"],
+        properties: {
+          condition_id: { type: "string", enum: CONDITION_IDS },
+          result: { type: "string", enum: ["pass", "fail", "unclear"] },
+          confidence: { type: "number", description: "0.0 to 1.0." },
+          reason: { type: "string", description: "One plain sentence, at most 200 characters, naming what was compared." },
+          evidence_used: { type: "array", items: { type: "string", enum: EVIDENCE_IDS } },
+        },
+      },
+    },
+  },
+} as const;
+
+/** Clamped, never rejected; a non-number is 0. Not rounded: 0.8499 must stay below a 0.85 threshold (05 section 4.7). */
+const clamp01 = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+
+export const VerdictsZ = z.object({
+  verdicts: z
+    .array(
+      z.object({
+        // Looser than the grammar on purpose (06 "AI output validation"): a well-formed label the deal lacks (c9) is dropped
+        // in judge(), an unknown evidence id (e7) is removed there too; anything else fails the call (the safe direction).
+        condition_id: z.preprocess(lower, z.string().regex(/^c\d+$/)),
+        result: z.preprocess(lower, z.enum(["pass", "fail", "unclear"])),
+        confidence: z.preprocess(clamp01, z.number().min(0).max(1)),
+        reason: z.string().transform((s) => s.trim().replace(/\s+/g, " ").slice(0, 300) || "No reason given."),
+        evidence_used: z.array(z.preprocess(lower, z.string())),
+      }),
+    )
+    .min(1),
+});
+export type VerdictsRaw = z.infer<typeof VerdictsZ>;
