@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "seed": "tsx prisma/seed.ts",
     "eval": "tsx eval/run.ts",
-    "sandbox": "tsx scripts/sandbox/scenario.ts"
+    "sandbox": "tsx scripts/sandbox/scenario.ts",
+    "demo:placeholders": "tsx scripts/demo/make-placeholders.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.132.1",

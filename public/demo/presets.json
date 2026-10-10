@@ -1,0 +1,51 @@
+{
+  "tracking_number": "TRK-DEMO-0000",
+  "font": "/demo/fonts/handwriting.woff2",
+  "presets": [
+    {
+      "id": "mug",
+      "label": "$18 mug, 5 days",
+      "sentence": "I'll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered",
+      "reference": ["/demo/reference/mug/ref-1.png", "/demo/reference/mug/ref-2.png"],
+      "code_photo": { "base": "/demo/reference/mug/code-base.png", "box": { "x": 880, "y": 620, "w": 560, "h": 220, "angle": -0.04 } },
+      "sets": {
+        "good": { "label": "Good", "purpose": "Every condition passes; the payment is released.", "photos": ["/demo/evidence/good/photo-1.png", "/demo/evidence/good/photo-2.png"] },
+        "reuse-listing": { "label": "Reuse listing photo", "purpose": "A listing photo as proof; fails without a model call.", "photos": ["/demo/reference/mug/ref-1.png"], "skip_listing_check": true }
+      }
+    },
+    {
+      "id": "lamp",
+      "label": "$35 lamp, 7 days",
+      "sentence": "I'll pay $35 for the wooden desk lamp if it arrives within 7 days, matches the listing photos and tracking shows delivered",
+      "reference": ["/demo/reference/lamp/ref-1.png", "/demo/reference/lamp/ref-2.png"],
+      "code_photo": { "base": "/demo/reference/lamp/code-base.png", "box": { "x": 860, "y": 640, "w": 560, "h": 220, "angle": 0.03 } },
+      "sets": {
+        "wrong-item": { "label": "Wrong item", "purpose": "A different lamp; one fix is requested, a second failure voids.", "photos": ["/demo/evidence/wrong-item/photo-1.png", "/demo/evidence/wrong-item/photo-2.png"] }
+      }
+    },
+    {
+      "id": "bottle",
+      "label": "$22 bottle, 7 days",
+      "sentence": "I'll pay $22 for the 1 L stainless steel water bottle if it arrives within 7 days, matches the listing photos and tracking shows delivered",
+      "reference": ["/demo/reference/bottle/ref-1.png", "/demo/reference/bottle/ref-2.png"],
+      "code_photo": { "base": "/demo/reference/bottle/code-base.png", "box": { "x": 900, "y": 600, "w": 540, "h": 220, "angle": -0.02 } },
+      "sets": {
+        "blurry": { "label": "Blurry", "purpose": "Unreadable proof; the buyer decides.", "photos": ["/demo/evidence/blurry/photo-1.png"] }
+      }
+    }
+  ],
+  "extras": [
+    {
+      "id": "mug-over-limit",
+      "label": "$250 mug (over the auto-release limit)",
+      "preset": "mug",
+      "sentence": "I'll pay $250 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered"
+    },
+    {
+      "id": "mug-subjective",
+      "label": "$45 mug, subjective wording",
+      "preset": "mug",
+      "sentence": "I'll pay $45 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and looks nice"
+    }
+  ]
+}

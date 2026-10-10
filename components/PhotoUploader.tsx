@@ -4,24 +4,26 @@
 import { useState } from "react";
 import type { DealView, FileRef } from "@/lib/deal/types";
 import { downscale, errorCopy, formatBytes, sendJson, UNDECODABLE_COPY, uploadFile } from "@/lib/client-upload";
+import { fetchSample, findPreset, type Presets } from "@/lib/demo-kit";
 
 const MAX = 4;
 type Item = { key: number; blob: Blob; preview: string; ref?: FileRef; error?: string };
 let seq = 0;
 
-export function PhotoUploader({ deal, onAccepted }: { deal: DealView; onAccepted: (d: DealView) => void }) {
+export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView; kit?: Presets | null; onAccepted: (d: DealView) => void }) {
   const [items, setItems] = useState<Item[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function add(files: FileList | null) {
+  /** Stages downscaled files after the current ones, or instead of them with `replace` (the sample button). */
+  async function add(files: FileList | File[] | null, replace = false) {
     if (!files) return;
     const next: Item[] = [];
     const msgs: string[] = [];
     for (const f of Array.from(files)) {
-      if (items.length + next.length >= MAX) {
+      if ((replace ? 0 : items.length) + next.length >= MAX) {
         msgs.push("Up to 4 listing photos.");
         break;
       }
@@ -32,8 +34,21 @@ export function PhotoUploader({ deal, onAccepted }: { deal: DealView; onAccepted
         msgs.push(`${f.name}: ${e instanceof Error ? e.message : UNDECODABLE_COPY}`);
       }
     }
-    setItems((cur) => [...cur, ...next]);
+    if (replace) items.forEach((it) => URL.revokeObjectURL(it.preview));
+    setItems((cur) => (replace ? next : [...cur, ...next]));
     setNotice(msgs.length ? msgs.join(" ") : null);
+  }
+
+  async function stageSample() {
+    if (!kit) return;
+    setBusy(true);
+    try {
+      await add(await Promise.all(findPreset(kit, deal.source_text).reference.map(fetchSample)), true);
+    } catch (e) {
+      setError(errorCopy(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function remove(key: number) {
@@ -79,8 +94,10 @@ export function PhotoUploader({ deal, onAccepted }: { deal: DealView; onAccepted
           Choose photos
           <input type="file" accept="image/*" multiple className="sr-only" disabled={items.length >= MAX || busy} onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
         </label>
-        {/* T-33: stage the preset's reference[] whose sentence equals deal.source_text, else preset 1 (08 section 12.4) */}
-        <button type="button" className="hs-btn-secondary" data-testid="use-sample-reference" disabled>Use sample listing photos</button>
+        {/* T-33: stages the preset's reference[] whose sentence equals deal.source_text, else preset 1 (08 section 12.4) */}
+        {kit && (
+          <button type="button" className="hs-btn-secondary" data-testid="use-sample-reference" disabled={busy} onClick={() => void stageSample()}>Use sample listing photos</button>
+        )}
         <span className="text-sm text-[var(--hs-muted)]">{items.length} of {MAX}</span>
       </div>
       {notice && <p role="alert" className="mt-2 text-sm text-[var(--hs-status-voided)]">{notice}</p>}

@@ -3,17 +3,17 @@
 import { useState } from "react";
 import type { DealView } from "@/lib/deal/types";
 import { errorCopy, sendJson } from "@/lib/client-upload";
+import { chips, type Presets } from "@/lib/demo-kit";
 import { TermsForm, type Rejected } from "@/components/TermsForm";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { ShareLink } from "@/components/ShareLink";
 
-/** One chip of 08 section 6.1; T-33 reads them from public/demo/presets.json. */
-export type Preset = { id: string; label: string; sentence: string };
-
 const STEPS = ["Describe", "Review terms", "Listing photos", "Share"];
 const HELP = "Include the item, the price in US dollars, and what the seller must show: photos, a tracking number, or both. Keep it to one deal.";
 
-export function NewDealFlow({ presets = [] }: { presets?: Preset[] }) {
+/** `kit` is public/demo/presets.json (08 section 12.2) when DEMO_LOGIN is on: it gives the 6.1 chips and the 6.3 sample listing photos. */
+export function NewDealFlow({ kit = null }: { kit?: Presets | null }) {
+  const presets = kit ? chips(kit) : [];
   const [step, setStep] = useState(1);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,7 +88,7 @@ export function NewDealFlow({ presets = [] }: { presets?: Preset[] }) {
       )}
 
       {step === 2 && deal && <TermsForm deal={deal} rejected={rejected} onSaved={(d) => { setDeal(d); setStep(3); }} />}
-      {step === 3 && deal && <PhotoUploader deal={deal} onAccepted={(d) => { setDeal(d); setStep(4); }} />}
+      {step === 3 && deal && <PhotoUploader deal={deal} kit={kit} onAccepted={(d) => { setDeal(d); setStep(4); }} />}
       {step === 4 && deal && <ShareLink deal={deal} />}
     </main>
   );

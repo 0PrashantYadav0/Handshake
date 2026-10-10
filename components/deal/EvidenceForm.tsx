@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/client-api";
 import { downscale, errorCopy as uploadErrorCopy, formatBytes, UNDECODABLE_COPY, uploadFile } from "@/lib/client-upload";
 import { carrierStatus } from "@/lib/carrier";
 import { carrierLabel } from "@/lib/deal-copy";
+import { composeCodePhoto, fetchSample, findPreset, usePresets } from "@/lib/demo-kit";
 import { VerdictIcon } from "./VerdictList";
 import { WaitScreen } from "./WaitScreen";
 
@@ -41,6 +42,8 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
   const [notice, setNotice] = useState<string | null>(null);
   const [phase, setPhase] = useState<"edit" | "uploading" | "checking" | "lost">("edit");
   const [progress, setProgress] = useState<string | null>(null);
+  const kit = usePresets(demo);
+  const preset = kit && findPreset(kit, deal.source_text);
 
   const needPhoto = deal.conditions.some((c) => c.evidence_type === "photo");
   const trackingCond = deal.conditions.find((c) => c.evidence_type === "tracking");
@@ -49,25 +52,41 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
   const refHashes = new Set(deal.reference_files.map((f) => f.sha256));
   const ready = (!needPhoto || items.length > 0) && (!trackingCond || tracking.trim() !== "") && !items.some((i) => i.listing);
 
-  async function add(files: FileList | null) {
+  /** Stages downscaled files after the current ones, or instead of them with `replace`; `skipListingCheck` lets the D8 sample through (7.7). */
+  async function add(files: FileList | File[] | null, { replace = false, skipListingCheck = false } = {}) {
     if (!files) return;
     const next: Item[] = [];
     const msgs: string[] = [];
     for (const f of Array.from(files)) {
-      if (items.length + next.length >= MAX) {
+      if ((replace ? 0 : items.length) + next.length >= MAX) {
         msgs.push("Up to 6 photos.");
         break;
       }
       try {
         const blob = await downscale(f);
-        const hash = await sha256(blob);
+        const hash = skipListingCheck ? null : await sha256(blob);
         next.push({ key: ++seq, blob, preview: URL.createObjectURL(blob), listing: !!hash && refHashes.has(hash) });
       } catch (e) {
         msgs.push(`${f.name}: ${e instanceof Error ? e.message : UNDECODABLE_COPY}`);
       }
     }
-    setItems((cur) => [...cur, ...next]);
+    if (replace) items.forEach((it) => URL.revokeObjectURL(it.preview));
+    setItems((cur) => (replace ? next : [...cur, ...next]));
     setNotice(msgs.length ? msgs.join(" ") : null);
+  }
+
+  /** 08 section 12.4: the set's photos plus the code photo composed for this deal, and the demo tracking number. */
+  async function stageSample(setId: string) {
+    if (!kit || !preset) return;
+    const set = preset.sets[setId];
+    try {
+      const { base, box } = preset.code_photo;
+      const files = await Promise.all([...set.photos.map(fetchSample), composeCodePhoto(base, deal.code, box, kit.font)]);
+      await add(files, { replace: true, skipListingCheck: !!set.skip_listing_check });
+      setTracking(kit.tracking_number);
+    } catch (e) {
+      fail(e);
+    }
   }
 
   const remove = (key: number) => setItems((cur) => cur.filter((it) => (it.key === key ? (URL.revokeObjectURL(it.preview), false) : true)));
@@ -187,17 +206,16 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
         </p>
       </div>
 
-      {demo && (
+      {preset && (
         <div>
           <p className="hs-label">Use sample evidence</p>
-          {/* T-33 slot: each button clears the staged photos, stages the preset set plus the canvas code photo (08 section 12.3) and fills TRK-DEMO-0000 */}
+          {/* T-33: one button per set of the deal's preset (12.4); each clears the staged photos, stages the set plus the canvas code photo (12.3) and fills TRK-DEMO-0000 */}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="hs-btn-secondary" data-testid="use-sample-evidence-good" disabled>Good</button>
-            <button type="button" className="hs-btn-secondary" data-testid="use-sample-evidence-wrong-item" disabled>Wrong item</button>
-            <button type="button" className="hs-btn-secondary" data-testid="use-sample-evidence-blurry" disabled>Blurry</button>
-            <button type="button" className="hs-btn-secondary" data-testid="use-sample-evidence-reuse-listing" disabled>Reuse listing photo</button>
+            {Object.entries(preset.sets).map(([id, s]) => (
+              <button key={id} type="button" className="hs-btn-secondary" data-testid={`use-sample-evidence-${id}`} onClick={() => void stageSample(id)}>{s.label}</button>
+            ))}
           </div>
-          <p className="hs-help mt-1">Good passes every condition; Wrong item fails one; Blurry leaves Claude unsure; Reuse listing photo trips the guardrail.</p>
+          <p className="hs-help mt-1">{Object.values(preset.sets).map((s) => `${s.label}: ${s.purpose}`).join(" ")}</p>
         </div>
       )}
 
