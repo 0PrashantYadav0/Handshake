@@ -8,6 +8,7 @@ import { Purpose } from "@/lib/http-schemas";
 
 export const POST = route(async (req: Request, { params }: { params: Promise<{ code: string }> }) => {
   const actor = await requireSession(req);
+  // Browsers always send Content-Length for multipart; a chunked body is still bounded by validateFile's 2 MB cap after parsing.
   if (Number(req.headers.get("content-length")) > MAX_BODY_BYTES) throw new DealError("file_too_large", "The request body exceeds 2.5 MB.");
   const form = await req.formData().catch(() => {
     throw new DealError("invalid_input", "Body must be multipart/form-data.");

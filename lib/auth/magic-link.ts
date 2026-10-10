@@ -3,7 +3,7 @@ import { LOGIN_TTL_SEC, readToken, signToken } from "./session";
 
 /** 04 section 4.1: relative paths only; `//evil` and `/\evil` fall back to /ledger. */
 export function safeNext(next: string | null | undefined): string {
-  return next && next.length <= 200 && /^\/(?![/\\])/.test(next) ? next : "/ledger";
+  return next && next.length <= 200 && /^\/(?![/\\])[^\s\\]*$/.test(next) ? next : "/ledger";
 }
 
 export const createMagicToken = (email: string): Promise<string> =>

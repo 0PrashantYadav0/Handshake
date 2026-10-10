@@ -12,6 +12,7 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 
 export const POST = route(async (req: Request) => {
   const deps = getDeps();
+  if (Number(req.headers.get("content-length")) > 64 * 1024) throw new DealError("invalid_input", "Body too large.");
   const raw = await req.text();
   const headers = Object.fromEntries(HEADERS.map((h) => [h, req.headers.get(h)]));
   const { result } = await deps.paypal.verifyWebhook(raw, headers);

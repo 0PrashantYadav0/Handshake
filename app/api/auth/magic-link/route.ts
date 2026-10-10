@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildMagicLink, createMagicToken } from "@/lib/auth/magic-link";
 import { getDeps } from "@/lib/deps";
 import { json, parseBody, route } from "@/lib/http";
+import { allow, clientIp } from "@/lib/rate-limit";
 
 // html5Email: what <input type="email"> accepts (dot-less hosts included), matching the test addresses in 06.
 const Body = z.object({ email: z.email({ pattern: z.regexes.html5Email }), next: z.string().optional() });
@@ -10,6 +11,7 @@ const Body = z.object({ email: z.email({ pattern: z.regexes.html5Email }), next:
 export const POST = route(async (req: Request) => {
   const { email, next } = await parseBody(Body, req);
   const to = email.toLowerCase();
+  if (!allow(`magic:${to}`, 3, 10 * 60_000) || !allow(`magic-ip:${clientIp(req)}`, 10, 10 * 60_000)) return json({ ok: true });
   const link = buildMagicLink(await createMagicToken(to), next);
   await getDeps().email.send({ to, subject: "Your Handshake sign-in link", text: `Sign in to Handshake (link valid for 15 minutes):\n\n${link}` });
   return json({ ok: true });

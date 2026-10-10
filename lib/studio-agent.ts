@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgAiConversationItem, AgAiOutputItem, AgLlmResponse } from "ag-studio";
 import { z } from "zod";
+import { allow } from "@/lib/rate-limit";
 import type { MessagesClient } from "@/lib/ai/call-json";
 import type { ServerTools } from "@/lib/studio-tools";
 
@@ -33,16 +34,9 @@ export const AgentBody = z.object({
 }); // toolChoice, responseFormat and model are accepted and dropped (04 section 15)
 export type AgentRequest = z.infer<typeof AgentBody>;
 
-// ponytail: in-memory sliding window, so one instance only; a Postgres counter if we ever scale out. 30 turns per
-// user per 10 minutes (04 section 15); every judge shares one demo persona and a prompt is 3 to 6 turns.
-const turns = new Map<string, number[]>();
-export function allowTurn(key: string, now = Date.now(), limit = 30, windowMs = 10 * 60_000): boolean {
-  const recent = (turns.get(key) ?? []).filter((t) => now - t < windowMs);
-  if (recent.length >= limit) return false;
-  recent.push(now);
-  turns.set(key, recent);
-  return true;
-}
+// 30 turns per user per 10 minutes (04 section 15); every judge shares one demo persona and a prompt is 3 to 6 turns.
+export const allowTurn = (key: string, now = Date.now(), limit = 30, windowMs = 10 * 60_000): boolean =>
+  allow(`studio:${key}`, limit, windowMs, now);
 
 const toolId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_"); // Anthropic's tool_use id charset
 const parseArgs = (s: string): unknown => {

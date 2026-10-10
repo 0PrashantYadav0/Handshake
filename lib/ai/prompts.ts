@@ -1,4 +1,6 @@
 // 05 sections 3.2, 3.3, 4.3 and 4.4. Bump EXTRACT_PROMPT_VERSION / JUDGE_PROMPT_VERSION (types.ts) on any change to the matching prompt (D10).
+/** JSON with < escaped, so untrusted text can never close a delimiter tag (D11). */
+const safeJson = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c");
 import type Anthropic from "@anthropic-ai/sdk";
 
 import type { JudgeInput, JudgePhoto } from "./types";
@@ -41,7 +43,7 @@ export function buildExtractMessages(sentence: string, today: Date): Anthropic.M
   const weekday = today.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
   return [{
     role: "user",
-    content: `Today is ${weekday}, ${iso}.\n\n<buyer_sentence>\n${JSON.stringify(sentence)}\n</buyer_sentence>\n\nReturn the deal terms as JSON.`,
+    content: `Today is ${weekday}, ${iso}.\n\n<buyer_sentence>\n${safeJson(sentence)}\n</buyer_sentence>\n\nReturn the deal terms as JSON.`,
   }];
 }
 
@@ -92,8 +94,8 @@ export function buildJudgeMessages(input: JudgeInput): Anthropic.MessageParam[] 
   const carrier = input.tracking_number === null
     ? "No tracking number was supplied."
     : `A tracking number was supplied. Carrier status: ${input.carrier_status}.`;
-  const untrusted = JSON.stringify({ tracking_number: input.tracking_number, note: input.note });
-  const conditions = JSON.stringify(input.conditions.map((c, i) => ({ id: `c${i + 1}`, text: c.text, evidence_type: c.evidence_type })));
+  const untrusted = safeJson({ tracking_number: input.tracking_number, note: input.note });
+  const conditions = safeJson(input.conditions.map((c, i) => ({ id: `c${i + 1}`, text: c.text, evidence_type: c.evidence_type })));
 
   content.push({
     type: "text",

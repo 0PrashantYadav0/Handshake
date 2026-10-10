@@ -16,7 +16,7 @@ const EnvZ = z.object({
   NEXT_PUBLIC_PAYPAL_CLIENT_ID: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().min(1),
   AI_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
-  RESEND_API_KEY: z.string().default(""),
+  RESEND_API_KEY: production ? z.string().min(1) : z.string().default(""),
   EMAIL_FROM: z.string().min(1),
   PASS_THRESHOLD: z.string().optional(),
   AUTO_CAPTURE_MAX_MINOR: z.string().optional(),

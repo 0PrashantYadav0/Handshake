@@ -150,7 +150,7 @@ export function realPaypal(env: NodeJS.ProcessEnv = process.env): PayPal {
         } catch (err) {
           // A sender_batch_id used in the last 30 days is rejected with a HATEOAS link to the original batch: follow it.
           const links = err instanceof PayPalError ? (err.body as ErrorBody)?.links : undefined;
-          const original = links?.find((l) => l.href?.includes("/v1/payments/payouts/"))?.href;
+          const original = links?.find((l) => l.href?.startsWith(`${base}/v1/payments/payouts/`))?.href;
           if (!original) throw err;
           return parsePayout(await raw<PayoutBody>("GET", original));
         }

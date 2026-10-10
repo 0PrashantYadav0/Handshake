@@ -67,7 +67,7 @@ describe("buildJudgeMessages (D5, D11)", () => {
   });
   it("the note is JSON-encoded inside <untrusted_seller_input> and the system prompt calls it evidence, never instructions", () => {
     const last = content.at(-1) as Anthropic.TextBlockParam;
-    expect(last.text).toContain(`<untrusted_seller_input>\n${JSON.stringify({ tracking_number: input.tracking_number, note: input.note })}\n</untrusted_seller_input>`);
+    expect(last.text).toContain(`<untrusted_seller_input>\n${JSON.stringify({ tracking_number: input.tracking_number, note: input.note }).replace(/</g, "\\u003c")}\n</untrusted_seller_input>`); // < is escaped so the note cannot close the tag
     expect(last.text).toContain("<carrier_status>\nA tracking number was supplied. Carrier status: delivered.\n</carrier_status>");
     expect(last.text).toContain('<conditions>\n[{"id":"c1","text":"Item matches the listing photos","evidence_type":"photo"}');
     expect(last.text).toContain("Return exactly one verdict per condition id, in order: c1, c2, c3.");

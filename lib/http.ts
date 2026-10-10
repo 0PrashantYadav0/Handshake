@@ -17,7 +17,9 @@ export async function requireSession(req: Request): Promise<Actor> {
 }
 
 /** JSON body -> trimmed strings -> Zod. Throws invalid_input on a bad body. Unknown fields are ignored. */
+export const MAX_JSON_BYTES = 256 * 1024;
 export async function parseBody<T>(schema: z.ZodType<T>, req: Request): Promise<T> {
+  if (Number(req.headers.get("content-length")) > MAX_JSON_BYTES) throw new DealError("invalid_input", "Body too large.");
   let raw: unknown;
   try {
     raw = await req.json();
