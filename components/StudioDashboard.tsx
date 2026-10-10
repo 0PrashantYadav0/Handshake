@@ -23,7 +23,7 @@ export function DashboardSkeleton() {
   );
 }
 
-export function StudioDashboard({ licenseKey, dataUrl }: { licenseKey?: string; dataUrl: string }) {
+export function StudioDashboard({ licenseKey, dataUrl, agent }: { licenseKey?: string; dataUrl: string; agent?: boolean }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -33,5 +33,5 @@ export function StudioDashboard({ licenseKey, dataUrl }: { licenseKey?: string; 
   }, [dataUrl]);
   if (error) return <p className="p-8 text-[var(--hs-muted)]">Could not load the dashboard ({error}). Reload to try again.</p>;
   if (!data) return <DashboardSkeleton />;
-  return <StudioCanvas data={data} licenseKey={licenseKey} />;
+  return <StudioCanvas data={data} licenseKey={licenseKey} agent={agent} />;
 }

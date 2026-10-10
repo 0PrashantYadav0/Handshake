@@ -4,9 +4,58 @@
 // Studio API names verified against ag-studio 3.0.0 types: relationships use { id, source: { tableId, fieldId },
 // target }, widget sort is AgSortConfig[] with field: { id }, the grid maps `cols`, the layout key is `widgetLayout`.
 import { useState } from "react";
-import { createFormats, enableStudioDevValidations, studioTheme, type AgDataSourcesDefinition, type AgReportState } from "ag-studio";
-import { AgStudio, AgStudioProvider } from "ag-studio-react";
+import {
+  AgStudioAiModule, createAiHarness, createFormats, enableStudioDevValidations, studioTheme,
+  type AgAiEvent, type AgAiHarnessSetup, type AgAiOutputItem, type AgDataSourcesDefinition, type AgDefaultRegistry, type AgDefaultWidgetDefinition,
+  type AgLlmAdapter, type AgLlmResponse, type AgReportState,
+} from "ag-studio";
+import { AgStudio, AgStudioProvider, createWidgets } from "ag-studio-react";
+import { dealPipelineWidget } from "@/components/DealPipelineWidget";
 import type { DashboardData } from "@/lib/dashboard-rows";
+
+// T-37: the default widgets plus `deal-pipeline` (09 section 5.6), registered through createWidgets({ additionalTypes }).
+type Registry = Omit<AgDefaultRegistry, "widgets"> & { widgets: readonly (AgDefaultWidgetDefinition | typeof dealPipelineWidget)[] };
+const widgets = createWidgets<Registry>({ additionalTypes: [dealPipelineWidget], menu: [{ label: "Handshake", widgetIds: ["deal-pipeline"] }] });
+
+// ---------- T-38 Claude adapter (09 section 6.2): one non-streaming POST, replayed as stream events ----------
+const failed = (message: string): AgLlmResponse => ({ id: crypto.randomUUID(), createdAt: Date.now(), status: "failed", output: [], error: { code: "failed", message } });
+
+function* replay(output: AgAiOutputItem[]): Generator<AgAiEvent> {
+  for (const item of output) {
+    if (item.type === "message") {
+      yield { type: "TEXT_MESSAGE_START", messageId: item.id, role: "assistant" };
+      for (const c of item.content) if (c.type === "text") yield { type: "TEXT_MESSAGE_CONTENT", messageId: item.id, delta: c.text };
+      yield { type: "TEXT_MESSAGE_END", messageId: item.id };
+    } else if (item.type === "function_call") {
+      yield { type: "TOOL_CALL_START", toolCallId: item.callId, toolCallName: item.name };
+      yield { type: "TOOL_CALL_ARGS", toolCallId: item.callId, delta: item.arguments };
+      yield { type: "TOOL_CALL_END", toolCallId: item.callId };
+    }
+  }
+}
+
+const claudeAdapter: AgLlmAdapter = {
+  executeTurn(request, options) {
+    const complete = fetch("/api/studio/agent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request), signal: options?.signal })
+      .then(async (r) => {
+        const body = (await r.json().catch(() => ({}))) as Partial<AgLlmResponse> & { error?: { message?: string } };
+        return r.ok && Array.isArray(body.output) ? (body as AgLlmResponse) : failed(body.error?.message ?? "Assistant unavailable"); // 401 / 429 / junk
+      }, (e: Error) => failed(e.message));
+    return { complete, stream: { async *[Symbol.asyncIterator]() { yield* replay((await complete).output); } } };
+  },
+};
+
+// The five built-in agents on Claude (T-39 adds `auditor`); starters from 09 section 6.6 that need no custom tool.
+const ai: AgAiHarnessSetup = ({ api }) =>
+  createAiHarness(api, {
+    adapter: claudeAdapter,
+    primary: "lead",
+    promptStarters: [
+      { label: "Voided this month", prompt: "Show my voided deals this month" },
+      { label: "Held vs released", prompt: "Chart held versus released money by week" },
+      { label: "Average confidence", prompt: "Add a tile with the average verdict confidence" },
+    ],
+  });
 
 if (process.env.NODE_ENV !== "production") enableStudioDevValidations();
 
@@ -38,7 +87,7 @@ const theme = studioTheme.withParams({
 });
 
 // ---------- 5.3 sources: descriptions are written for the agents' schema() context ----------
-function toSources(d: DashboardData): AgDataSourcesDefinition {
+function toSources(d: DashboardData): AgDataSourcesDefinition<Registry> {
   return {
     description:
       'Handshake "pay on proof" deals for the signed-in user. PayPal holds the buyer\'s money (status held); ' +
@@ -109,7 +158,7 @@ function toSources(d: DashboardData): AgDataSourcesDefinition {
 }
 
 // ---------- 5.4 widgets and layout on the 24-column canvas ----------
-const initialState: AgReportState = {
+const initialState: AgReportState<Registry> = {
   version: "3.0.0",
   selectedPageId: "overview",
   pages: [
@@ -120,8 +169,12 @@ const initialState: AgReportState = {
         released: { type: "value", format: title("Released to sellers"), dataMapping: { value: [{ id: "deals.released_usd", aggregation: "sum" }] } },
         voided: { type: "value", format: title("Returned to buyers"), dataMapping: { value: [{ id: "deals.voided_usd", aggregation: "sum" }] } },
         statusFilter: { type: "button-filter", format: title("Status"), dataMapping: { value: [{ id: "deals.status" }] } },
-        // T-37 slot: the custom `deal-pipeline` widget replaces this built-in funnel (09 section 5.6; cut 5 fallback).
-        pipeline: { type: "funnel-chart", format: title("Deal pipeline"), dataMapping: { categoryKey: [{ id: "deals.status" }], valueKey: [{ id: "deals.code", aggregation: "count" }] } },
+        // T-37: the custom widget (09 section 5.6). Cut 5 fallback: type "funnel-chart" with categoryKey/valueKey.
+        pipeline: {
+          type: "deal-pipeline",
+          format: title("Deal pipeline"),
+          dataMapping: { status: [{ id: "deals.status" }], deals: [{ id: "deals.code", aggregation: "count" }], money: [{ id: "deals.amount_usd", aggregation: "sum" }] },
+        },
         byStatus: { type: "donut-chart", format: title("Deals by status"), dataMapping: { categoryKey: [{ id: "deals.status" }], valueKey: [{ id: "deals.code", aggregation: "count" }] } },
         confidence: {
           type: "column-chart-grouped",
@@ -166,13 +219,20 @@ const initialState: AgReportState = {
   ],
 };
 
-export function StudioCanvas({ data, licenseKey }: { data: DashboardData; licenseKey?: string }) {
+/** `agent` false (no ANTHROPIC_API_KEY on the server) leaves the AI module out, so the dashboard renders without a prompt box (09 section 6.7). */
+export function StudioCanvas({ data, licenseKey, agent = false }: { data: DashboardData; licenseKey?: string; agent?: boolean }) {
   const [sources] = useState(() => toSources(data)); // stable reference: Studio reads `data` once
-  // T-37: widgets={createWidgets({ additionalTypes: [dealPipelineWidget], menu: [...] })} and `pipeline` becomes type "deal-pipeline".
-  // T-38/39: modules={[AgStudioAiModule]} on the provider and ai={harness} on AgStudio, backed by POST /api/studio/agent.
   return (
-    <AgStudioProvider licenseKey={licenseKey || undefined}>
-      <AgStudio data={sources} theme={theme} initialState={initialState} mode="edit" style={{ height: "calc(100vh - 64px)", width: "100%" }} />
+    <AgStudioProvider licenseKey={licenseKey || undefined} modules={agent ? [AgStudioAiModule] : undefined}>
+      <AgStudio<Registry>
+        data={sources}
+        theme={theme}
+        initialState={initialState}
+        widgets={widgets}
+        ai={agent ? ai : undefined}
+        mode="edit"
+        style={{ height: "calc(100vh - 64px)", width: "100%" }}
+      />
     </AgStudioProvider>
   );
 }

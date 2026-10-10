@@ -9,5 +9,6 @@ export default async function DashboardPage() {
   const user_id = token ? await readSession(token) : null;
   if (!user_id) redirect("/?next=/dashboard");
   // The key is validated in the browser (09 section 7); empty locally, watermark only.
-  return <StudioDashboard licenseKey={process.env.AG_GRID_LICENSE_KEY} dataUrl="/api/dashboard/data" />;
+  // T-38: the agent is offered only when the server holds an Anthropic key (09 section 6.7 otherwise).
+  return <StudioDashboard licenseKey={process.env.AG_GRID_LICENSE_KEY} dataUrl="/api/dashboard/data" agent={Boolean(process.env.ANTHROPIC_API_KEY)} />;
 }
