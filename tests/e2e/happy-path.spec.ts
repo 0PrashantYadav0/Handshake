@@ -70,8 +70,8 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   // 8. in_review -> buyer approves; otherwise the rule already captured
   if ((await status(seller).textContent()) === "in_review") {
     await buyer.reload();
-    buyer.once("dialog", (d) => void d.accept()); // ReviewPanel confirms with window.confirm
     await buyer.getByTestId("review-approve").click();
+    await buyer.getByTestId("confirm-dialog-confirm").click(); // ReviewPanel confirms with the ConfirmDialog
   }
   await buyer.reload();
   await expect(status(buyer)).toHaveText(/^(captured|paid)$/, { timeout: 30_000 });

@@ -1,5 +1,6 @@
 "use client";
 // The "What happens next" card (08 sections 7.3 to 7.10) for every status: the 7.4 heading and helper, then the state's controls.
+// `checking` (the seller's evidence POST in flight, 7.8) lives in Deal.tsx so the sticky bar can hide while the wait screen shows.
 import { useState } from "react";
 import type { DealEvent, DealPreview, DealView } from "@/lib/deal/types";
 import { ApiError } from "@/lib/client-api";
@@ -15,14 +16,15 @@ type Props = {
   paypalClientId: string;
   pollExpired: boolean;
   events: DealEvent[];
+  checking: boolean;
+  setChecking: (on: boolean) => void;
   setDeal: (d: DealView) => void;
   refetch: () => Promise<DealView | DealPreview | null>;
   fail: (e: unknown) => void;
 };
 
-export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, setDeal, refetch, fail }: Props) {
+export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, checking, setChecking, setDeal, refetch, fail }: Props) {
   const [holdFailed, setHoldFailed] = useState(false);
-  const [checking, setChecking] = useState(false); // the seller's evidence POST is in flight (7.8)
   const [paypalNote, setPaypalNote] = useState<string | null>(null);
   const view = deal.role === "preview" ? null : deal;
   const p = view?.payment ?? null;
@@ -52,8 +54,10 @@ export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, setD
     await refetch();
   };
 
+  // 08 section 11: the PayPal iframe gets a heading; data-primary-action lets the sticky bar scroll here (the button itself can't be repeated).
   const paypalPanel = (
-    <div className="mt-4 grid gap-3">
+    <div className="mt-4 grid gap-3 outline-none" data-primary-action tabIndex={-1} aria-labelledby="paypal-h">
+      <h3 id="paypal-h" className="sr-only">Pay with PayPal</h3>
       {demo && (
         <p className="hs-help">
           Sandbox: in the PayPal window, sign in with the test buyer account from the{" "}
@@ -72,7 +76,7 @@ export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, setD
     const mine = view.role === "buyer" ? view.buyer_accepted_version : view.seller_accepted_version;
     body = (
       <>
-        {view.role === "buyer" && !view.seller && <ShareLink code={view.code} />}
+        {view.role === "buyer" && !view.seller && <ShareLink code={view.code} title={view.item_title} />}
         {mine !== view.terms_version ? <AcceptTerms deal={view} onDone={setDeal} fail={fail} /> : <p className="text-sm">You accepted v{mine}.</p>}
       </>
     );
@@ -90,9 +94,9 @@ export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, setD
 
   return (
     <section className="hs-card" aria-labelledby="next-h">
-      <h2 id="next-h" className="text-lg font-semibold">{heading}</h2>
-      {helper && <p className="mt-1 text-sm text-[var(--hs-muted)]">{helper}</p>}
-      {body && <div className="mt-4 grid gap-3">{body}</div>}
+      <h2 id="next-h" className="hs-display text-2xl">{heading}</h2>
+      {helper && <p className="mt-2 text-sm leading-relaxed text-[var(--hs-muted)]">{helper}</p>}
+      {body && <div className="mt-5 grid gap-3">{body}</div>}
     </section>
   );
 }

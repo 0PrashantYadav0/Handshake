@@ -1,7 +1,7 @@
 // 08 sections 2, 7.2, 7.4, 7.9, 7.11 and 7.13 copy and the pure rules behind the deal page.
 import { describe, expect, it } from "vitest";
 import type { DealEvent, DealView, Payout, Submission } from "@/lib/deal/types";
-import { cancellable, canRetryPayout, deadlineLine, decisionLine, evidenceChip, modelLine, paymentLine, payoutCopy, timelineSentence, voidEvent, whatNext } from "@/lib/deal-copy";
+import { cancellable, canRetryPayout, deadlineLine, decisionLine, evidenceChip, modelLine, paymentLine, payoutCopy, primaryAction, timelineSentence, voidEvent, whatNext } from "@/lib/deal-copy";
 
 const base: DealView = {
   code: "HS-TEST", role: "buyer", status: "draft", item_title: "mug", source_text: "", amount_minor: 1800, currency: "USD",
@@ -146,5 +146,23 @@ describe("paymentLine / deadlineLine", () => {
     expect(deadlineLine(base)).toBe("Seller has 5 days after the hold is placed");
     expect(deadlineLine({ status: "held", deadline_days: 5, deadline_at: "2026-10-15T00:00:00Z" }, Date.parse("2026-10-10T00:00:00Z"))).toMatch(/^Proof due .* \(in 5 days\)$/);
     expect(deadlineLine({ status: "paid", deadline_days: 5, deadline_at: "2026-10-15T00:00:00Z" })).toBeNull();
+  });
+});
+
+describe("primaryAction (sticky bar, 7.2)", () => {
+  it("one label per role and state, none once the viewer has nothing to do", () => {
+    expect(primaryAction({ role: "preview", code: "HS-TEST", item_title: "mug", amount_minor: 1800, currency: "USD", deadline_days: 5, conditions: [], buyer: { display_name: "B" } })).toBe("Join as seller");
+    expect(primaryAction(base)).toBe("Accept terms");
+    expect(primaryAction({ ...base, buyer_accepted_version: 1 })).toBeNull();
+    expect(primaryAction({ ...base, role: "seller", seller, seller_accepted_version: null })).toBe("Accept terms");
+    expect(primaryAction({ ...base, status: "terms_agreed", seller })).toBe("Pay with PayPal");
+    expect(primaryAction({ ...base, status: "terms_agreed", seller, payment: { ...payment, status: "approved", authorization_id: null } })).toBeNull();
+    expect(primaryAction({ ...base, status: "terms_agreed", role: "seller", seller })).toBeNull();
+    expect(primaryAction({ ...base, status: "held", role: "seller", seller, payment })).toBe("Submit proof for checking");
+    expect(primaryAction({ ...base, status: "held", seller, payment })).toBeNull();
+    expect(primaryAction({ ...base, status: "in_review", seller, payment, submissions: [sub({ decision: "buyer_review" })] })).toBe("Release payment");
+    expect(primaryAction({ ...base, status: "in_review", role: "seller", seller, payment, submissions: [sub({})] })).toBeNull();
+    expect(primaryAction({ ...base, status: "paid", seller, payment })).toBeNull();
+    expect(primaryAction({ ...base, seeded: true })).toBeNull();
   });
 });

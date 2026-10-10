@@ -1,80 +1,122 @@
 @import "tailwindcss";
 
-/* 08 section 1: the only palette. Tailwind utilities, the AG Grid theme and the Studio theme all read these. */
+/* Tailwind reads the font tokens so font-sans / font-display / font-mono utilities and the --hs-* palette agree. */
+@theme inline {
+  --font-sans: var(--hs-font);
+  --font-display: var(--hs-font-display);
+  --font-mono: var(--hs-font-mono);
+}
+
+/* 08 section 1: the only palette. Tailwind utilities, the AG Grid theme and the Studio theme all read these.
+   T-40 visual direction: warm paper, one teal accent, IBM Plex Sans body with Newsreader for the big headings (loaded by next/font in app/layout.tsx). */
 :root {
-  --hs-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --hs-bg: #f7f6f3;
+  --hs-font: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --hs-font-display: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --hs-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --hs-bg: #f5f3ee;
   --hs-surface: #ffffff;
-  --hs-ink: #1c1917;
-  --hs-muted: #68625c;
-  --hs-border: #e5e1db;
-  --hs-accent: #0f766e;
-  /* status colour roles (08 section 2); each is >= 4.5:1 on white */
+  --hs-ink: #1b1a17;
+  --hs-muted: #5f5a53;
+  --hs-border: #e2ddd4;
+  --hs-accent: #0d6b64;
+  --hs-radius: 0.875rem;
+  --hs-shadow: 0 1px 2px rgb(27 26 23 / 0.04), 0 1px 0 rgb(27 26 23 / 0.02);
+  /* status colour roles (08 section 2); each is >= 4.5:1 on white and on --hs-bg */
   --hs-status-draft: #57534e;
   --hs-status-terms_agreed: #44403c;
-  --hs-status-held: #0f766e;
-  --hs-status-proof_submitted: #0f766e;
-  --hs-status-in_review: #a16207;
-  --hs-status-captured: #15803d;
+  --hs-status-held: #0d6b64;
+  --hs-status-proof_submitted: #0d6b64;
+  --hs-status-in_review: #9a5b06;
+  --hs-status-captured: #137036;
   --hs-status-paid: #166534;
-  --hs-status-voided: #b91c1c;
+  --hs-status-voided: #b42318;
 }
 
-body { font-family: var(--hs-font); }
+html { scroll-behavior: smooth; }
+body { font-family: var(--hs-font); font-size: 1rem; line-height: 1.5; }
+h1 { font-family: var(--hs-font-display); font-weight: 500; letter-spacing: -0.015em; line-height: 1.1; }
+.hs-display { font-family: var(--hs-font-display); font-weight: 500; letter-spacing: -0.01em; }
+::selection { background: color-mix(in srgb, var(--hs-accent) 20%, white); }
 
+/* 08 section 11: one visible focus ring, in the accent, on every interactive element (AG Grid cells and dialog controls included). */
+:focus-visible { outline: 2px solid var(--hs-accent); outline-offset: 2px; }
+.hs-input:focus-visible { outline-offset: 0; border-color: var(--hs-accent); }
+.hs-skip {
+  position: absolute; left: 1rem; top: -3rem; z-index: 100;
+  padding: 0.5rem 0.75rem; border-radius: 0.5rem; background: var(--hs-accent); color: white; font-size: 0.875rem; font-weight: 500;
+}
+.hs-skip:focus { top: 0.75rem; }
+
+/* 08 section 11: no motion of any kind under prefers-reduced-motion; progress is text and static icons. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Status pill (08 section 2): icon + word, the colour role from data-status; proof_submitted adds the pulsing dot. */
 .hs-pill {
   --c: var(--hs-status-draft);
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.1rem 0.6rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 500; line-height: 1.4;
-  color: var(--c); border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 10%, white);
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.15rem 0.7rem 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 500; line-height: 1.4; white-space: nowrap;
+  color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 45%, white); background: color-mix(in srgb, var(--c) 8%, white);
 }
-.hs-pill::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 9999px; background: var(--c); }
-.hs-pill[data-status="terms_agreed"] { --c: var(--hs-status-terms_agreed); }
+.hs-pill svg { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.hs-pill[data-status="terms_agreed"] { --c: var(--hs-status-terms_agreed); color: white; background: var(--c); border-color: var(--c); }
 .hs-pill[data-status="held"] { --c: var(--hs-status-held); }
 .hs-pill[data-status="proof_submitted"] { --c: var(--hs-status-proof_submitted); }
 .hs-pill[data-status="in_review"] { --c: var(--hs-status-in_review); }
 .hs-pill[data-status="captured"] { --c: var(--hs-status-captured); }
-.hs-pill[data-status="paid"] { --c: var(--hs-status-paid); color: white; background: var(--c); }
+.hs-pill[data-status="paid"] { --c: var(--hs-status-paid); color: white; background: var(--c); border-color: var(--c); }
 .hs-pill[data-status="voided"] { --c: var(--hs-status-voided); }
+.hs-pill[data-status="proof_submitted"]::after { content: ""; width: 0.4rem; height: 0.4rem; border-radius: 9999px; background: var(--c); }
 @media (prefers-reduced-motion: no-preference) {
-  .hs-pill[data-status="proof_submitted"]::before { animation: hs-pulse 1.2s ease-in-out infinite; }
+  .hs-pill[data-status="proof_submitted"]::after { animation: hs-pulse 1.2s ease-in-out infinite; }
 }
-@keyframes hs-pulse { 50% { opacity: 0.3; } }
+@keyframes hs-pulse { 50% { opacity: 0.25; } }
 
 .hs-badge {
-  display: inline-block; padding: 0 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 500;
+  display: inline-block; padding: 0 0.5rem; border-radius: 0.3rem; font-size: 0.75rem; font-weight: 500; line-height: 1.5;
   color: var(--hs-muted); border: 1px dashed var(--hs-border); background: var(--hs-bg);
 }
-.hs-btn, .hs-btn-secondary, .hs-chip {
-  display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;
-  border: 1px solid var(--hs-accent); background: var(--hs-accent); color: white;
+
+/* Buttons: 44 px tall on phones (08 section 1), 40 px from md. One accent for primary, outlined secondary, text-style danger. */
+.hs-btn, .hs-btn-secondary, .hs-chip, .hs-btn-danger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 1.1rem;
+  border-radius: 0.6rem; font-size: 0.9rem; font-weight: 500; line-height: 1.2; cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.hs-btn:hover { filter: brightness(1.1); }
-.hs-btn-secondary { background: var(--hs-surface); color: var(--hs-accent); }
-.hs-btn-secondary:hover { background: var(--hs-bg); }
-.hs-chip { min-height: 2rem; padding: 0 0.75rem; border-radius: 9999px; border-color: var(--hs-border); background: var(--hs-surface); color: var(--hs-ink); }
-.hs-chip[aria-pressed="true"] { border-color: var(--hs-accent); background: color-mix(in srgb, var(--hs-accent) 12%, white); color: var(--hs-accent); }
+.hs-btn { border: 1px solid var(--hs-accent); background: var(--hs-accent); color: white; }
+.hs-btn:hover { background: color-mix(in srgb, var(--hs-accent) 88%, black); }
+.hs-btn-secondary { border: 1px solid color-mix(in srgb, var(--hs-accent) 40%, var(--hs-border)); background: var(--hs-surface); color: var(--hs-accent); }
+.hs-btn-secondary:hover { background: color-mix(in srgb, var(--hs-accent) 6%, white); }
+.hs-btn-danger { padding: 0 0.6rem; color: var(--hs-status-voided); border: 1px solid transparent; background: transparent; }
+.hs-btn-danger:hover { background: color-mix(in srgb, var(--hs-status-voided) 8%, white); }
+.hs-chip { min-height: 2.5rem; padding: 0 0.8rem; border-radius: 9999px; border: 1px solid var(--hs-border); background: var(--hs-surface); color: var(--hs-ink); font-size: 0.85rem; }
+.hs-chip:hover { border-color: color-mix(in srgb, var(--hs-accent) 50%, var(--hs-border)); }
+.hs-chip[aria-pressed="true"] { border-color: var(--hs-accent); background: color-mix(in srgb, var(--hs-accent) 10%, white); color: var(--hs-accent); }
+@media (min-width: 768px) {
+  .hs-btn, .hs-btn-secondary, .hs-btn-danger { min-height: 2.5rem; }
+  .hs-chip { min-height: 2rem; }
+}
+.hs-btn:disabled, .hs-btn-secondary:disabled, .hs-btn-danger:disabled, .hs-chip:disabled { opacity: 0.55; cursor: not-allowed; }
 .hs-input {
-  min-height: 2.5rem; padding: 0 0.75rem; border-radius: 0.5rem; border: 1px solid var(--hs-border); background: var(--hs-surface);
+  min-height: 2.75rem; padding: 0 0.75rem; border-radius: 0.6rem; border: 1px solid var(--hs-border); background: var(--hs-surface); color: var(--hs-ink);
 }
-.hs-input:focus, .hs-chip:focus-visible, .hs-btn:focus-visible, .hs-btn-secondary:focus-visible {
-  outline: 2px solid var(--hs-accent); outline-offset: 2px;
-}
-
-/* T-18: cards, banners and the danger text button (08 sections 4.3, 7.2, 7.13) */
-.hs-card { background: var(--hs-surface); border: 1px solid var(--hs-border); border-radius: 0.75rem; padding: 1rem; }
-.hs-banner { border-radius: 0.5rem; padding: 0.6rem 0.75rem; font-size: 0.875rem; border: 1px solid var(--hs-status-voided); color: var(--hs-status-voided); background: color-mix(in srgb, var(--hs-status-voided) 8%, white); }
-.hs-banner[data-tone="info"] { border-color: var(--hs-status-in_review); color: var(--hs-status-in_review); background: color-mix(in srgb, var(--hs-status-in_review) 8%, white); }
-.hs-btn-danger { display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 0.5rem; font-size: 0.875rem; color: var(--hs-status-voided); border-radius: 0.5rem; }
-.hs-btn-danger:hover { text-decoration: underline; }
-.hs-btn:disabled, .hs-btn-secondary:disabled, .hs-btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
-.hs-btn-danger:focus-visible, .hs-input:focus-visible, .hs-link:focus-visible { outline: 2px solid var(--hs-accent); outline-offset: 2px; }
-.hs-link { color: var(--hs-accent); text-underline-offset: 2px; }
+@media (min-width: 768px) { .hs-input { min-height: 2.5rem; } }
+.hs-input::placeholder { color: var(--hs-muted); }
+.hs-input[aria-invalid="true"] { border-color: var(--hs-status-voided); }
+.hs-link { color: var(--hs-accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
 .hs-link:hover { text-decoration: underline; }
-.hs-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
-.hs-help { font-size: 0.8rem; color: var(--hs-muted); }
+.hs-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.3rem; }
+.hs-help { font-size: 0.8rem; line-height: 1.45; color: var(--hs-muted); }
 
-/* T-28: verdict icons and words, the confidence bar, the wait-screen dot (08 sections 7.8, 7.9, 11; static under reduced motion) */
+/* Cards, banners (08 sections 4.3, 7.2, 7.13) */
+.hs-card { background: var(--hs-surface); border: 1px solid var(--hs-border); border-radius: var(--hs-radius); padding: 1.1rem; box-shadow: var(--hs-shadow); }
+@media (min-width: 768px) { .hs-card { padding: 1.35rem; } }
+.hs-banner { border-radius: 0.6rem; padding: 0.65rem 0.85rem; font-size: 0.875rem; border: 1px solid var(--hs-status-voided); color: var(--hs-status-voided); background: color-mix(in srgb, var(--hs-status-voided) 7%, white); }
+.hs-banner[data-tone="info"] { border-color: var(--hs-status-in_review); color: var(--hs-status-in_review); background: color-mix(in srgb, var(--hs-status-in_review) 7%, white); }
+
+/* Verdict icons and words, the confidence bar, the wait-screen dot (08 sections 7.8, 7.9, 11; static under reduced motion) */
 .hs-verdict { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 1.25rem; height: 1.25rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: white; background: var(--hs-status-in_review); }
 .hs-verdict[data-result="pass"] { background: var(--hs-status-captured); }
 .hs-verdict[data-result="fail"] { background: var(--hs-status-voided); }
@@ -88,3 +130,58 @@ body { font-family: var(--hs-font); }
 @media (prefers-reduced-motion: no-preference) {
   .hs-dot[data-active="true"] { animation: hs-pulse 1.2s ease-in-out infinite; }
 }
+
+/* T-40: progress ring (wait screen steps, the thumbnail being uploaded). Indeterminate arc that spins; a static three-quarter arc under reduced motion. */
+.hs-ring { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+.hs-ring circle { fill: none; stroke-width: 2.5; }
+.hs-ring .track { stroke: var(--hs-border); }
+.hs-ring .arc { stroke: var(--hs-accent); stroke-linecap: round; stroke-dasharray: 38 50; transform-origin: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .hs-ring .arc { animation: hs-spin 0.9s linear infinite; }
+}
+@keyframes hs-spin { to { transform: rotate(360deg); } }
+
+/* T-40: thumbnails are buttons that open the lightbox. */
+.hs-thumb { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 0.6rem; border: 1px solid var(--hs-border); background: var(--hs-bg); padding: 0; cursor: zoom-in; }
+.hs-thumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.hs-thumb-label { position: absolute; left: 0.3rem; top: 0.3rem; padding: 0 0.3rem; border-radius: 0.25rem; background: rgb(255 255 255 / 0.92); color: var(--hs-ink); font-family: var(--hs-font-mono); font-size: 0.75rem; }
+
+/* T-40: native dialogs (08 sections 4.5, 11). showModal() gives the focus trap, Escape and focus return. */
+.hs-dialog { margin: auto; width: min(28rem, calc(100% - 2rem)); padding: 1.5rem; border: 0; border-radius: var(--hs-radius); background: var(--hs-surface); color: var(--hs-ink); box-shadow: 0 20px 50px rgb(27 26 23 / 0.25); }
+.hs-dialog::backdrop { background: rgb(27 26 23 / 0.5); }
+.hs-dialog .hs-btn-danger { background: var(--hs-status-voided); border-color: var(--hs-status-voided); color: white; }
+.hs-dialog .hs-btn-danger:hover { background: color-mix(in srgb, var(--hs-status-voided) 88%, black); }
+.hs-lightbox { margin: auto; width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; padding: 0; border: 0; background: transparent; color: white; }
+.hs-lightbox::backdrop { background: rgb(0 0 0 / 0.88); }
+.hs-lightbox figure { position: relative; display: grid; grid-template-rows: 1fr auto; width: 100%; height: 100%; }
+.hs-lightbox img { max-width: 100%; max-height: 100%; width: auto; height: auto; margin: auto; object-fit: contain; }
+.hs-lightbox-btn { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: 9999px; background: rgb(255 255 255 / 0.14); color: white; }
+.hs-lightbox-btn:hover { background: rgb(255 255 255 / 0.26); }
+.hs-lightbox-btn:focus-visible { outline-color: white; }
+
+/* T-40: toasts (08 section 10, 11): one aria-live region, bottom centre. */
+.hs-toast-region { position: fixed; left: 50%; bottom: 1rem; z-index: 60; display: grid; gap: 0.5rem; transform: translateX(-50%); pointer-events: none; }
+.hs-toast { padding: 0.6rem 1rem; border-radius: 0.75rem; background: var(--hs-ink); color: var(--hs-bg); font-size: 0.875rem; box-shadow: 0 8px 24px rgb(27 26 23 / 0.25); white-space: nowrap; animation: hs-rise 180ms ease-out; }
+.hs-toast[data-tone="error"] { background: var(--hs-status-voided); color: white; }
+@keyframes hs-rise { from { opacity: 0; transform: translateY(0.5rem); } }
+@media (max-width: 767px) { .hs-toast-region { bottom: 5.5rem; } }
+
+/* T-40: sticky action bar on phones (08 section 7.2 item 3). Hidden from md; the page adds matching bottom padding. */
+.hs-sticky { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--hs-border); background: color-mix(in srgb, var(--hs-surface) 92%, transparent); backdrop-filter: blur(10px); }
+@media (min-width: 768px) { .hs-sticky { display: none; } }
+
+/* T-40: the /new stepper (08 section 6). Done steps are buttons that go back. */
+.hs-steps { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.85rem; color: var(--hs-muted); }
+.hs-steps li { display: flex; }
+.hs-steps li > * { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+.hs-steps button { color: var(--hs-ink); cursor: pointer; border-radius: 0.4rem; }
+.hs-steps button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.hs-step-n { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 9999px; border: 1px solid var(--hs-border); font-size: 0.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hs-steps [data-state="current"] { color: var(--hs-ink); font-weight: 600; }
+.hs-steps [data-state="current"] .hs-step-n { border-color: var(--hs-accent); background: var(--hs-accent); color: white; }
+.hs-steps [data-state="done"] .hs-step-n { border-color: var(--hs-accent); color: var(--hs-accent); background: color-mix(in srgb, var(--hs-accent) 10%, white); }
+
+/* T-40: proof photos swipe as a snapping strip on phones, grid from sm (08 section 7.2 item 6). */
+.hs-strip { display: flex; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 0.25rem; }
+.hs-strip > li { flex: 0 0 60%; scroll-snap-align: start; }
+@media (min-width: 640px) { .hs-strip { display: grid; overflow: visible; } .hs-strip > li { flex: initial; } }

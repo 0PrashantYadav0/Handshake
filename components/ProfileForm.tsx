@@ -1,10 +1,11 @@
 "use client";
-// Profile card (08 section 10): display name + PayPal email -> PATCH /api/me, "Saved." line, `next` return after the paypal_email_required prompt.
+// Profile card (08 section 10): display name + PayPal email -> PATCH /api/me, "Saved." toast, `next` return after the paypal_email_required prompt.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Me } from "@/lib/auth/me";
 import { api, ApiError, errorCopy } from "@/lib/client-api";
+import { toast } from "@/components/Toast";
 
 const DEMO_SELLER = "demo-seller@handshake.demo";
 
@@ -13,19 +14,17 @@ export function ProfileForm({ me, next }: { me: Me; next?: string }) {
   const [name, setName] = useState(me.display_name ?? "");
   const [email, setEmail] = useState(me.paypal_email ?? "");
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     setBusy(true);
-    setSaved(false);
     setEmailError(null);
     setError(null);
     try {
       await api("/api/me", { method: "PATCH", json: { ...(name.trim() && { display_name: name.trim() }), ...(email.trim() && { paypal_email: email.trim() }) } });
-      setSaved(true);
+      toast("Saved.");
       router.refresh(); // header shows the new name
       if (next) router.push(next);
     } catch (e) {
@@ -60,7 +59,6 @@ export function ProfileForm({ me, next }: { me: Me; next?: string }) {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" data-testid="save-profile" className="hs-btn" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
-        {saved && <span role="status" className="text-sm text-[var(--hs-status-paid)]">Saved.</span>}
         {next && <Link href={next} className="hs-link text-sm">Back to the deal</Link>}
       </div>
     </form>

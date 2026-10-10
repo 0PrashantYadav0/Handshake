@@ -1,7 +1,9 @@
 "use client";
-// The verdict wait screen (08 section 7.8): three steps, elapsed seconds, the conditions with pulsing dots (static under reduced motion, CSS).
+// The verdict wait screen (08 section 7.8): three steps with a ring on the active one and a check when done, elapsed seconds,
+// the conditions with pulsing dots (static under reduced motion, CSS). The list is the aria-live region; step changes are announced.
 import { useEffect, useState } from "react";
 import type { Condition } from "@/lib/deal/types";
+import { Ring } from "@/components/Ring";
 
 type Props = { conditions: Condition[]; uploaded: boolean; progress: string | null; lost: boolean };
 
@@ -27,13 +29,15 @@ export function WaitScreen({ conditions, uploaded, progress, lost }: Props) {
     ["Applying the rule", false, false],
   ];
   return (
-    <div aria-live="polite" className="grid gap-4">
-      <ol className="grid gap-2 text-sm">
+    <div className="grid gap-4" data-testid="wait-screen">
+      <ol className="grid gap-2 text-sm" aria-live="polite">
         {steps.map(([label, done, active]) => (
-          <li key={label} className="flex items-center gap-2">
-            {done ? <span className="hs-verdict" data-result="pass" aria-hidden>✓</span> : <span className="hs-dot" data-active={active} aria-hidden />}
-            <span>{label}{done && <span className="sr-only"> (done)</span>}</span>
-            {active && <span className="hs-help">{uploaded ? `${sec} s` : progress}</span>}
+          <li key={label} className="flex items-center gap-2" data-state={done ? "done" : active ? "active" : "todo"}>
+            {done ? <span className="hs-verdict" data-result="pass" aria-hidden>✓</span> : active ? <Ring /> : <span className="hs-dot" aria-hidden />}
+            <span className={active ? "font-medium" : done ? "" : "text-[var(--hs-muted)]"}>
+              {label}{done && <span className="sr-only"> (done)</span>}{active && <span className="sr-only"> (in progress)</span>}
+            </span>
+            {active && <span className="hs-help tabular-nums">{uploaded ? `${sec} s` : progress}</span>}
           </li>
         ))}
       </ol>

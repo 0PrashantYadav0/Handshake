@@ -62,9 +62,9 @@ export function TermsForm({ deal, rejected: initialRejected, onSaved }: { deal: 
 
   return (
     <section>
-      <h2 ref={heading} tabIndex={-1} className="text-2xl font-semibold outline-none">Check what Claude understood</h2>
-      <p className="mt-1 text-sm text-[var(--hs-muted)]">You can edit anything. The seller sees exactly this.</p>
-      <p className="mt-4 flex items-center gap-2 text-sm">
+      <h1 ref={heading} tabIndex={-1} className="text-3xl outline-none md:text-4xl">Check what Claude understood</h1>
+      <p className="mt-2 text-sm text-[var(--hs-muted)]">You can edit anything. The seller sees exactly this.</p>
+      <p className="mt-5 flex items-center gap-2 text-sm">
         Deal code <span data-testid="deal-code" className="font-mono font-semibold">{deal.code}</span>
         <CopyButton text={deal.code} className="hs-chip" />
       </p>
@@ -127,14 +127,14 @@ export function TermsForm({ deal, rejected: initialRejected, onSaved }: { deal: 
                 <option value="photo">Photo</option>
                 <option value="tracking">Tracking</option>
               </select>
-              <button type="button" className="hs-btn-secondary" aria-label={`Remove condition ${i + 1}`} onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))}>
-                ✕
+              <button type="button" className="hs-btn-secondary shrink-0 px-3" aria-label={`Remove condition ${i + 1}`} onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))}>
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M4 4l8 8M12 4l-8 8" /></svg>
               </button>
             </li>
           ))}
           {system && (
             <li className="flex items-start gap-2 text-sm text-[var(--hs-muted)]">
-              <span aria-hidden>🔒</span>
+              <svg viewBox="0 0 16 16" width="16" height="16" className="mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 7V5a3 3 0 0 1 6 0v2M3.5 7h9v6.5h-9z" /></svg>
               <div>
                 <span className="text-[var(--hs-ink)]">{system.text}</span>
                 <p>Added automatically whenever a photo condition exists. It proves the photos were taken for this deal.</p>

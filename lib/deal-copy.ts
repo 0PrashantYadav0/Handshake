@@ -216,3 +216,23 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
     }
   }
 }
+
+/** T-40, 08 section 7.2 item 3: the label of the viewer's primary action in the "What happens next" card, repeated in the mobile sticky bar; null when there is none. */
+export function primaryAction(d: DealView | DealPreview): string | null {
+  if (d.role === "preview") return "Join as seller";
+  if (d.seeded) return null;
+  switch (d.status) {
+    case "draft": {
+      const mine = d.role === "buyer" ? d.buyer_accepted_version : d.seller_accepted_version;
+      return mine === d.terms_version ? null : "Accept terms";
+    }
+    case "terms_agreed":
+      return d.role === "buyer" && d.payment?.status !== "approved" ? "Pay with PayPal" : null;
+    case "held":
+      return d.role === "seller" ? "Submit proof for checking" : null;
+    case "in_review":
+      return d.role === "buyer" && d.submissions.length > 0 ? "Release payment" : null;
+    default:
+      return null;
+  }
+}

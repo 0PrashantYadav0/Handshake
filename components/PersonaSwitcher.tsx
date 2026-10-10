@@ -2,7 +2,8 @@
 // Header right side (08 sections 3.3, 4.1): the Demo badge with the Buyer | Seller control, and Sign out.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { api } from "@/lib/client-api";
+import { api, errorCopy } from "@/lib/client-api";
+import { toast } from "@/components/Toast";
 
 type Persona = "buyer" | "seller";
 const personaOf = (email: string): Persona | null =>
@@ -19,6 +20,8 @@ export function PersonaSwitcher({ demo, email }: { demo: boolean; email: string 
       await fn();
       if (then) router.push(then);
       router.refresh();
+    } catch (e) {
+      toast(errorCopy(e), "error"); // no inline home in the header
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,5 @@
 "use client";
-// /new: four headings in sequence, forward only (08 section 6, 4.6 "First pass"). Holds the deal between steps.
+// /new: four steps on one page (08 section 6). The stepper announces the current step; done steps go back (step 1 starts a new deal, 6 intro).
 import { useState } from "react";
 import type { DealView } from "@/lib/deal/types";
 import { errorCopy, sendJson } from "@/lib/client-upload";
@@ -36,22 +36,45 @@ export function NewDealFlow({ kit = null }: { kit?: Presets | null }) {
     }
   }
 
+  // Back to 1 starts a new deal (the draft stays in the ledger); back to 2 re-opens the terms. Nothing goes back once accepted (step 4) except a new deal.
+  function back(n: number) {
+    if (n === 1) {
+      setDeal(null);
+      setRejected([]);
+    }
+    setStep(n);
+  }
+
   return (
     <main className="mx-auto max-w-2xl p-4 md:p-8">
-      <ol aria-label="Steps" className="mb-6 flex flex-wrap gap-x-2 text-sm text-[var(--hs-muted)]">
-        {STEPS.map((s, i) => (
-          <li key={s} aria-current={step === i + 1 ? "step" : undefined} className={step === i + 1 ? "font-semibold text-[var(--hs-ink)]" : ""}>
-            {i > 0 && <span aria-hidden className="mr-2">·</span>}
-            {i + 1} {s}
-          </li>
-        ))}
-      </ol>
+      <nav aria-label="Steps">
+        <ol className="hs-steps mb-8">
+          {STEPS.map((s, i) => {
+            const n = i + 1;
+            const state = n < step ? "done" : n === step ? "current" : "todo";
+            const clickable = n < step && (n === 1 || step < 4);
+            const num = <span className="hs-step-n" aria-hidden>{state === "done" ? "✓" : n}</span>;
+            return (
+              <li key={s} data-state={state} aria-current={n === step ? "step" : undefined}>
+                {clickable ? (
+                  <button type="button" onClick={() => back(n)} data-testid={`step-${n}`} title={n === 1 ? "Start a new deal" : undefined}>
+                    {num}{s}<span className="sr-only"> (done, go back)</span>
+                  </button>
+                ) : (
+                  <span>{num}{s}{state === "done" && <span className="sr-only"> (done)</span>}</span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+      <p className="sr-only" aria-live="polite">Step {step} of {STEPS.length}: {STEPS[step - 1]}</p>
 
       {step === 1 && (
         <section>
-          <h2 className="text-2xl font-semibold">Describe the deal in one sentence</h2>
+          <h1 className="text-3xl md:text-4xl">Describe the deal in one sentence</h1>
           {presets.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-6 flex flex-wrap items-center gap-2">
               <span className="text-sm text-[var(--hs-muted)]">Try one:</span>
               {presets.map((p) => (
                 <button key={p.id} type="button" className="hs-chip" data-testid="preset-sentence" data-preset={p.id} onClick={() => setText(p.sentence)}>
@@ -60,10 +83,10 @@ export function NewDealFlow({ kit = null }: { kit?: Presets | null }) {
               ))}
             </div>
           )}
-          <label htmlFor="sentence" className="mt-4 block text-sm font-medium">Your sentence</label>
+          <label htmlFor="sentence" className="hs-label mt-6">Your sentence</label>
           <textarea
             id="sentence"
-            className="hs-input mt-1 w-full py-2"
+            className="hs-input w-full py-2"
             rows={4}
             maxLength={500}
             value={text}
@@ -73,14 +96,14 @@ export function NewDealFlow({ kit = null }: { kit?: Presets | null }) {
           />
           <div className="mt-1 flex justify-between gap-4 text-sm text-[var(--hs-muted)]">
             <span id="sentence-help">{HELP}</span>
-            <span className="shrink-0">{text.length} / 500</span>
+            <span className="shrink-0 tabular-nums">{text.length} / 500</span>
           </div>
           {error && <p id="sentence-error" role="alert" className="mt-2 text-sm text-[var(--hs-status-voided)]">{error}</p>}
-          <button type="button" className="hs-btn mt-4" data-testid="extract-terms" disabled={busy || text.trim() === ""} onClick={extract}>
+          <button type="button" className="hs-btn mt-5" data-testid="extract-terms" disabled={busy || text.trim() === ""} onClick={extract}>
             {busy ? "Reading your sentence…" : "Extract terms"}
           </button>
           {busy && (
-            <div aria-live="polite" className="mt-4 animate-pulse rounded-lg border border-[var(--hs-border)] bg-[var(--hs-surface)] p-4 text-sm text-[var(--hs-muted)]">
+            <div aria-live="polite" className="hs-card mt-4 text-sm text-[var(--hs-muted)] motion-safe:animate-pulse">
               Usually a few seconds; at most 30.
             </div>
           )}

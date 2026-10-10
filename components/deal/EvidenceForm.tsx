@@ -8,6 +8,7 @@ import { downscale, errorCopy as uploadErrorCopy, formatBytes, UNDECODABLE_COPY,
 import { carrierStatus } from "@/lib/carrier";
 import { carrierLabel } from "@/lib/deal-copy";
 import { composeCodePhoto, fetchSample, findPreset, usePresets } from "@/lib/demo-kit";
+import { Thumb, useLightbox } from "@/components/Lightbox";
 import { VerdictIcon } from "./VerdictList";
 import { WaitScreen } from "./WaitScreen";
 
@@ -44,6 +45,8 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
   const [progress, setProgress] = useState<string | null>(null);
   const kit = usePresets(demo);
   const preset = kit && findPreset(kit, deal.source_text);
+  const photos = items.map((it, i) => ({ src: it.ref?.url ?? it.preview, alt: `Proof photo ${i + 1}`, label: `e${i + 1}` }));
+  const lb = useLightbox(photos);
 
   const needPhoto = deal.conditions.some((c) => c.evidence_type === "photo");
   const trackingCond = deal.conditions.find((c) => c.evidence_type === "tracking");
@@ -146,7 +149,7 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
                   <span className="mt-1 flex items-center gap-2 text-[var(--hs-status-voided)]"><VerdictIcon result="fail" /> Failed last time: {failed.get(c.id)}</span>
                 )}
               </span>
-              <span className="hs-badge shrink-0">{c.evidence_type === "photo" ? "Photo" : "Tracking"}</span>
+              <span className="hs-badge shrink-0 self-start">{c.evidence_type === "photo" ? "Photo" : "Tracking"}</span>
             </li>
           ))}
         </ol>
@@ -170,14 +173,10 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
           <ul className="mt-3 grid grid-cols-3 gap-2">
             {items.map((it, i) => (
               <li key={it.key} className="text-xs">
-                <span className="relative block overflow-hidden rounded-lg border border-[var(--hs-border)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- blob: and signed URLs */}
-                  <img src={it.ref?.url ?? it.preview} alt={`Proof photo ${i + 1}`} className="aspect-square w-full object-cover" />
-                  <span className="absolute left-1 top-1 rounded bg-white/90 px-1 font-mono">e{i + 1}</span>
-                </span>
+                <Thumb photo={photos[i]} onClick={() => lb.open(i)} />
                 <span className="mt-1 flex items-center justify-between text-[var(--hs-muted)]">
                   <span>{formatBytes(it.blob.size)}</span>
-                  <button type="button" className="font-medium text-[var(--hs-accent)]" onClick={() => remove(it.key)}>Remove</button>
+                  <button type="button" className="hs-link font-medium" onClick={() => remove(it.key)}>Remove</button>
                 </span>
                 {it.listing && <span className="mt-1 flex items-center gap-1 text-[var(--hs-status-voided)]"><VerdictIcon result="fail" /> This is one of the listing photos; remove it</span>}
                 {it.error && <span className="mt-1 block text-[var(--hs-status-voided)]">{it.error}</span>}
@@ -185,6 +184,7 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
             ))}
           </ul>
         )}
+        {lb.lightbox}
       </div>
 
       <div>
@@ -220,7 +220,7 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
       )}
 
       <div>
-        <button type="submit" data-testid="submit-evidence" className="hs-btn w-full justify-center sm:w-auto" disabled={!ready}>Submit proof for checking</button>
+        <button type="submit" data-testid="submit-evidence" data-primary-action className="hs-btn w-full sm:w-auto" disabled={!ready}>Submit proof for checking</button>
         <p className="hs-help mt-2">{fix ? "This is your last attempt." : "Submitting is final for this attempt. If a condition fails, you get one fix."}</p>
       </div>
     </form>

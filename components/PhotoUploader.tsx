@@ -5,6 +5,8 @@ import { useState } from "react";
 import type { DealView, FileRef } from "@/lib/deal/types";
 import { downscale, errorCopy, formatBytes, sendJson, UNDECODABLE_COPY, uploadFile } from "@/lib/client-upload";
 import { fetchSample, findPreset, type Presets } from "@/lib/demo-kit";
+import { Thumb, useLightbox } from "@/components/Lightbox";
+import { Ring } from "@/components/Ring";
 
 const MAX = 4;
 type Item = { key: number; blob: Blob; preview: string; ref?: FileRef; error?: string };
@@ -16,6 +18,9 @@ export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const photos = items.map((it, i) => ({ src: it.ref?.url ?? it.preview, alt: `Listing photo ${i + 1}`, label: `r${i + 1}` }));
+  const lb = useLightbox(photos);
+  const uploading = progress ? items.findIndex((it) => !it.ref && !it.error) : -1; // the thumbnail that carries the ring
 
   /** Stages downscaled files after the current ones, or instead of them with `replace` (the sample button). */
   async function add(files: FileList | File[] | null, replace = false) {
@@ -85,10 +90,10 @@ export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView
 
   return (
     <section>
-      <h2 className="text-2xl font-semibold">Add listing photos (optional)</h2>
-      <p className="mt-1 text-sm text-[var(--hs-muted)]">Up to 4. Claude compares the seller&apos;s proof photos with these. Skip this if your conditions are tracking-only.</p>
+      <h1 className="text-3xl md:text-4xl">Add listing photos (optional)</h1>
+      <p className="mt-2 text-sm text-[var(--hs-muted)]">Up to 4. Claude compares the seller&apos;s proof photos with these. Skip this if your conditions are tracking-only.</p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         {/* no `capture` attribute: the OS sheet offers camera or gallery (08 section 6.3) */}
         <label className={`hs-btn-secondary cursor-pointer ${items.length >= MAX || busy ? "pointer-events-none opacity-50" : ""}`}>
           Choose photos
@@ -105,17 +110,17 @@ export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView
       {items.length > 0 && (
         <ul className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {items.map((it, i) => (
-            <li key={it.key} className="text-sm">
-              <a href={it.ref?.url ?? it.preview} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-lg border border-[var(--hs-border)]">
-                {/* eslint-disable-next-line @next/next/no-img-element -- blob: and signed URLs */}
-                <img src={it.ref?.url ?? it.preview} alt={`Listing photo ${i + 1}`} className="h-full w-full object-cover" />
-              </a>
+            <li key={it.key} className="relative text-sm">
+              <Thumb photo={photos[i]} onClick={() => lb.open(i)} />
+              {uploading === i && (
+                <span className="absolute inset-x-0 top-0 grid aspect-square place-items-center rounded-lg bg-white/60" aria-hidden><Ring className="h-8 w-8" /></span>
+              )}
               <div className="mt-1 flex items-center justify-between text-[var(--hs-muted)]">
                 <span>{formatBytes(it.blob.size)}</span>
                 {it.ref ? (
                   <span>Uploaded</span>
                 ) : (
-                  <button type="button" className="font-medium text-[var(--hs-accent)]" disabled={busy} onClick={() => remove(it.key)}>Remove</button>
+                  <button type="button" className="hs-link font-medium" disabled={busy} onClick={() => remove(it.key)}>Remove</button>
                 )}
               </div>
               {it.error && <p className="mt-1 text-[var(--hs-status-voided)]">{it.error}</p>}
@@ -123,14 +128,15 @@ export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView
           ))}
         </ul>
       )}
+      {lb.lightbox}
       <p aria-live="polite" className="mt-2 min-h-5 text-sm text-[var(--hs-muted)]">{progress}</p>
       {error && <p role="alert" className="mt-2 text-sm text-[var(--hs-status-voided)]">{error}</p>}
 
-      <div className="mt-4 flex items-center gap-4">
+      <div className="mt-5 flex items-center gap-4">
         <button type="button" className="hs-btn" data-testid="accept-and-share" disabled={busy} onClick={() => accept(true)}>
-          Accept terms and get link
+          {busy && !progress ? "Accepting…" : "Accept terms and get link"}
         </button>
-        <button type="button" className="text-sm font-medium text-[var(--hs-accent)]" disabled={busy} onClick={() => accept(false)}>
+        <button type="button" className="hs-link text-sm font-medium" disabled={busy} onClick={() => accept(false)}>
           Skip photos
         </button>
       </div>
