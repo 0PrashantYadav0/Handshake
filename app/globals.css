@@ -60,3 +60,16 @@ body { font-family: var(--hs-font); }
 .hs-input:focus, .hs-chip:focus-visible, .hs-btn:focus-visible, .hs-btn-secondary:focus-visible {
   outline: 2px solid var(--hs-accent); outline-offset: 2px;
 }
+
+/* T-18: cards, banners and the danger text button (08 sections 4.3, 7.2, 7.13) */
+.hs-card { background: var(--hs-surface); border: 1px solid var(--hs-border); border-radius: 0.75rem; padding: 1rem; }
+.hs-banner { border-radius: 0.5rem; padding: 0.6rem 0.75rem; font-size: 0.875rem; border: 1px solid var(--hs-status-voided); color: var(--hs-status-voided); background: color-mix(in srgb, var(--hs-status-voided) 8%, white); }
+.hs-banner[data-tone="info"] { border-color: var(--hs-status-in_review); color: var(--hs-status-in_review); background: color-mix(in srgb, var(--hs-status-in_review) 8%, white); }
+.hs-btn-danger { display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 0.5rem; font-size: 0.875rem; color: var(--hs-status-voided); border-radius: 0.5rem; }
+.hs-btn-danger:hover { text-decoration: underline; }
+.hs-btn:disabled, .hs-btn-secondary:disabled, .hs-btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+.hs-btn-danger:focus-visible, .hs-input:focus-visible, .hs-link:focus-visible { outline: 2px solid var(--hs-accent); outline-offset: 2px; }
+.hs-link { color: var(--hs-accent); text-underline-offset: 2px; }
+.hs-link:hover { text-decoration: underline; }
+.hs-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
+.hs-help { font-size: 0.8rem; color: var(--hs-muted); }
