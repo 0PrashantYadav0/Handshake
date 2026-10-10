@@ -6,9 +6,12 @@ import { fakeAi, type FakeAi } from "@/lib/ai/fake";
 import { fakeEmail, type RecordingEmail } from "@/lib/email/console";
 import { fakePaypal, type FakePaypal } from "@/lib/paypal/fake";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
-import type { PaypalWebhookEvent } from "@/lib/deal/types";
+import { createDeal, DealError, handle } from "@/lib/deal";
+import type { Actor, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
+import { expect } from "vitest";
 
 process.env.SESSION_SECRET ??= "test-session-secret-at-least-32-characters-long";
+process.env.FILE_URL_SECRET ??= "test-file-url-secret-at-least-32-characters-long";
 
 export const CLOCK_START = "2026-10-20T10:00:00Z";
 
@@ -60,4 +63,84 @@ export function callRoute(
 export function webhookEvent(type: string, resource: Record<string, unknown>): PaypalWebhookEvent {
   if (!deps) throw new Error("call testDeps() first");
   return deps.paypal.event(type, resource);
+}
+
+// ---------- parties and deal builders (06 "Harness") ----------
+
+export const DEFAULT_TEXT = "I'll pay $80 for the hand-painted denim jacket once it arrives within a week and matches the photos";
+
+export async function parties() {
+  const buyer = await makeUser("buyer@test", { display_name: "Buyer" });
+  const seller = await makeUser("seller@test", { display_name: "Seller", paypal_email: "seller-pp@test" });
+  const third = await makeUser("third@test");
+  const as = (u: { id: string }): Actor => ({ user_id: u.id });
+  return { buyer, seller, third, asBuyer: as(buyer), asSeller: as(seller), asThird: as(third) };
+}
+export type Parties = Awaited<ReturnType<typeof parties>>;
+
+/** Drives a deal through the real commands; each step returns the public code. */
+export function dealBuilder(deps: TestDeps, p: Parties) {
+  const b = {
+    async draft(text = DEFAULT_TEXT): Promise<string> {
+      return (await createDeal(p.asBuyer, { text }, deps)).code;
+    },
+    async joined(): Promise<string> {
+      const code = await b.draft();
+      await handle(code, p.asSeller, { type: "join" }, deps);
+      return code;
+    },
+    async agreed(): Promise<string> {
+      const code = await b.joined();
+      await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
+      await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+      return code;
+    },
+    async held(): Promise<string> {
+      const code = await b.agreed();
+      const v = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
+      await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v.payment!.paypal_order_id }, deps);
+      return code;
+    },
+  };
+  return b;
+}
+
+export const events = (code: string) =>
+  prisma.dealEvent.findMany({ where: { deal: { public_code: code } }, orderBy: { id: "asc" } });
+export const dealRow = (code: string) =>
+  prisma.deal.findUniqueOrThrow({ where: { public_code: code }, include: { payment: true, payouts: true, conditions: { orderBy: { position: "asc" } } } });
+
+/** Asserts the promise rejects with a DealError of the given code; returns it for message checks. */
+export function expectError(promise: Promise<unknown>, code: string): Promise<DealError> {
+  return promise.then(
+    () => { throw new Error(`expected DealError ${code}`); },
+    (e: unknown) => {
+      expect(e).toBeInstanceOf(DealError);
+      expect((e as DealError).code).toBe(code);
+      return e as DealError;
+    },
+  );
+}
+
+/** Decisions C6: cause -> allowed actors. */
+export const C6: Record<string, EventActor[]> = {
+  create: ["buyer"], edit_terms: ["buyer"], join: ["seller"], accept: ["buyer", "seller"], start_payment: ["buyer"],
+  submit_evidence: ["seller"], verdict: ["ai"],
+  "decision:capture": ["system"], "decision:request_fix": ["system"], "decision:buyer_review": ["system"], "decision:void": ["system"],
+  "review:approve": ["buyer"], "review:reject": ["buyer"], cancel: ["buyer", "seller"], retry_payout: ["seller"],
+  "tick:deadline": ["system"], "tick:reverify": ["system"],
+  "fact:authorization_created": ["paypal"], "fact:late_authorization_voided": ["paypal"], "fact:capture_completed": ["paypal"],
+  "fact:capture_pending": ["paypal"], "fact:capture_declined": ["paypal"], "fact:authorization_voided": ["paypal"],
+  "fact:payout_succeeded": ["paypal"], "fact:payout_failed": ["paypal"],
+};
+
+/** afterEach: every cause written by the test is a C6 string with a C6 actor, and the per-deal chain is unbroken (06 "Audit log"). */
+export async function assertEventsInC6(): Promise<void> {
+  const rows = await prisma.dealEvent.findMany({ orderBy: { id: "asc" } });
+  const prev = new Map<string, string>();
+  for (const r of rows) {
+    expect(C6[r.cause], `unknown cause ${r.cause}`).toContain(r.actor);
+    expect(r.from_status, `chain broken at event ${r.id} (${r.cause})`).toBe(prev.get(r.deal_id) ?? null);
+    prev.set(r.deal_id, r.to_status);
+  }
 }
