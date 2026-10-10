@@ -1,0 +1,287 @@
+// prisma/schema.prisma
+// Prisma 7.10.0. The database URL is set in prisma.config.ts, not here.
+// Field names are the Postgres column names verbatim (snake_case); models and enums
+// are PascalCase and @@map to snake_case tables and types.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- enums (values spelled as in docs/decisions.md) ----------
+
+enum DealStatus {
+  draft
+  terms_agreed
+  held
+  proof_submitted
+  in_review
+  captured
+  paid
+  voided
+
+  @@map("deal_status")
+}
+
+enum EvidenceType {
+  photo
+  tracking
+
+  @@map("evidence_type")
+}
+
+enum FilePurpose {
+  reference
+  evidence
+
+  @@map("file_purpose")
+}
+
+enum EvidenceKind {
+  photo
+  tracking
+  note
+
+  @@map("evidence_kind")
+}
+
+enum VerdictResult {
+  pass
+  fail
+  unclear
+
+  @@map("verdict_result")
+}
+
+enum PaymentStatus {
+  created
+  approved
+  authorized
+  capture_pending
+  captured
+  declined
+  voided
+
+  @@map("payment_status")
+}
+
+enum PayoutStatus {
+  pending
+  success
+  failed
+
+  @@map("payout_status")
+}
+
+enum EventActor {
+  buyer
+  seller
+  system
+  paypal
+  ai
+
+  @@map("event_actor")
+}
+
+// ---------- models ----------
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  display_name String?
+  paypal_email String?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @updatedAt @db.Timestamptz(6)
+
+  deals_as_buyer  Deal[]     @relation("DealBuyer")
+  deals_as_seller Deal[]     @relation("DealSeller")
+  files           File[]
+  evidence        Evidence[]
+
+  @@map("users")
+}
+
+model Deal {
+  id                      String     @id @default(uuid()) @db.Uuid
+  public_code             String     @unique
+  buyer_id                String     @db.Uuid
+  seller_id               String?    @db.Uuid
+  source_text             String
+  item_title              String
+  amount_minor            Int?
+  currency                String     @default("USD")
+  deadline_days           Int?
+  deadline_at             DateTime?  @db.Timestamptz(6)
+  status                  DealStatus @default(draft)
+  terms_version           Int        @default(1)
+  buyer_accepted_version  Int?
+  seller_accepted_version Int?
+  fix_attempts_used       Int        @default(0)
+  seeded                  Boolean    @default(false)
+  created_at              DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime   @updatedAt @db.Timestamptz(6)
+
+  buyer      User        @relation("DealBuyer", fields: [buyer_id], references: [id], onDelete: Restrict)
+  seller     User?       @relation("DealSeller", fields: [seller_id], references: [id], onDelete: Restrict)
+  conditions Condition[]
+  files      File[]
+  evidence   Evidence[]
+  verdicts   Verdict[]
+  payment    Payment?
+  payouts    Payout[]
+  events     DealEvent[]
+
+  @@index([buyer_id, status])
+  @@index([seller_id, status])
+  @@index([status, deadline_at])
+  @@index([status, updated_at])
+  @@map("deals")
+}
+
+model Condition {
+  id            String       @id @default(uuid()) @db.Uuid
+  deal_id       String       @db.Uuid
+  position      Int
+  text          String
+  evidence_type EvidenceType
+  created_at    DateTime     @default(now()) @db.Timestamptz(6)
+
+  deal     Deal      @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+  verdicts Verdict[]
+
+  @@unique([deal_id, position])
+  @@map("conditions")
+}
+
+model File {
+  id          String      @id @default(uuid()) @db.Uuid
+  deal_id     String      @db.Uuid
+  uploaded_by String      @db.Uuid
+  purpose     FilePurpose
+  mime        String
+  size_bytes  Int
+  sha256      String
+  bytes       Bytes
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+
+  deal     Deal       @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+  uploader User       @relation(fields: [uploaded_by], references: [id], onDelete: Restrict)
+  evidence Evidence[]
+
+  @@index([deal_id, purpose])
+  @@map("files")
+}
+
+model Evidence {
+  id            String       @id @default(uuid()) @db.Uuid
+  deal_id       String       @db.Uuid
+  submission_no Int
+  kind          EvidenceKind
+  position      Int
+  file_id       String?      @db.Uuid
+  value         String?
+  uploaded_by   String       @db.Uuid
+  created_at    DateTime     @default(now()) @db.Timestamptz(6)
+
+  deal     Deal  @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+  file     File? @relation(fields: [file_id], references: [id], onDelete: Restrict)
+  uploader User  @relation(fields: [uploaded_by], references: [id], onDelete: Restrict)
+
+  @@unique([deal_id, submission_no, kind, position])
+  @@index([deal_id, submission_no])
+  @@map("evidence")
+}
+
+model Verdict {
+  id             String        @id @default(uuid()) @db.Uuid
+  deal_id        String        @db.Uuid
+  condition_id   String        @db.Uuid
+  submission_no  Int
+  result         VerdictResult
+  confidence     Float
+  reason         String
+  evidence_used  String[]      @default([])
+  model          String
+  prompt_version String
+  raw_response   Json
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+
+  deal      Deal      @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+  condition Condition @relation(fields: [condition_id], references: [id], onDelete: Restrict)
+
+  @@unique([condition_id, submission_no])
+  @@index([deal_id, submission_no])
+  @@map("verdicts")
+}
+
+model Payment {
+  id               String        @id @default(uuid()) @db.Uuid
+  deal_id          String        @unique @db.Uuid
+  paypal_order_id  String        @unique
+  order_attempts   Int           @default(0)
+  authorization_id String?       @unique
+  authorized_at    DateTime?     @db.Timestamptz(6)
+  auth_expires_at  DateTime?     @db.Timestamptz(6)
+  capture_id       String?       @unique
+  capture_attempts Int           @default(0)
+  status           PaymentStatus @default(created)
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @updatedAt @db.Timestamptz(6)
+
+  deal Deal @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+
+  @@map("payments")
+}
+
+model Payout {
+  id              String       @id @default(uuid()) @db.Uuid
+  deal_id         String       @db.Uuid
+  attempt         Int
+  sender_batch_id String       @unique
+  recipient_email String
+  amount_minor    Int
+  currency        String       @default("USD")
+  paypal_batch_id String?      @unique
+  paypal_item_id  String?      @unique
+  status          PayoutStatus @default(pending)
+  failure_reason  String?
+  created_at      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime     @updatedAt @db.Timestamptz(6)
+
+  deal Deal @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+
+  @@unique([deal_id, attempt])
+  @@map("payouts")
+}
+
+model DealEvent {
+  id          BigInt      @id @default(autoincrement())
+  deal_id     String      @db.Uuid
+  from_status DealStatus?
+  to_status   DealStatus
+  actor       EventActor
+  cause       String
+  payload     Json
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+
+  deal Deal @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+
+  @@index([deal_id, id])
+  @@map("deal_events")
+}
+
+model WebhookEvent {
+  paypal_event_id String    @id
+  event_type      String
+  verified        Boolean
+  processed_at    DateTime? @db.Timestamptz(6)
+  body            Json
+  last_error      String?
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@map("webhook_events")
+}

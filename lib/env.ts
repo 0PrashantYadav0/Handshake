@@ -1,0 +1,31 @@
+// Zod-validated process.env for every name in decisions J3; fails fast at boot (02 section 9.5).
+import { z } from "zod";
+import { limitsFromEnv } from "@/lib/deal/decide";
+
+const production = process.env.NODE_ENV === "production";
+
+const EnvZ = z.object({
+  DATABASE_URL: z.string().min(1),
+  APP_URL: z.url(),
+  SESSION_SECRET: z.string().min(32),
+  FILE_URL_SECRET: z.string().min(32),
+  PAYPAL_CLIENT_ID: z.string().min(1),
+  PAYPAL_CLIENT_SECRET: z.string().min(1),
+  PAYPAL_API_BASE: z.url(),
+  PAYPAL_WEBHOOK_ID: production ? z.string().min(1) : z.string().default(""),
+  NEXT_PUBLIC_PAYPAL_CLIENT_ID: z.string().min(1),
+  ANTHROPIC_API_KEY: z.string().min(1),
+  AI_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
+  RESEND_API_KEY: z.string().default(""),
+  EMAIL_FROM: z.string().min(1),
+  PASS_THRESHOLD: z.string().optional(),
+  AUTO_CAPTURE_MAX_MINOR: z.string().optional(),
+  CRON_SECRET: z.string().min(32),
+  DEMO_LOGIN: z.string().default(""),
+  DEMO_SELLER_PAYPAL_EMAIL: z.string().default(""),
+  AG_GRID_LICENSE_KEY: z.string().default(""),
+});
+
+export const env = EnvZ.parse(process.env);
+export const LIMITS = limitsFromEnv(); // evaluated at module load: a bad PASS_THRESHOLD stops the deploy
+export const DEMO_LOGIN = env.DEMO_LOGIN === "true";
