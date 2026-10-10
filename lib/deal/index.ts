@@ -1,17 +1,14 @@
 // The whole public surface of lib/deal (02 section 3.1). Routes call these and nothing else in this directory.
 import { loadDeal, requireRole } from "./access";
 import { DealError } from "./errors";
-import type { Actor, DealEvent, DealPreview, DealView, Deps, LedgerRow, PaypalWebhookEvent, TickReport } from "./types";
+import type { Actor, DealEvent, DealPreview, DealView, Deps, LedgerRow, TickReport } from "./types";
 import { buildDealPreview, buildDealView, buildLedgerRow, toEvent } from "./views";
 
 export { addFile, createDeal, handle } from "./commands";
 export { getEvidencePack } from "./pack";
+export { applyPaypalEvent, toFact, type WebhookOutcome } from "./webhooks";
 export { DealError, HTTP_STATUS, type DealErrorCode } from "./errors";
 export type * from "./types";
-
-export async function applyPaypalEvent(event: PaypalWebhookEvent, deps: Deps): Promise<{ outcome: "unverified" | "already_processed" | "applied" | "noop" | "unknown_deal" }> {
-  throw new DealError("internal_error", `not implemented: T-09 (${event.id}, ${typeof deps})`);
-}
 
 export async function tick(now: Date, deps: Deps): Promise<TickReport> {
   throw new DealError("internal_error", `not implemented: T-10 (${now.toISOString()}, ${typeof deps})`);
