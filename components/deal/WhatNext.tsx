@@ -1,29 +1,34 @@
 "use client";
-// The "What happens next" card (08 sections 7.3 to 7.6) for draft, terms_agreed and held; later states show a placeholder (T-28).
+// The "What happens next" card (08 sections 7.3 to 7.10) for every status: the 7.4 heading and helper, then the state's controls.
 import { useState } from "react";
-import type { DealPreview, DealView } from "@/lib/deal/types";
+import type { DealEvent, DealPreview, DealView } from "@/lib/deal/types";
 import { ApiError } from "@/lib/client-api";
 import { whatNext } from "@/lib/deal-copy";
 import { AcceptTerms, Join, ShareLink } from "./Controls";
+import { EvidenceForm } from "./EvidenceForm";
 import { PayButton } from "./PayButton";
+import { ReviewPanel } from "./ReviewPanel";
 
 type Props = {
   deal: DealView | DealPreview;
   demo: boolean;
   paypalClientId: string;
   pollExpired: boolean;
+  events: DealEvent[];
   setDeal: (d: DealView) => void;
   refetch: () => Promise<DealView | DealPreview | null>;
   fail: (e: unknown) => void;
 };
 
-export function WhatNext({ deal, demo, paypalClientId, pollExpired, setDeal, refetch, fail }: Props) {
+export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, setDeal, refetch, fail }: Props) {
   const [holdFailed, setHoldFailed] = useState(false);
+  const [checking, setChecking] = useState(false); // the seller's evidence POST is in flight (7.8)
+  const [paypalNote, setPaypalNote] = useState<string | null>(null);
   const view = deal.role === "preview" ? null : deal;
   const p = view?.payment ?? null;
   const approvedUnconfirmed = p?.status === "approved" && !p.authorization_id;
   const failed = holdFailed || (approvedUnconfirmed && pollExpired);
-  const { heading, helper } = whatNext(deal, { holdFailed: failed });
+  const { heading, helper } = whatNext(checking && view ? { ...view, status: "proof_submitted" } : deal, { holdFailed: failed, events });
 
   // 7.6: paypal_error with no authorization stored -> "The hold wasn't confirmed" at once; anything else -> the refetched deal decides.
   const onPayFail = async (e: unknown) => {
@@ -31,6 +36,20 @@ export function WhatNext({ deal, demo, paypalClientId, pollExpired, setDeal, ref
     const auth = fresh && fresh.role !== "preview" ? fresh.payment?.authorization_id : null;
     if (e instanceof ApiError && e.code === "paypal_error" && !auth) setHoldFailed(true);
     else if (!(e instanceof ApiError && e.code === "paypal_error")) fail(e);
+  };
+
+  // 7.8 on 200: show the verdicts and move focus to the decision line of the newest Proof card.
+  const onProofDone = (d: DealView) => {
+    setChecking(false);
+    setDeal(d);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-decision-line]")?.focus());
+  };
+  // 7.8 on paypal_error: the verdict is stored, the deal stays proof_submitted; Deal.tsx polls until tick finishes the payment step.
+  const onPaypalError = async (e: ApiError) => {
+    const id = /debug[ _-]?id[=: ]+([A-Za-z0-9-]+)/i.exec(e.message)?.[1];
+    setPaypalNote(`PayPal couldn't complete the payment step${id ? ` (debug id ${id})` : ""}. The result is saved; the payment step is retried automatically.`);
+    setChecking(false);
+    await refetch();
   };
 
   const paypalPanel = (
@@ -61,6 +80,12 @@ export function WhatNext({ deal, demo, paypalClientId, pollExpired, setDeal, ref
     if (p?.status === "approved" && p.authorization_id) body = <button type="button" className="hs-btn-secondary" onClick={() => void refetch()}>Check again</button>;
     else if (approvedUnconfirmed && !failed) body = <button type="button" className="hs-btn-secondary" onClick={() => void refetch()}>Check again</button>;
     else body = paypalPanel;
+  } else if (view.status === "held" && view.role === "seller") {
+    body = <EvidenceForm deal={view} demo={demo} onChecking={setChecking} onDone={onProofDone} onPaypalError={onPaypalError} fail={(e) => { setChecking(false); fail(e); }} />;
+  } else if (view.status === "proof_submitted" && paypalNote) {
+    body = <p className="hs-banner" data-tone="info" role="status">{paypalNote}</p>;
+  } else if (view.status === "in_review") {
+    body = <ReviewPanel deal={view} demo={demo} onDone={setDeal} fail={fail} />;
   }
 
   return (

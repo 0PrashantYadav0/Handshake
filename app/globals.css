@@ -73,3 +73,18 @@ body { font-family: var(--hs-font); }
 .hs-link:hover { text-decoration: underline; }
 .hs-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
 .hs-help { font-size: 0.8rem; color: var(--hs-muted); }
+
+/* T-28: verdict icons and words, the confidence bar, the wait-screen dot (08 sections 7.8, 7.9, 11; static under reduced motion) */
+.hs-verdict { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 1.25rem; height: 1.25rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; color: white; background: var(--hs-status-in_review); }
+.hs-verdict[data-result="pass"] { background: var(--hs-status-captured); }
+.hs-verdict[data-result="fail"] { background: var(--hs-status-voided); }
+.hs-verdict-word { display: inline-flex; align-items: center; gap: 0.4rem; align-self: start; font-weight: 600; color: var(--hs-status-in_review); }
+.hs-verdict-word[data-result="pass"] { color: var(--hs-status-captured); }
+.hs-verdict-word[data-result="fail"] { color: var(--hs-status-voided); }
+.hs-bar { height: 0.3rem; margin-top: 0.25rem; border-radius: 9999px; background: var(--hs-border); overflow: hidden; }
+.hs-bar > div { height: 100%; background: var(--hs-accent); }
+.hs-dot { display: inline-block; flex-shrink: 0; width: 0.6rem; height: 0.6rem; margin: 0 0.3rem; border-radius: 9999px; background: var(--hs-border); }
+.hs-dot[data-active="true"] { background: var(--hs-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .hs-dot[data-active="true"] { animation: hs-pulse 1.2s ease-in-out infinite; }
+}

@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DealPreview, DealView } from "@/lib/deal/types";
 import { api, ApiError, errorCopy } from "@/lib/client-api";
-import { when } from "@/lib/ledger-columns";
+import { cancellable } from "@/lib/deal-copy";
 import { CancelDeal } from "./Controls";
 import { DealHeader } from "./DealHeader";
+import { PayoutCard } from "./PayoutCard";
+import { ProofCard } from "./ProofCard";
 import { TermsCard } from "./TermsCard";
+import { Timeline, useEvents } from "./Timeline";
 import { WhatNext } from "./WhatNext";
 
 type Props = { initial: DealView | DealPreview; demo: boolean; paypalClientId: string };
@@ -30,6 +33,8 @@ function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
   }, [active, fn]);
   return expired;
 }
+
+const POLLED = ["draft", "terms_agreed", "proof_submitted"];
 
 export function Deal({ initial, demo, paypalClientId }: Props) {
   const [deal, setDeal] = useState(initial);
@@ -55,14 +60,17 @@ export function Deal({ initial, demo, paypalClientId }: Props) {
   useEffect(() => bannerRef.current?.focus(), [banner]);
 
   const view = deal.role === "preview" ? null : deal;
-  const polling = !!view && !view.seeded && (view.status === "draft" || view.status === "terms_agreed");
+  const polling = !!view && !view.seeded && POLLED.includes(view.status);
   const expired = usePoll(polling, refetch);
+  const events = useEvents(code, view?.updated_at ?? "");
   const onImgError = () => {
     if (imgRetried.current) return;
     imgRetried.current = true;
     void refetch();
   };
-  const cancellable = !!view && !view.seeded && ["draft", "terms_agreed", "held"].includes(view.status);
+  const canCancel = !!view && !view.seeded && cancellable(view.status);
+  // Newest first; in in_review the review panel already shows the latest attempt.
+  const proofs = view ? [...view.submissions].reverse().filter((s) => !(view.status === "in_review" && s === view.submissions.at(-1))) : [];
 
   return (
     <main className="mx-auto max-w-5xl p-4 md:p-8">
@@ -75,23 +83,18 @@ export function Deal({ initial, demo, paypalClientId }: Props) {
       )}
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <div className="grid content-start gap-4 md:col-span-2">
-          <WhatNext deal={deal} demo={demo} paypalClientId={paypalClientId} pollExpired={expired} setDeal={setDeal} refetch={refetch} fail={fail} />
+          <WhatNext deal={deal} demo={demo} paypalClientId={paypalClientId} pollExpired={expired} events={events} setDeal={setDeal} refetch={refetch} fail={fail} />
           <TermsCard deal={deal} onImgError={onImgError} />
+          {view && proofs.map((s) => <ProofCard key={s.submission_no} sub={s} deal={view} demo={demo} />)}
         </div>
         {view && (
           <aside className="grid content-start gap-4">
-            {view.payment && (
-              <section className="hs-card text-sm">
-                <h2 className="font-semibold">Payment</h2>
-                {view.payment.authorized_at && <p className="mt-2" title={view.payment.authorized_at}>Hold placed {when(view.payment.authorized_at)}</p>}
-                {view.payment.auth_expires_at && <p title={view.payment.auth_expires_at}>Hold valid until {when(view.payment.auth_expires_at)}</p>}
-                {view.payment.capture_id && <p>Capture {view.payment.capture_id}</p>}
-              </section>
-            )}
+            <PayoutCard deal={view} onDone={setDeal} fail={fail} />
+            <Timeline events={events} />
             <section className="hs-card grid gap-2 text-sm">
               <a className="hs-link" href={`/api/deals/${view.code}/evidence-pack`}>Download evidence pack (JSON)</a>
-              <p className="hs-help">Everything about this deal in one file: terms and versions, photo hashes, each verdict with its reason, PayPal ids, and the full timeline.</p>
-              {cancellable && <div><CancelDeal deal={view} onDone={setDeal} fail={fail} /></div>}
+              <p className="hs-help">Everything about this deal in one file: terms and versions, photo hashes, each verdict with its reason, PayPal ids, and the full timeline. Built from the database, so it can be reproduced.</p>
+              {canCancel && <div><CancelDeal deal={view} onDone={setDeal} fail={fail} /></div>}
             </section>
           </aside>
         )}
