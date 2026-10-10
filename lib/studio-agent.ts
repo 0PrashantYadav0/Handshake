@@ -1,12 +1,17 @@
-// Server half of the Studio Claude adapter (09 sections 6.2 to 6.4; 04 section 15; T-38). Maps Studio's
-// AgLlmRequest to one non-streaming messages.create with the built-in tool schemas, and the reply back to an
-// AgLlmResponse. The server never executes tools; Studio does. Shapes verified against ag-studio 3.0.0 types
-// (agAiMessage.d.ts: message / function_call { callId, name, arguments } / function_call_output { callId, output } /
-// reasoning; agLlmAdapter.d.ts: status "completed" | "incomplete" | "failed", error { code, message }).
+// Server half of the Studio Claude adapter (09 sections 6.2 to 6.5; 04 section 15; T-38, T-39). Maps Studio's
+// AgLlmRequest to non-streaming messages.create calls with the built-in tool schemas, and the reply back to an
+// AgLlmResponse. Studio executes its own tools in the browser; the only server-run tool is `explain_verdict`
+// (kind "server" in Studio), which runAgentTurn resolves in a short loop before answering. Shapes verified against
+// ag-studio 3.0.0 types (agAiMessage.d.ts: message / function_call { callId, name, arguments } /
+// function_call_output { callId, output } / reasoning; agLlmAdapter.d.ts: status "completed" | "incomplete" | "failed").
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgAiConversationItem, AgAiOutputItem, AgLlmResponse } from "ag-studio";
 import { z } from "zod";
 import type { MessagesClient } from "@/lib/ai/call-json";
+import type { ServerTools } from "@/lib/studio-tools";
+
+/** Server-tool rounds per turn (09 section 6.5): tool_use -> run -> tool_result -> model, at most this many times. */
+export const MAX_TOOL_ROUNDS = 3;
 
 // Fixed, not AI_MODEL (D3): `thinking: between_tools` is the only way to turn thinking off and is Sonnet 5.5-only.
 export const AGENT_MODEL = "claude-sonnet-5-5";
@@ -71,40 +76,63 @@ export function toMessages(input: AgAiConversationItem[]): Anthropic.MessagePara
   return out;
 }
 
-/** Anthropic content blocks -> Studio output items (text -> message, tool_use -> function_call). */
-export function toOutput(msg: Anthropic.Message): AgAiOutputItem[] {
+/** Anthropic content blocks -> Studio output items (text -> message, tool_use -> function_call). Server tools never reach Studio. */
+export function toOutput(msg: Anthropic.Message, serverTools: ServerTools = {}): AgAiOutputItem[] {
   const out: AgAiOutputItem[] = [];
   msg.content.forEach((b, i) => {
     if (b.type === "text" && b.text) {
       out.push({ id: `${msg.id}-${i}`, kind: "output", type: "message", role: "assistant", status: "completed", content: [{ type: "text", text: b.text, annotations: [] }] });
-    } else if (b.type === "tool_use") {
+    } else if (b.type === "tool_use" && !(b.name in serverTools)) {
       out.push({ id: b.id, kind: "output", type: "function_call", callId: b.id, name: b.name, arguments: JSON.stringify(b.input ?? {}), status: "completed" });
     }
   });
   return out;
 }
 
-/** One turn. Never throws: a model failure is status "failed" with error.message, so the chat panel shows it. */
-export async function runAgentTurn(client: () => MessagesClient, body: AgentRequest, signal?: AbortSignal): Promise<AgLlmResponse> {
+/**
+ * One turn. Never throws: a model failure is status "failed" with error.message, so the chat panel shows it.
+ * A tool_use naming a server tool is run here with the caller's actor and fed back as a tool_result (a thrown
+ * error, e.g. not_a_party, becomes an is_error result, never a 500); any client tool_use in that same reply is
+ * dropped from the history so the model re-issues it after the data arrives. After MAX_TOOL_ROUNDS the last
+ * reply is returned as is, minus server tool calls.
+ */
+export async function runAgentTurn(client: () => MessagesClient, body: AgentRequest, signal?: AbortSignal, serverTools: ServerTools = {}): Promise<AgLlmResponse> {
   const createdAt = Date.now();
   const failed = (code: string, message: string): AgLlmResponse => ({ id: crypto.randomUUID(), createdAt, status: "failed", output: [], error: { code, message } });
+  const messages = toMessages(body.input as unknown as AgAiConversationItem[]);
+  const usage = { inputTokens: 0, outputTokens: 0 };
   let msg: Anthropic.Message;
-  try {
-    msg = await client().messages.create(
-      {
-        model: AGENT_MODEL,
-        max_tokens: 2000,
-        system: [body.instructions, GUARD].filter(Boolean).join("\n\n"),
-        messages: toMessages(body.input as unknown as AgAiConversationItem[]),
-        tools: body.tools.map((t) => ({ name: t.name, description: t.description ?? "", input_schema: t.parameters as Anthropic.Tool.InputSchema })),
-        thinking: { type: "between_tools" },
-        output_config: { effort: "low" },
-      },
-      { timeout: 30_000, maxRetries: 1, signal },
-    );
-  } catch (e) {
-    const code = e instanceof Anthropic.APIError ? `api_${e.status ?? "error"}` : "unavailable";
-    return failed(code, e instanceof Error ? e.message : "Assistant unavailable");
+  for (let round = 0; ; round++) {
+    try {
+      msg = await client().messages.create(
+        {
+          model: AGENT_MODEL,
+          max_tokens: 2000,
+          system: [body.instructions, GUARD].filter(Boolean).join("\n\n"),
+          messages,
+          tools: body.tools.map((t) => ({ name: t.name, description: t.description ?? "", input_schema: t.parameters as Anthropic.Tool.InputSchema })),
+          thinking: { type: "between_tools" },
+          output_config: { effort: "low" },
+        },
+        { timeout: 30_000, maxRetries: 1, signal },
+      );
+    } catch (e) {
+      const code = e instanceof Anthropic.APIError ? `api_${e.status ?? "error"}` : "unavailable";
+      return failed(code, e instanceof Error ? e.message : "Assistant unavailable");
+    }
+    usage.inputTokens += msg.usage.input_tokens;
+    usage.outputTokens += msg.usage.output_tokens;
+    const calls = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name in serverTools);
+    if (msg.stop_reason !== "tool_use" || calls.length === 0 || round >= MAX_TOOL_ROUNDS) break;
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const c of calls) {
+      try {
+        results.push({ type: "tool_result", tool_use_id: c.id, content: await serverTools[c.name](c.input) });
+      } catch (e) {
+        results.push({ type: "tool_result", tool_use_id: c.id, is_error: true, content: e instanceof Error ? e.message : "Tool failed" });
+      }
+    }
+    messages.push({ role: "assistant", content: msg.content.filter((b) => b.type !== "tool_use" || b.name in serverTools) }, { role: "user", content: results });
   }
   if (msg.stop_reason === "refusal") return failed("refusal", "The assistant declined that request.");
   const truncated = msg.stop_reason === "max_tokens";
@@ -114,7 +142,7 @@ export async function runAgentTurn(client: () => MessagesClient, body: AgentRequ
     model: msg.model,
     status: truncated ? "incomplete" : "completed",
     ...(truncated ? { incompleteDetails: { reason: "max_output_tokens" as const } } : {}),
-    output: toOutput(msg),
-    usage: { inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens },
+    output: toOutput(msg, serverTools),
+    usage,
   };
 }
