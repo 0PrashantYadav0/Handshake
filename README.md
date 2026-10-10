@@ -1,0 +1,197 @@
+# Handshake: pay on proof
+
+A buyer describes a deal in one sentence. Claude turns it into checkable conditions. Both sides accept. PayPal holds the money (an AUTHORIZE order, not a charge). The seller uploads photos and a tracking number. Claude judges each condition and returns JSON. A fixed rule in code, never the model, then captures the hold, asks for one fix, voids it, or hands the call to the buyer. The seller is paid through PayPal Payouts. Every step lands in an append-only audit log you can export.
+
+Built for the PayPal AI Hackathon 2026. Sandbox only, no real money moves.
+
+| | |
+| --- | --- |
+| Hosted demo | <!-- TODO(T-45): hosted URL --> `https://<host>` |
+| Video (under 3 min) | <!-- TODO(T-47): YouTube URL --> `https://youtube.com/<id>` |
+| Licence | MIT, see [LICENSE](LICENSE) |
+
+## Try it as a judge (10 minutes)
+
+One browser, no account, no install. The header has a **Buyer | Seller** switch that swaps between the two seeded personas (`demo-buyer@handshake.demo`, `demo-seller@handshake.demo`), so you play both sides.
+
+1. Open the hosted URL. Click **Continue as buyer**.
+2. On `/new` click the first **Try one:** chip ("I'll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered"), then **Extract terms**. You get 2 to 5 conditions; the last one, "Photo shows the deal code HS-XXXX written by hand", is added by the server. Click **Save terms**, **Use sample listing photos**, **Accept terms and get link**, then **Open deal page**.
+3. Switch to **Seller**. Click **Join as seller**, then **Accept terms**.
+4. Switch to **Buyer**. Click the PayPal button and log into the popup with the sandbox buyer:
+
+   ```
+   email:    <!-- TODO(T-45): sandbox personal account 1 email -->
+   password: <!-- TODO(T-45): sandbox personal account 1 password -->
+   ```
+
+   Approve. The deal shows **Money held. Waiting for proof.** ($18.00 held, not charged).
+5. Switch to **Seller**. Click **Use sample evidence: Good** (it stages two photos, the composed deal-code photo and the tracking number `TRK-DEMO-0000`), then **Submit proof for checking**. Checking takes 6 to 12 seconds, at most about 40.
+6. Every condition reads `pass` with a reason. Status goes to **Payment released**, then **Paid** within about a minute. Open `/ledger` (AG Grid), `/dashboard` (AG Studio) and **Download evidence pack**.
+
+More runs, each a different exit from the same state machine:
+
+| Chip on `/new` | Sample evidence | What happens |
+| --- | --- | --- |
+| `$35 lamp, 7 days` | **Wrong item**, submitted twice | First submission: one fix request. Second: `voided`, hold released |
+| `$22 bottle, 7 days` | **Blurry** | A condition is `unclear`: buyer review. Switch to Buyer and click **Release payment** or **Reject proof** |
+| `$250` sentence | **Good** | All pass, still buyer review: $250 is over the automatic release limit ($200) |
+| `$18 mug, 5 days` | **Reuse listing photo** | A listing photo as "proof" fails every photo condition with no model call (hash guardrail) |
+
+The seller's payout lands in sandbox personal account 2; log in at https://www.sandbox.paypal.com to see it:
+
+```
+email:    <!-- TODO(T-45): sandbox personal account 2 email -->
+password: <!-- TODO(T-45): sandbox personal account 2 password -->
+```
+
+Prompts to type into the `/dashboard` agent panel (for example "Why was HS-7K2Q voided?") are listed in [docs/studio-prompts.md](docs/studio-prompts.md).
+
+## How it works
+
+```
+ Buyer (browser)          Seller (phone browser)
+      |                          |
+      v                          v
+ +---------------------------------------------+
+ |  Next.js 16 on Render (one web service)     |
+ |                                             |
+ |  app/api/*  thin route handlers (Zod, JWT)  |
+ |      |                                      |
+ |      v                                      |
+ |  lib/deal/  the only code that changes      |
+ |    status, writes deal_events, or calls     |
+ |    PayPal.  decide() lives here.            |
+ |      |            |              |          |
+ +------|------------|--------------|----------+
+        v            v              v
+   Postgres 18    PayPal sandbox    Claude Sonnet 5.5
+   (deals, files, (Orders v2       (extract terms,
+    events,        AUTHORIZE,       judge photos:
+    verdicts)      capture, void,   JSON in, JSON out)
+                   Payouts, webhooks)
+        ^
+   cron 06:00 UTC -> POST /api/jobs/tick (void past deadline, re-run stuck verdicts)
+```
+
+Deal states: `draft` -> `terms_agreed` -> `held` -> `proof_submitted` -> `captured` -> `paid`, with `in_review` (the buyer decides) and `voided` (hold released) as the two side exits. Every transition writes one row to `deal_events` in the same transaction, with actor, cause and the PayPal ids needed to explain it.
+
+The hard rule: the model never moves money. Claude returns `pass`, `fail` or `unclear` with a confidence and a reason for each condition, and nothing else. The decision function is fixed code in `lib/deal/`, unit-tested row by row, and is the only thing that turns verdicts into a PayPal call. Quoted from `docs/decisions.md` D9:
+
+```
+decide(verdicts, deal):
+  if any verdict is fail:
+      if deal.fix_attempts_used == 0: return request_fix
+      hardFail = any verdict is fail with confidence >= PASS_THRESHOLD
+      if hardFail: return void
+      return buyer_review
+  if any verdict is unclear or any confidence < PASS_THRESHOLD:   # 0.85; exactly 0.85 passes
+      return buyer_review
+  if deal.amount_minor > AUTO_CAPTURE_MAX_MINOR:                 # 20000
+      return buyer_review
+  return capture
+```
+
+Void is the one irreversible automated action against the seller, so on the second submission a `fail` voids only when the model is confident; a low-confidence `fail` goes to the buyer. Before any model call, an evidence photo whose SHA-256 matches a listing photo fails every photo condition at confidence 1 (D8). Untrusted text (notes, text inside photos) is delimited in the prompt and treated as evidence, never as instructions.
+
+Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions.md](docs/decisions.md), [docs/02-system-design.md](docs/02-system-design.md).
+
+## Disclosures
+
+| What | Detail |
+| --- | --- |
+| Sandbox only, USD only | No real money moves. Holds are PayPal sandbox authorizations against a custom-balance personal account. |
+| Mock carrier | There is no carrier API. A tracking number ending in an even digit is `delivered`, an odd digit `in_transit`, anything else `unknown`. The demo uses `TRK-DEMO-0000`. |
+| Composed code photo | The handwritten deal-code photo in the sample evidence is composed in the browser on a canvas (a sample photo plus the deal code in the Caveat handwriting font) because codes are generated per deal. The other sample photos are real photographs we took. |
+| Platform as merchant | The Handshake sandbox business account receives the capture and pays the seller through Payouts. A production build would use PayPal multiparty onboarding so the seller is the payee. |
+| Seeded history | The ledger and dashboard show about 25 seeded historical deals (`deals.seeded = true`) with events but no PayPal objects, so there is something to sort and chart. Deals you create are real sandbox deals. |
+| AG Studio trial | `/dashboard` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
+| Demo login | Magic-link email only reaches the account owner's address (Resend test sender), so judges use the two demo personas. The seller persona's payout address is fixed server-side and cannot be changed from the profile page. |
+| 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the daily job voids the hold. |
+
+## Tools used and how
+
+| Tool | Used for |
+| --- | --- |
+| PayPal Orders v2 (intent `AUTHORIZE`), Payments v2 (authorize, capture, void), Payouts v1, Webhooks v1 | Hold the buyer's money at terms acceptance, capture or void it from `decide()`, pay the seller, and learn about captures, voids and payouts from webhooks. Signatures are verified in our own code (cert from `PAYPAL-CERT-URL`, CRC32, RSA-SHA256). Every write carries a `PayPal-Request-Id`; every PayPal fact is applied once, from the API response or the webhook, whichever arrives first. `@paypal/paypal-server-sdk` 2.5 for Orders and Payments, raw `fetch` for Payouts and verification, `@paypal/react-paypal-js` for the button. |
+| Claude `claude-sonnet-5-5` via `@anthropic-ai/sdk` | Two jobs, both structured outputs against hand-written JSON schemas at `effort: low`: extract `item_title`, amount, deadline and 1 to 4 checkable conditions from the sentence (subjective parts come back in `rejected[]` with a rewording); judge each condition from labelled base64 photos, the mock carrier status and the note. Every verdict row stores `model`, `prompt_version` and `raw_response`. |
+| AG Grid Community 36.2 | `/ledger`: every deal of the signed-in persona, sortable, filterable, with status chips and a quick filter. |
+| AG Studio 3.0 | `/dashboard`: a custom theme, a custom `deal-pipeline` widget with cross-filter, and a Claude-backed agent served from `POST /api/studio/agent` with an `auditor` sub-agent whose `explain_verdict` tool reads the audit log. Loaded client-side only. |
+| Render | One Blueprint (`render.yaml`): web service, Postgres 18, daily cron that calls `POST /api/jobs/tick`. Paid plans so nothing sleeps during judging. |
+| Prisma 7.10 + Postgres 18 | Schema, migrations (append-only trigger on `deal_events`), photos stored as `bytea` and served through HMAC-signed URLs that expire after 10 minutes. |
+| Next.js 16, React 19, TypeScript 5.9, Tailwind CSS v4, Zod, jose, Resend | The app, validation, HS256 session cookies, magic-link email. |
+| Caveat (SIL OFL 1.1, `public/demo/fonts/OFL.txt`) | The composed deal-code photo in the demo kit. |
+| Claude Code | The coding agent that built the app from the specs in `docs/`. |
+
+## Evaluation results
+
+`npm run eval` runs 30 cases in `eval/cases/` (good, wrong item, blurry, reused listing photo, in-transit tracking, two prompt-injection cases) through the real judge and compares `decide()`'s output with `expected.json`. Two numbers matter: the decision-match rate, and the wrong-capture rate, which must be zero. Each run writes `eval/results/<date>-<model>-<effort>.json`.
+
+<!-- TODO(T-30): eval numbers. Fill from the last run before submission: model, prompt versions (extract-v1, judge-v1), case count, decision-match rate, wrong-capture rate, p95 latency, run date, results file path. -->
+
+| Model | Prompt versions | Cases | Decision match | Wrong captures | Run date |
+| --- | --- | --- | --- | --- | --- |
+| `claude-sonnet-5-5`, effort low | extract-v1, judge-v1 | 30 | TODO | TODO | TODO |
+
+See [eval/README.md](eval/README.md) for flags, challenger models and how to add a case.
+
+## Run it locally
+
+Needs Node 24.21.0 (`.node-version`), Docker, and for webhooks `cloudflared`. Full detail in [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 4.
+
+```bash
+git clone https://github.com/0PrashantYadav0/Handshake.git handshake && cd handshake
+npm ci                                                   # postinstall runs prisma generate
+docker compose up -d                                     # Postgres 18 on :5432
+docker compose exec db createdb -U postgres handshake_test
+cp .env.example .env                                     # then fill it, see the table below
+npx prisma migrate dev
+npm run seed                                             # two personas + about 25 historical deals
+npm run dev                                              # http://localhost:3000, click "Continue as buyer"
+```
+
+Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point the `handshake-local` PayPal app's webhook at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the daily job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
+
+| Env var | Value |
+| --- | --- |
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/handshake` |
+| `APP_URL` | `http://localhost:3000` |
+| `SESSION_SECRET`, `FILE_URL_SECRET`, `CRON_SECRET` | Any long random strings |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | A sandbox REST app (type Merchant) from developer.paypal.com; the public id is the same client id |
+| `PAYPAL_API_BASE` | `https://api-m.sandbox.paypal.com` |
+| `PAYPAL_WEBHOOK_ID` | The webhook on that app, subscribed to the order, authorization, capture and payout events |
+| `ANTHROPIC_API_KEY`, `AI_MODEL` | Anthropic Console key; `claude-sonnet-5-5` |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Optional; without them magic links print to the console |
+| `PASS_THRESHOLD`, `AUTO_CAPTURE_MAX_MINOR` | `0.85`, `20000` |
+| `DEMO_LOGIN`, `DEMO_SELLER_PAYPAL_EMAIL` | `true`; the sandbox personal account that receives payouts |
+| `AG_GRID_LICENSE_KEY` | AG Studio trial key; leave empty for the ledger only |
+
+## Deploy it
+
+Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy` before each deploy), the Postgres 18 database and the 06:00 UTC cron. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). Register a second PayPal webhook on the Render hostname for the `handshake` app. Step by step: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
+
+## Tests
+
+```bash
+npm test                               # unit: state machine, decide(), facts, webhook verification, session, carrier
+npm run test:int                       # integration against handshake_test, serial: routes, flows, payment, webhooks, tick
+npx playwright install chromium        # once
+npm run test:e2e                       # builds and starts the app, runs the judge happy path
+npm run eval                           # the 30-case judge eval, calls the real API (about $2.40)
+npm run sandbox -- SB-1 --base <url>   # sandbox scenarios against a running app  <!-- TODO(T-44): scripts/sandbox/scenario.ts -->
+npm run lint && npm run typecheck
+```
+
+CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit and integration tests and the build on every push.
+
+## What a production build adds
+
+- PDF evidence pack (the pack is JSON today).
+- Disputes: open from the `CUSTOMER.DISPUTE.CREATED` webhook and submit the pack through the Disputes API.
+- A merged GitHub pull request as a proof type, for software work.
+- Split payouts and a platform fee.
+- PayPal multiparty onboarding so the seller is the payee instead of the platform.
+- A real carrier lookup, a verified email sending domain, and reauthorization for deals longer than 21 days.
+
+## Licence
+
+MIT. Copyright (c) 2026 Prashant Kumar Yadav. See [LICENSE](LICENSE). AG Studio is used under AG Grid's trial terms and is fetched from npm at install; the repo contains only our own widget, theme and agent code.
