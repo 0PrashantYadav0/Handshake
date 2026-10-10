@@ -49,9 +49,9 @@ export function buildSubmissions(deal: DealRow, now: Date, withRaw = false): Sub
   return nos.map((n) => {
     const ev = deal.evidence.filter((e) => e.submission_no === n);
     const verdictRows = deal.verdicts.filter((v) => v.submission_no === n).sort((a, b) => (posById.get(a.condition_id) ?? 0) - (posById.get(b.condition_id) ?? 0));
-    const byNo = (prefix: string) => deal.events.find((e) => e.cause.startsWith(prefix) && payloadOf(e).submission_no === n);
-    const submitted = byNo("submit_evidence");
-    const decided = byNo("decision:");
+    const ofNo = deal.events.filter((e) => payloadOf(e).submission_no === n);
+    const submitted = ofNo.find((e) => e.cause === "submit_evidence");
+    const decided = ofNo.filter((e) => e.cause.startsWith("decision:")).at(-1); // the newest decision:* of the submission (04 section 9.1 step 9)
     const tracking = ev.find((e) => e.kind === "tracking")?.value ?? null;
     return {
       submission_no: n as 1 | 2,

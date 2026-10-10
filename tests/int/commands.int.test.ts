@@ -185,7 +185,7 @@ describe("accept", () => {
   });
 });
 
-describe("seeded deals and unimplemented commands", () => {
+describe("seeded deals", () => {
   test("every command on a seeded deal is invalid_state", async () => {
     const code = await build.joined();
     await deps.db.deal.update({ where: { public_code: code }, data: { seeded: true } });
@@ -195,10 +195,13 @@ describe("seeded deals and unimplemented commands", () => {
     }
     expect(await events(code)).toHaveLength(2);
   });
-  test("submit_evidence, review and retry_payout are T-10", async () => {
+  test("submit_evidence, review and retry_payout on a seeded deal are invalid_state too", async () => {
     const code = await build.held();
-    await expectError(handle(code, p.asSeller, { type: "submit_evidence", file_ids: [], tracking_number: null, note: null }, deps), "internal_error");
-    await expectError(handle(code, p.asBuyer, { type: "review", decision: "approve", note: null }, deps), "internal_error");
-    await expectError(handle(code, p.asSeller, { type: "retry_payout" }, deps), "internal_error");
+    await deps.db.deal.update({ where: { public_code: code }, data: { seeded: true } });
+    const n = (await events(code)).length;
+    await expectError(handle(code, p.asSeller, { type: "submit_evidence", file_ids: [], tracking_number: null, note: null }, deps), "invalid_state");
+    await expectError(handle(code, p.asBuyer, { type: "review", decision: "approve", note: null }, deps), "invalid_state");
+    await expectError(handle(code, p.asSeller, { type: "retry_payout" }, deps), "invalid_state");
+    expect(await events(code)).toHaveLength(n);
   });
 });

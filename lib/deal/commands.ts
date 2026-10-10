@@ -2,17 +2,18 @@
 // Every command: one interactive transaction that locks the deal row, validates against the table, writes the change and its
 // deal_events row. Commands that call PayPal follow "write intent, call, write result" with no lock held during the call.
 import { Prisma } from "@/generated/prisma/client";
+import { carrierStatus } from "@/lib/carrier";
 import { validateFile } from "@/lib/files/validate";
-import { PayPalError } from "@/lib/paypal/types";
-import { loadDeal, requireLive, requireRole, type DealRow, type Loaded } from "./access";
+import { loadDeal, requireLive, requireRole, type Loaded } from "./access";
 import { newPublicCode } from "./code";
 import { DealError } from "./errors";
-import { afterCommit, applyFactTx, captureFact, type FactResult } from "./facts-db";
-import { authKey, captureKey, orderKey, strayVoidKey, voidKey } from "./keys";
+import { afterCommit, applyFactTx, captureHold, rethrowPaypal, sendPayout, voidHold, type FactResult } from "./facts-db";
+import { authKey, orderKey, payoutBatchId, strayVoidKey, voidKey } from "./keys";
 import { acceptanceOutcome, appendCodeCondition, validateTerms } from "./terms";
 import { lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import { commandError, nextStatus } from "./transitions";
 import type { Actor, AddFileInput, Command, CreateDealInput, DealView, Deps, FileRef } from "./types";
+import { runVerdict } from "./verdict";
 import { buildDealView, toFileRef } from "./views";
 
 const SIX_HOURS = 6 * 3600_000;
@@ -30,14 +31,9 @@ async function loadLocked(tx: Tx, code: string, actor: Actor): Promise<Loaded> {
   return loaded;
 }
 
-/** PayPalError -> paypal_error with the debug id (02 section 3.3); anything else propagates as internal_error. */
-function rethrowPaypal(e: unknown, what: string): never {
-  if (e instanceof PayPalError) {
-    const detail = `${e.name_ ?? `HTTP ${e.status}`}${e.debug_id ? ` (debug_id ${e.debug_id})` : ""}`;
-    throw new DealError("paypal_error", `PayPal ${what} failed: ${detail}`, e.debug_id ?? undefined);
-  }
-  throw e;
-}
+const textLength = (s: string | null, max: number, what: string) => {
+  if (s !== null && (s.length < 1 || s.length > max)) throw new DealError("invalid_input", `${what} must be 1 to ${max} characters.`);
+};
 
 async function view(code: string, actor: Actor, deps: Deps): Promise<DealView> {
   const loaded = await loadDeal(deps.db, code, actor);
@@ -112,8 +108,9 @@ export async function handle(code: string, actor: Actor, command: Command, deps:
     case "start_payment": await startPayment(code, actor, deps); break;
     case "confirm_approval": await confirmApproval(code, actor, command.order_id, deps); break;
     case "cancel": await cancel(code, actor, deps); break;
-    case "submit_evidence": case "review": case "retry_payout":
-      throw new DealError("internal_error", "not implemented: T-10");
+    case "submit_evidence": await submitEvidence(code, actor, command, deps); break;
+    case "review": await review(code, actor, command, deps); break;
+    case "retry_payout": await retryPayout(code, actor, deps); break;
   }
   return view(code, actor, deps);
 }
@@ -255,14 +252,7 @@ async function cancel(code: string, actor: Actor, deps: Deps): Promise<void> {
   requireLive(loaded.deal);
   if (!nextStatus(loaded.deal.status, "cancel")) throw new DealError("invalid_state", "This deal can no longer be cancelled.");
   const auth = loaded.deal.payment?.authorization_id ?? null;
-  if (auth) {
-    try {
-      await deps.paypal.voidAuthorization(auth, voidKey(code)); // PREVIOUSLY_VOIDED resolves as success in the adapter (C4)
-    } catch (e) {
-      if (e instanceof PayPalError && e.status === 422 && e.name_ !== "PREVIOUSLY_VOIDED") await captureAfterRefusedVoid(loaded.deal, actor, deps, e);
-      rethrowPaypal(e, "void");
-    }
-  }
+  if (auth && (await voidHold(loaded.deal, deps)) === "captured") throw new DealError("invalid_state", "The payment was already captured");
   const { deal, result } = await inTx(deps, async (tx) => {
     const { deal } = await loadLocked(tx, code, actor);
     if (!nextStatus(deal.status, "cancel")) throw new DealError("invalid_state", "This deal can no longer be cancelled.");
@@ -275,20 +265,105 @@ async function cancel(code: string, actor: Actor, deps: Deps): Promise<void> {
   await afterCommit(deps, deal, result);
 }
 
-/** C4: a void refused as already captured re-sends capture-{code}-{n}, applies the capture fact and answers invalid_state. */
-async function captureAfterRefusedVoid(deal: DealRow, actor: Actor, deps: Deps, voidError: PayPalError): Promise<never> {
-  const code = deal.public_code;
-  const key = captureKey(code, deal.payment?.capture_attempts ?? 0);
-  const cap = await deps.paypal
-    .captureAuthorization(deal.payment!.authorization_id!, deal.amount_minor!, key)
-    .catch(() => rethrowPaypal(voidError, "void")); // the re-sent capture also failed: the original void error
-  const fact = captureFact(cap);
-  if (fact) {
-    const applied = await inTx(deps, async (tx) => {
-      const { deal: locked } = await loadLocked(tx, code, actor);
-      return { deal: locked, result: await applyFactTx(tx, deps, locked, fact, { source: "api", paypal_request_id: key }) };
+/** 04 section 9.1: Tx A validates against the rows, stores the evidence and moves held -> proof_submitted; the verdict runs after commit. */
+async function submitEvidence(code: string, actor: Actor, cmd: Extract<Command, { type: "submit_evidence" }>, deps: Deps): Promise<void> {
+  const { file_ids, tracking_number, note } = cmd;
+  if (file_ids.length > 6) throw new DealError("too_many_files", "At most 6 evidence photos per submission.");
+  textLength(tracking_number, 64, "tracking_number");
+  textLength(note, 1000, "note");
+  await inTx(deps, async (tx) => {
+    const loaded = await loadLocked(tx, code, actor);
+    requireRole(loaded, "seller");
+    const { deal } = loaded;
+    if (deal.status !== "held") throw new DealError("invalid_state", "Evidence can be submitted only while the money is held.");
+    if (!deal.deadline_at || deps.clock.now() >= deal.deadline_at) throw new DealError("invalid_state", "The deadline has passed");
+    if (file_ids.length === 0 && deal.conditions.some((c) => c.evidence_type === "photo")) throw new DealError("invalid_input", "At least one photo is required.");
+    if (!tracking_number && deal.conditions.some((c) => c.evidence_type === "tracking")) throw new DealError("invalid_input", "A tracking number is required.");
+    const used = new Set(deal.evidence.map((e) => e.file_id));
+    const files = deal.files.filter((f) => f.purpose === "evidence" && !used.has(f.id) && file_ids.includes(f.id)); // upload order
+    if (files.length !== file_ids.length || new Set(file_ids).size !== file_ids.length) {
+      throw new DealError("invalid_input", "Every file id must be an evidence photo of this deal that no submission has used.");
+    }
+    const submission_no = deal.fix_attempts_used + 1;
+    const carrier_status = tracking_number ? carrierStatus(tracking_number) : null;
+    const row = (kind: "photo" | "tracking" | "note", position: number, file_id: string | null, value: string | null) =>
+      ({ deal_id: deal.id, submission_no, kind, position, file_id, value, uploaded_by: actor.user_id });
+    await tx.evidence.createMany({
+      data: [
+        ...files.map((f, i) => row("photo", i + 1, f.id, null)),
+        ...(tracking_number ? [row("tracking", 0, null, tracking_number)] : []), // 03: tracking and note rows sit at position 0
+        ...(note ? [row("note", 0, null, note)] : []),
+      ],
     });
-    await afterCommit(deps, applied.deal, applied.result);
+    await transition(tx, deal, "proof_submitted", "seller", "submit_evidence", { submission_no, file_ids: files.map((f) => f.id), tracking_number, carrier_status });
+  });
+  await runVerdict(code, deps);
+}
+
+/** 04 section 9.2: the stored verdicts are the intent; capture or void, then one transaction with the review:* event and the fact. */
+async function review(code: string, actor: Actor, cmd: Extract<Command, { type: "review" }>, deps: Deps): Promise<void> {
+  textLength(cmd.note, 1000, "note");
+  const loaded = await loadDeal(deps.db, code, actor);
+  requireRole(loaded, "buyer");
+  requireLive(loaded.deal);
+  if (loaded.deal.status !== "in_review") throw new DealError("invalid_state", "There is nothing to review on this deal.");
+  const moved = () => new DealError("invalid_state", "The deal moved on while PayPal was being called.");
+
+  if (cmd.decision === "approve") {
+    const r = await captureHold(loaded.deal, deps);
+    if (!r) return; // the hold was gone: authorization_voided applied
+    const done = await inTx(deps, async (tx) => {
+      const { deal } = await loadLocked(tx, code, actor);
+      if (deal.status !== "in_review") throw moved();
+      await transition(tx, deal, "captured", "buyer", "review:approve", { note: cmd.note, capture_id: r.cap.capture_id, capture_status: r.cap.status });
+      return { deal, result: await applyFactTx(tx, deps, deal, r.fact, { source: "api", paypal_request_id: r.key }) };
+    });
+    await afterCommit(deps, done.deal, done.result);
+    return;
   }
-  throw new DealError("invalid_state", "The payment was already captured");
+
+  if ((await voidHold(loaded.deal, deps)) === "captured") throw new DealError("invalid_state", "The payment was already captured");
+  const done = await inTx(deps, async (tx) => {
+    const { deal } = await loadLocked(tx, code, actor);
+    if (deal.status !== "in_review") throw moved();
+    const authorization_id = deal.payment!.authorization_id!;
+    await transition(tx, deal, "voided", "buyer", "review:reject", { note: cmd.note, authorization_id });
+    return { deal, result: await applyFactTx(tx, deps, deal, { type: "authorization_voided", authorization_id }, { source: "api", paypal_request_id: voidKey(code) }) };
+  });
+  await afterCommit(deps, done.deal, done.result);
+}
+
+/** 02 section 5.1 retry_payout; 04 section 9.4: re-send attempt n (pending, no batch id) or create n + 1 (failed; UNCLAIMED cancelled first). */
+async function retryPayout(code: string, actor: Actor, deps: Deps): Promise<void> {
+  const loaded = await loadDeal(deps.db, code, actor);
+  requireRole(loaded, "seller");
+  requireLive(loaded.deal);
+  const { deal } = loaded;
+  const latest = deal.payouts.at(-1);
+  if (deal.status !== "captured" || deal.payment?.status !== "captured" || !latest) throw new DealError("invalid_state", "There is no payout to retry.");
+  const resend = latest.status === "pending" && latest.paypal_batch_id === null;
+  if (!resend && latest.status !== "failed") throw new DealError("invalid_state", "PayPal has this payout; its result will arrive by webhook.");
+  if (!deal.seller?.paypal_email) throw new DealError("paypal_email_required", "Add a PayPal email before retrying the payout.");
+  const cancelled_item_id = !resend && latest.failure_reason === "UNCLAIMED" && latest.paypal_item_id ? latest.paypal_item_id : null;
+  if (cancelled_item_id) await deps.paypal.cancelPayoutItem(cancelled_item_id).catch((e) => rethrowPaypal(e, "cancel payout item"));
+
+  const row = await inTx(deps, async (tx) => {
+    const { deal: d } = await loadLocked(tx, code, actor);
+    const cur = d.payouts.at(-1);
+    const email = d.seller?.paypal_email;
+    if (d.status !== "captured" || !cur || cur.id !== latest.id || cur.status !== latest.status || cur.paypal_batch_id !== latest.paypal_batch_id) {
+      throw new DealError("invalid_state", "The payout changed; reload the deal.");
+    }
+    if (!email) throw new DealError("paypal_email_required");
+    const row = resend
+      ? cur
+      : await tx.payout.create({
+          data: { deal_id: d.id, attempt: cur.attempt + 1, sender_batch_id: payoutBatchId(code, cur.attempt + 1), recipient_email: email, amount_minor: d.amount_minor!, status: "pending" },
+        });
+    await writeEvent(tx, d, "seller", "retry_payout", {
+      attempt: row.attempt, sender_batch_id: row.sender_batch_id, paypal_batch_id: row.paypal_batch_id, status: row.status, failure_reason: row.failure_reason, cancelled_item_id,
+    });
+    return row;
+  });
+  await sendPayout(deps, row, code);
 }

@@ -3,12 +3,13 @@
 // Shared by confirm_approval and cancel (T-08), the webhook path (T-09) and the verdict/review/tick paths (T-10).
 import type { Payout } from "@/generated/prisma/client";
 import { PayPalError } from "@/lib/paypal/types";
-import type { DealRow } from "./access";
+import { DEAL_INCLUDE, type DealRow } from "./access";
 import { deadlineAt } from "./dates";
+import { DealError } from "./errors";
 import { applyFact, type PaypalFact } from "./facts";
-import { payoutBatchId, strayVoidKey, voidKey } from "./keys";
+import { captureKey, payoutBatchId, strayVoidKey, voidKey } from "./keys";
 import { notifyCaptureDeclined } from "./notify";
-import { transition, writeEvent, type Tx } from "./transition";
+import { lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps } from "./types";
 
 export type { PaypalFact } from "./facts";
@@ -18,12 +19,73 @@ export type FactSource = { source: "api"; paypal_request_id: string } | { source
 export type AfterCommit = { payout: Payout | null; declined: boolean };
 export type FactResult = { outcome: "noop" } | { outcome: "applied"; after: AfterCommit };
 
-/** The fact a captureAuthorization answer carries; null for a status no C2 row names (FAILED, refunds). */
+/** The fact a captureAuthorization answer carries; FAILED is treated as DECLINED (04 section 9.1 step 9); null for refunds. */
 export function captureFact(r: { capture_id: string; status: string; reason: string | null }): PaypalFact | null {
   if (r.status === "COMPLETED") return { type: "capture_completed", capture_id: r.capture_id };
   if (r.status === "PENDING") return { type: "capture_pending", capture_id: r.capture_id, reason: r.reason };
-  if (r.status === "DECLINED") return { type: "capture_declined", capture_id: r.capture_id, reason: r.reason };
+  if (r.status === "DECLINED" || r.status === "FAILED") return { type: "capture_declined", capture_id: r.capture_id, reason: r.reason };
   return null;
+}
+
+/** PayPalError -> paypal_error with the debug id (02 section 3.3); anything else propagates as internal_error. */
+export function rethrowPaypal(e: unknown, what: string): never {
+  if (e instanceof PayPalError) {
+    const detail = `${e.name_ ?? `HTTP ${e.status}`}${e.debug_id ? ` (debug_id ${e.debug_id})` : ""}`;
+    throw new DealError("paypal_error", `PayPal ${what} failed: ${detail}`, e.debug_id ?? undefined);
+  }
+  throw e;
+}
+
+const inTx = <T>(deps: Deps, fn: (tx: Tx) => Promise<T>) => deps.db.$transaction(fn, TX_OPTIONS);
+
+/** The deal locked and reloaded inside the caller's transaction (8.2 Tx-after). */
+export async function lockAndLoad(tx: Tx, id: string): Promise<DealRow> {
+  await lockDeal(tx, id);
+  return tx.deal.findUniqueOrThrow({ where: { id }, include: DEAL_INCLUDE });
+}
+
+export type Captured = { key: string; cap: { capture_id: string; status: string; reason: string | null }; fact: PaypalFact };
+
+/** capture-{code}-{n} on the stored authorization (8.2). A 422 AUTHORIZATION_EXPIRED / AUTHORIZATION_VOIDED applies authorization_voided
+ *  and returns null (02 section 7); any other failure is paypal_error with nothing written. The caller writes Tx-after. */
+export async function captureHold(deal: DealRow, deps: Deps): Promise<Captured | null> {
+  const p = deal.payment!;
+  const key = captureKey(deal.public_code, p.capture_attempts);
+  try {
+    const cap = await deps.paypal.captureAuthorization(p.authorization_id!, deal.amount_minor!, key);
+    return { key, cap, fact: captureFact(cap) ?? { type: "capture_declined", capture_id: cap.capture_id, reason: cap.reason } };
+  } catch (e) {
+    if (!(e instanceof PayPalError && e.status === 422 && (e.name_ === "AUTHORIZATION_EXPIRED" || e.name_ === "AUTHORIZATION_VOIDED"))) rethrowPaypal(e, "capture");
+    const done = await inTx(deps, async (tx) => {
+      const d = await lockAndLoad(tx, deal.id);
+      return { deal: d, result: await applyFactTx(tx, deps, d, { type: "authorization_voided", authorization_id: p.authorization_id! }, { source: "api", paypal_request_id: key }) };
+    });
+    await afterCommit(deps, done.deal, done.result);
+    return null;
+  }
+}
+
+/** void-{code} on the stored authorization; PREVIOUSLY_VOIDED resolves in the adapter. "captured" is C4: the void was refused because the
+ *  money is captured, capture-{code}-{n} was re-sent and its fact applied; the caller then stops. Any other failure is paypal_error. */
+export async function voidHold(deal: DealRow, deps: Deps): Promise<"voided" | "captured"> {
+  const p = deal.payment!;
+  try {
+    await deps.paypal.voidAuthorization(p.authorization_id!, voidKey(deal.public_code));
+    return "voided";
+  } catch (e) {
+    if (!(e instanceof PayPalError && e.status === 422 && e.name_ !== "PREVIOUSLY_VOIDED")) rethrowPaypal(e, "void");
+    const key = captureKey(deal.public_code, p.capture_attempts);
+    const cap = await deps.paypal.captureAuthorization(p.authorization_id!, deal.amount_minor!, key).catch(() => rethrowPaypal(e, "void")); // the re-sent capture also failed: the original void error
+    const fact = captureFact(cap);
+    if (fact) {
+      const done = await inTx(deps, async (tx) => {
+        const d = await lockAndLoad(tx, deal.id);
+        return { deal: d, result: await applyFactTx(tx, deps, d, fact, { source: "api", paypal_request_id: key }) };
+      });
+      await afterCommit(deps, done.deal, done.result);
+    }
+    return "captured";
+  }
 }
 
 /** Deal row locked by the caller. Mutates deal.status on a transition. */

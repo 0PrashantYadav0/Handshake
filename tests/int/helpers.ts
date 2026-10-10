@@ -6,8 +6,9 @@ import { fakeAi, type FakeAi } from "@/lib/ai/fake";
 import { fakeEmail, type RecordingEmail } from "@/lib/email/console";
 import { fakePaypal, type FakePaypal } from "@/lib/paypal/fake";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
-import { createDeal, DealError, handle } from "@/lib/deal";
-import type { Actor, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
+import { addFile, createDeal, DealError, handle } from "@/lib/deal";
+import type { JudgeMode } from "@/lib/ai/fake";
+import type { Actor, DealView, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
 import { expect } from "vitest";
 
 process.env.SESSION_SECRET ??= "test-session-secret-at-least-32-characters-long";
@@ -78,9 +79,42 @@ export async function parties() {
 }
 export type Parties = Awaited<ReturnType<typeof parties>>;
 
+/** A distinct, valid-looking JPEG (FF D8 FF header) per seed; 64 bytes. */
+export function makeJpeg(seed: number): Uint8Array {
+  const b = new Uint8Array(64);
+  b.set([0xff, 0xd8, 0xff, 0xe0]);
+  for (let i = 4; i < b.length; i++) b[i] = (seed * 31 + i * 7) & 0xff;
+  b[b.length - 1] = seed & 0xff;
+  return b;
+}
+
+export const TRACKING = "TRK-DEMO-0000"; // last digit even: delivered (D7)
+
 /** Drives a deal through the real commands; each step returns the public code. */
 export function dealBuilder(deps: TestDeps, p: Parties) {
   const b = {
+    /** n evidence photos uploaded by the seller (held); returns their file ids in upload order. */
+    async evidence(code: string, n = 2, seedFrom = 100): Promise<string[]> {
+      const ids: string[] = [];
+      for (let i = 0; i < n; i++) ids.push((await addFile(code, p.asSeller, { purpose: "evidence", mime: "image/jpeg", bytes: makeJpeg(seedFrom + i) }, deps)).id);
+      return ids;
+    },
+    /** submit_evidence on a held deal with fresh photos and TRK-DEMO-0000; the verdict and the decision run inside (B5). */
+    async submit(code: string, extra: { note?: string | null; tracking_number?: string | null; files?: number } = {}): Promise<DealView> {
+      const file_ids = await b.evidence(code, extra.files ?? 2, 100 + 10 * (await deps.db.evidence.count({ where: { deal: { public_code: code } } })));
+      return handle(code, p.asSeller, { type: "submit_evidence", file_ids, tracking_number: extra.tracking_number === undefined ? TRACKING : extra.tracking_number, note: extra.note ?? null }, deps);
+    },
+    /** held, then submit_evidence judged with `set` (default: all pass); the status is wherever decide() sent it. */
+    async proofSubmitted(set: JudgeMode = []): Promise<string> {
+      const code = await b.held();
+      deps.ai.judgeWith(set);
+      await b.submit(code);
+      return code;
+    },
+    /** in_review: c1 unclear 0.40 (SB-4). */
+    inReview: (): Promise<string> => b.proofSubmitted([{ result: "unclear", confidence: 0.4, reason: "Blurry." }]),
+    /** captured with CAP-1, payout attempt 1 sent (SB-1 to captured). */
+    captured: (): Promise<string> => b.proofSubmitted(),
     async draft(text = DEFAULT_TEXT): Promise<string> {
       return (await createDeal(p.asBuyer, { text }, deps)).code;
     },
