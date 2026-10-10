@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# env
+.env
+.env.*
+!.env.example
+
+# prisma
+generated/
+
+# tests
+coverage/
+test-results/
+playwright-report/
+
+# os / editor
+.DS_Store
+*.log
+.idea/
+.vscode/
