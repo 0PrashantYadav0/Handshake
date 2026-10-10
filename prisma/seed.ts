@@ -1,0 +1,171 @@
+// Seed (03 "Seed"; decisions F3, F6): the two demo personas, upserted on every run, and 25 historical deals written
+// once (skipped when any deals.seeded row exists). Events only, no PayPal objects, no photos: conditions and verdicts
+// are enough for the deal page, the ledger and the dashboard. Run: npm run seed (tsx prisma/seed.ts).
+import { pathToFileURL } from "node:url";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient, type Prisma } from "../generated/prisma/client";
+import { newPublicCode } from "../lib/deal/code";
+import { CODE_CONDITION } from "../lib/deal/terms";
+import type { DealStatus, EventActor, VerdictResult } from "../lib/deal/types";
+
+type Db = Pick<PrismaClient, "user" | "deal" | "$transaction">;
+
+type Ev = { from_status: DealStatus | null; to_status: DealStatus; actor: EventActor; cause: string; payload: Prisma.InputJsonObject; created_at: Date };
+type Row = { result: VerdictResult; confidence: number; reason: string };
+type VerdictSpec = { submission_no: 1 | 2; rows: Row[]; created_at: Date };
+
+type Kind =
+  | "draft" | "draft_joined" | "terms_agreed" | "held"
+  | "in_review_limit" | "in_review_unclear" | "captured_payout_failed"
+  | "paid" | "paid_fix" | "paid_review"
+  | "voided_cancel" | "voided_deadline" | "voided_fix" | "voided_reject";
+
+// [kind, item, amount_minor, deadline_days, age in days]: the 03 distribution (draft 3, terms_agreed 2, held 4,
+// in_review 2, captured 2, paid 8, voided 4), amounts 1,500 to 45,000, ages spread over 60 days.
+const DEALS: [Kind, string, number, number, number][] = [
+  ["paid", "blue ceramic mug", 1800, 5, 59], ["paid", "wooden desk lamp", 3500, 7, 55], ["voided_cancel", "board game", 2400, 5, 53],
+  ["paid_fix", "stainless steel water bottle", 2200, 7, 50], ["paid_review", "mirrorless camera lens", 45000, 10, 47], ["paid", "denim jacket", 6500, 5, 44],
+  ["captured_payout_failed", "wireless headphones", 9900, 7, 41], ["voided_deadline", "vintage record player", 15000, 7, 38],
+  ["paid_review", "road bicycle", 32000, 14, 32], ["voided_fix", "leather satchel", 7200, 7, 29], ["paid_fix", "cast iron skillet", 4100, 5, 26],
+  ["paid", "mechanical keyboard", 12500, 7, 23], ["captured_payout_failed", "acoustic guitar", 19900, 14, 20], ["voided_reject", "standing desk mat", 1500, 3, 17],
+  ["in_review_limit", "electric scooter", 42000, 14, 11], ["in_review_unclear", "chess set", 5600, 5, 9],
+  ["held", "linen tablecloth", 3900, 7, 6], ["held", "robot vacuum", 19000, 10, 5], ["held", "bluetooth speaker", 7400, 7, 4],
+  ["held", "ceramic plant pot", 2900, 5, 3], ["terms_agreed", "winter coat", 11000, 7, 2], ["terms_agreed", "yoga mat", 2600, 3, 2],
+  ["draft_joined", "reading lamp", 4500, 5, 1], ["draft", "garden hose", 3100, 5, 1], ["draft", "picture frame", 1900, 3, 0],
+];
+
+const PASS = "The photos match the listing and the code is legible.";
+const FAIL = "The item in the photo does not match the listing.";
+const UNCLEAR = "The photo is too blurry to compare with the listing.";
+
+const conditionsFor = (i: number, code: string): { id: string; position: number; text: string; evidence_type: "photo" | "tracking" }[] => {
+  const own: [string, "photo" | "tracking"][] =
+    i % 3 === 0 ? [["Item matches the listing photos", "photo"], ["Tracking shows delivered", "tracking"]]
+    : i % 3 === 1 ? [["Item matches the listing photos", "photo"], ["Original box is included", "photo"], ["Tracking shows delivered", "tracking"]]
+    : [["Item matches the listing photos", "photo"]];
+  return [...own, [CODE_CONDITION(code), "photo"] as [string, "photo"]].map(([text, evidence_type], k) => ({ id: crypto.randomUUID(), position: k + 1, text, evidence_type }));
+};
+
+/** Walks one deal's path; from_status chains from the previous to_status (C2) and time advances per step. */
+function trail(kind: Kind, start: Date, deal: { seller_id: string; amount_minor: number; deadline_days: number; source_text: string; conditionIds: string[] }) {
+  const events: Ev[] = [];
+  const verdicts: VerdictSpec[] = [];
+  let at = start;
+  let deadline_at: Date | null = null;
+  const step = (cause: string, actor: EventActor, to: DealStatus, payload: Prisma.InputJsonObject = {}, afterMin = 90) => {
+    at = new Date(at.getTime() + afterMin * 60_000);
+    events.push({ from_status: events.at(-1)?.to_status ?? null, to_status: to, actor, cause, payload: { seeded: true, ...payload }, created_at: at });
+  };
+  const done = () => ({ events, verdicts, deadline_at, status: events.at(-1)!.to_status });
+  const judge = (no: 1 | 2, rows: Row[]) => {
+    step("submit_evidence", "seller", "proof_submitted", { submission_no: no, file_ids: [], tracking_number: "TRK-DEMO-0000", carrier_status: "delivered" }, 2 * 24 * 60);
+    const vs = deal.conditionIds.map((condition_id, k) => ({ condition_id, result: rows[k].result, confidence: rows[k].confidence }));
+    step("verdict", "ai", "proof_submitted", { submission_no: no, model: "seed", prompt_version: "judge-v1", verdicts: vs }, 1);
+    verdicts.push({ submission_no: no, rows, created_at: at });
+  };
+  const allPass = (seedConf: number) => deal.conditionIds.map((_, k) => ({ result: "pass" as const, confidence: Math.round((0.86 + ((seedConf + k * 3) % 13) / 100) * 100) / 100, reason: PASS }));
+  const oneFail = () => allPass(5).map((r, k) => (k === 0 ? { result: "fail" as const, confidence: 0.93, reason: FAIL } : r));
+  const oneUnclear = () => allPass(2).map((r, k) => (k === 0 ? { result: "unclear" as const, confidence: 0.55, reason: UNCLEAR } : r));
+  const paidTail = () => {
+    step("fact:capture_completed", "paypal", "captured", { payout: { attempt: 1 } }, 2);
+    step("fact:payout_succeeded", "paypal", "paid", { attempt: 1 }, 5);
+  };
+
+  step("create", "buyer", "draft", { source_text: deal.source_text, model: "seed", prompt_version: "extract-v1", rejected: [] }, 0);
+  if (kind === "draft") return done();
+  step("join", "seller", "draft", { seller_id: deal.seller_id });
+  step("accept", "buyer", "draft", { terms_version: 1 });
+  if (kind === "draft_joined") return done();
+  step("accept", "seller", "terms_agreed", { terms_version: 1 });
+  if (kind === "terms_agreed") return done();
+  if (kind === "voided_cancel") {
+    step("cancel", "buyer", "voided", { voided: false }, 6 * 60);
+    return done();
+  }
+  step("start_payment", "buyer", "terms_agreed", { order_attempt: 1 });
+  deadline_at = new Date(at.getTime() + 10 * 60_000 + deal.deadline_days * 24 * 60 * 60_000);
+  step("fact:authorization_created", "paypal", "held", { auth_expires_at: new Date(at.getTime() + 10 * 60_000 + 29 * 24 * 60 * 60_000).toISOString() }, 10);
+  switch (kind) {
+    case "held": break;
+    case "voided_deadline": step("tick:deadline", "system", "voided", { deadline_at: deadline_at.toISOString() }, deal.deadline_days * 24 * 60 + 30); break;
+    case "in_review_limit": judge(1, allPass(1)); step("decision:buyer_review", "system", "in_review", { submission_no: 1, reason: "amount_over_limit" }, 1); break;
+    case "in_review_unclear": judge(1, oneUnclear()); step("decision:buyer_review", "system", "in_review", { submission_no: 1, reason: "unclear" }, 1); break;
+    case "voided_reject":
+      judge(1, oneUnclear()); step("decision:buyer_review", "system", "in_review", { submission_no: 1, reason: "unclear" }, 1);
+      step("review:reject", "buyer", "voided", { note: "The photo does not show my item." }, 5 * 60); break;
+    case "paid_review":
+      judge(1, allPass(3)); step("decision:buyer_review", "system", "in_review", { submission_no: 1, reason: "amount_over_limit" }, 1);
+      step("review:approve", "buyer", "captured", { note: "Looks right, releasing." }, 4 * 60); paidTail(); break;
+    case "captured_payout_failed":
+      judge(1, allPass(4)); step("decision:capture", "system", "captured", { submission_no: 1 }, 1);
+      step("fact:capture_completed", "paypal", "captured", { payout: { attempt: 1 } }, 2);
+      step("fact:payout_failed", "paypal", "captured", { attempt: 1, failure_reason: "RECEIVER_UNREGISTERED" }, 5); break;
+    case "paid": judge(1, allPass(6)); step("decision:capture", "system", "captured", { submission_no: 1 }, 1); paidTail(); break;
+    case "paid_fix":
+      judge(1, oneFail()); step("decision:request_fix", "system", "held", { submission_no: 1 }, 1);
+      judge(2, allPass(7)); step("decision:capture", "system", "captured", { submission_no: 2 }, 1); paidTail(); break;
+    case "voided_fix":
+      judge(1, oneFail()); step("decision:request_fix", "system", "held", { submission_no: 1 }, 1);
+      judge(2, oneFail()); step("decision:void", "system", "voided", { submission_no: 2 }, 1); break;
+  }
+  return done();
+}
+
+/** Upserts the personas every run; writes the historical deals only when none exist. Returns the counts. */
+export async function seed(db: Db, now = new Date()): Promise<{ users: number; deals: number }> {
+  const buyer = await db.user.upsert({
+    where: { email: "demo-buyer@handshake.demo" },
+    update: { display_name: "Demo Buyer" },
+    create: { email: "demo-buyer@handshake.demo", display_name: "Demo Buyer" },
+  });
+  const paypal_email = process.env.DEMO_SELLER_PAYPAL_EMAIL || null;
+  const seller = await db.user.upsert({
+    where: { email: "demo-seller@handshake.demo" },
+    update: { display_name: "Demo Seller", paypal_email },
+    create: { email: "demo-seller@handshake.demo", display_name: "Demo Seller", paypal_email },
+  });
+
+  const existing = await db.deal.count({ where: { seeded: true } });
+  if (existing) {
+    console.log(`seed: ${existing} historical deals already present, skipping`);
+    return { users: 2, deals: existing };
+  }
+
+  await db.$transaction(async (tx) => {
+    for (const [i, [kind, item, amount_minor, deadline_days, age]] of DEALS.entries()) {
+      let public_code = newPublicCode();
+      while (await tx.deal.findUnique({ where: { public_code } })) public_code = newPublicCode();
+      const conditions = conditionsFor(i, public_code);
+      const source_text = `I'll pay $${(amount_minor / 100).toFixed(amount_minor % 100 ? 2 : 0)} for the ${item} if it arrives within ${deadline_days} days, matches the listing photos and tracking shows delivered`;
+      const start = new Date(now.getTime() - age * 24 * 60 * 60_000 - 9 * 60 * 60_000);
+      const t = trail(kind, start, { seller_id: seller.id, amount_minor, deadline_days, source_text, conditionIds: conditions.map((c) => c.id) });
+      const joined = kind !== "draft";
+      const agreed = joined && kind !== "draft_joined";
+      const deal = await tx.deal.create({
+        data: {
+          public_code, seeded: true, buyer_id: buyer.id, seller_id: joined ? seller.id : null,
+          status: t.status, source_text, item_title: item, amount_minor, deadline_days, deadline_at: t.deadline_at,
+          terms_version: 1, buyer_accepted_version: joined ? 1 : null, seller_accepted_version: agreed ? 1 : null,
+          fix_attempts_used: t.verdicts.length === 2 ? 1 : 0,
+          created_at: t.events[0].created_at, updated_at: t.events.at(-1)!.created_at,
+          conditions: { create: conditions },
+        },
+      });
+      await tx.dealEvent.createMany({ data: t.events.map((e) => ({ deal_id: deal.id, ...e })) });
+      await tx.verdict.createMany({
+        data: t.verdicts.flatMap((v) => v.rows.map((r, k) => ({
+          deal_id: deal.id, condition_id: conditions[k].id, submission_no: v.submission_no, ...r,
+          evidence_used: [], model: "seed", prompt_version: "judge-v1", raw_response: { seeded: true }, created_at: v.created_at,
+        }))),
+      });
+    }
+  }, { timeout: 60_000 });
+  console.log(`seed: wrote ${DEALS.length} historical deals`);
+  return { users: 2, deals: DEALS.length };
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  try { process.loadEnvFile(); } catch {} // .env is optional; Render and CI inject env vars
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+  seed(prisma).finally(() => prisma.$disconnect());
+}
