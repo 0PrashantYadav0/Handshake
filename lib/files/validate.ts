@@ -4,6 +4,7 @@ import { DealError } from "@/lib/deal/errors";
 import type { Mime } from "@/lib/deal/types";
 
 export const MAX_FILE_BYTES = 2_097_152;
+export const MAX_BODY_BYTES = 2_621_440; // Content-Length cap on the upload request (04 section 8.1)
 
 const at = (b: Uint8Array, i: number, s: string) => b.length >= i + s.length && s.split("").every((ch, k) => b[i + k] === ch.charCodeAt(0));
 
