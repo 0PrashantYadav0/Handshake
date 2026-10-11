@@ -4,7 +4,8 @@ import { canonicalJson, CONTRACT_FORMAT, signingMessage, type ContractDoc } from
 import { fingerprint, verifySignature, type PublicKey } from "@/lib/contract/signature";
 import type { DealRow } from "./access";
 import { DealError } from "./errors";
-import type { Tx } from "./transition";
+import { lockDeal, TX_OPTIONS, writeEvent, type Tx } from "./transition";
+import type { Deps } from "./types";
 
 /** null until both parties are named and the amount and deadline are set: there is nothing to sign yet. */
 export function contractDocOf(deal: Pick<DealRow, "public_code" | "terms_version" | "item_title" | "amount_minor" | "deadline_days" | "conditions" | "buyer" | "seller">): ContractDoc | null {
@@ -35,4 +36,44 @@ export async function useSigningKey(tx: Tx, userId: string, pk: PublicKey, now: 
 
 export async function checkSignature(pk: PublicKey, hash: string, signature: string): Promise<void> {
   if (!(await verifySignature(pk, signingMessage(hash), signature))) throw new DealError("signature_invalid", "The signature does not match this contract.");
+}
+
+// ---------- trust spec §7: the gate before every money step ----------
+
+/** null when both parties signed the current terms and both signatures verify against the hash of the rows as they are now. */
+export async function verifyContract(deal: DealRow): Promise<string | null> {
+  const doc = contractDocOf(deal);
+  if (!doc) return "there is no complete contract";
+  const v = deal.terms_version;
+  if (deal.buyer_accepted_version !== v || deal.seller_accepted_version !== v) return `both parties have not signed version ${v}`;
+  const hash = hashOf(doc);
+  for (const role of ["buyer", "seller"] as const) {
+    const s = deal.signatures.find((x) => x.role === role && x.terms_version === v);
+    if (!s) return `the ${role} signature for version ${v} is missing`;
+    const owner = role === "buyer" ? deal.buyer_id : deal.seller_id;
+    if (s.user_id !== owner || s.key.user_id !== owner) return `the ${role} signature was not made by the ${role}`;
+    if (s.contract_hash !== hash) return `the terms differ from what the ${role} signed`;
+    if (!(await verifySignature({ x: s.key.x, y: s.key.y }, signingMessage(hash), s.signature))) return `the ${role} signature does not verify`;
+  }
+  return null;
+}
+
+export const contractInvalid = (problem: string) =>
+  new DealError("contract_invalid", `The contract no longer matches what both parties signed (${problem}). No money was moved.`);
+
+/** Outside any transaction: on failure writes contract:verification_failed (under the row lock) and throws contract_invalid. */
+export async function requireContract(deal: DealRow, deps: Deps, step: "start_payment" | "confirm_approval" | "capture" | "payout"): Promise<void> {
+  const problem = await verifyContract(deal);
+  if (!problem) return;
+  await recordContractFailure(deal.id, deps, step, problem);
+  throw contractInvalid(problem);
+}
+
+export async function recordContractFailure(dealId: string, deps: Deps, step: string, problem: string): Promise<void> {
+  await deps.db.$transaction(async (tx) => {
+    await lockDeal(tx, dealId);
+    const cur = await tx.deal.findUniqueOrThrow({ where: { id: dealId }, select: { id: true, status: true } });
+    await writeEvent(tx, cur, "system", "contract:verification_failed", { step, problem });
+  }, TX_OPTIONS);
+  console.error(`[contract] ${step} refused for deal ${dealId}: ${problem}`);
 }

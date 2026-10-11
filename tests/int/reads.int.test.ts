@@ -110,7 +110,9 @@ describe("evidence pack", () => {
     await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v.payment!.paypal_order_id }, deps);
 
     const pack = await getEvidencePack(code, p.asSeller, deps);
-    expect(Object.keys(pack).sort()).toEqual(["conditions", "deal", "events", "extraction", "format", "generated_at", "generated_for", "parties", "payment", "payouts", "reference_files", "submissions", "webhook_events"].sort());
+    expect(Object.keys(pack).sort()).toEqual(["conditions", "contract", "deal", "events", "extraction", "format", "generated_at", "generated_for", "parties", "payment", "payouts", "reference_files", "signature_history", "submissions", "webhook_events"].sort());
+    expect(pack.contract?.signatures.map((x) => x.role).sort()).toEqual(["buyer", "seller"]); // trust spec §6
+    expect(pack.signature_history).toHaveLength(2);
     expect(pack).toMatchObject({
       format: "handshake-evidence-pack/1", generated_at: toIso(deps.clock.now()), generated_for: "seller",
       deal: { code, status: "held", terms_version: 1, seeded: false },
