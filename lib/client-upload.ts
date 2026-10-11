@@ -78,7 +78,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.ok) return res.json() as Promise<T>;
   const body = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
   const code = body?.error?.code ?? "internal_error";
-  if (code === "not_signed_in") location.assign(new URL(`/?next=${encodeURIComponent(location.pathname)}`, location.origin).href);
+  if (code === "not_signed_in") location.assign(new URL(`/signin?next=${encodeURIComponent(location.pathname)}`, location.origin).href);
   throw new ApiError(code, body?.error?.message ?? "");
 }
 

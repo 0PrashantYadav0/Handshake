@@ -1,4 +1,4 @@
-// Error mapping (H2; 02 section 3.3): the 16 codes, their statuses, the response shape, and no extra member.
+// Error mapping (H2; 02 section 3.3): the 21 codes, their statuses, the response shape, and no extra member.
 import { describe, expect, it } from "vitest";
 import { DealError, HTTP_STATUS, type DealErrorCode } from "@/lib/deal/errors";
 import { toResponse } from "@/lib/http";
@@ -8,12 +8,13 @@ const EXPECTED: Record<DealErrorCode, number> = {
   invalid_state: 409, terms_not_accepted: 409, terms_version_mismatch: 409, paypal_email_required: 409,
   condition_not_checkable: 422, unsupported_currency: 422, too_many_files: 422, rate_limited: 429,
   internal_error: 500, paypal_error: 502, ai_unavailable: 503,
+  mfa_required: 401, totp_invalid: 400, signature_invalid: 400, contract_invalid: 409, payout_email_unverified: 409,
 };
 
 describe("error mapping (H2)", () => {
-  it("the code list is exactly 16 and has no other member", () => {
+  it("the code list is exactly 21 and has no other member", () => {
     expect(Object.keys(HTTP_STATUS).sort()).toEqual(Object.keys(EXPECTED).sort());
-    expect(Object.keys(HTTP_STATUS)).toHaveLength(16);
+    expect(Object.keys(HTTP_STATUS)).toHaveLength(21);
   });
 
   it.each(Object.entries(EXPECTED) as [DealErrorCode, number][])("%s -> %i with { error: { code, message } }", async (code, status) => {

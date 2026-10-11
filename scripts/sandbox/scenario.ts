@@ -126,7 +126,12 @@ async function signIn(base: string, persona: "buyer" | "seller"): Promise<Jar> {
   const res = await fetch(`${base}/api/auth/demo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ persona }) });
   const cookie = /hs_session=[^;]+/.exec(res.headers.get("set-cookie") ?? "")?.[0];
   if (!res.ok || !cookie) throw new Error(`sign in ${persona} -> ${res.status} ${(await res.text()).slice(0, 200)} (is DEMO_LOGIN=true on the server?)`);
-  return { who: persona, cookie };
+  // Second factor (trust spec §4): the personas' code comes from the demo endpoint; verifying swaps the partial cookie for a full one.
+  const { code } = (await (await fetch(`${base}/api/auth/2fa/demo-code`, { headers: { cookie } })).json()) as { code: string };
+  const v = await fetch(`${base}/api/auth/2fa/verify`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ code }) });
+  const full = /hs_session=[^;]+/.exec(v.headers.get("set-cookie") ?? "")?.[0];
+  if (!v.ok || !full) throw new Error(`2FA ${persona} -> ${v.status} ${(await v.text()).slice(0, 200)}`);
+  return { who: persona, cookie: full };
 }
 
 async function pause(flags: Flags, text: string) {

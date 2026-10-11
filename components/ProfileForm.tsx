@@ -28,7 +28,7 @@ export function ProfileForm({ me, next }: { me: Me; next?: string }) {
       router.refresh(); // header shows the new name
       if (next) router.push(next);
     } catch (e) {
-      if (e instanceof ApiError && e.code === "not_signed_in") return router.push("/?next=/me");
+      if (e instanceof ApiError && e.code === "not_signed_in") return router.push("/signin?next=/me");
       if (e instanceof ApiError && e.code === "invalid_input") setEmailError("Enter a valid email address.");
       else setError(errorCopy(e));
     } finally {

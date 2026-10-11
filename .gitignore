@@ -30,3 +30,6 @@ next-env.d.ts
 
 # sandbox spike ids
 scripts/sandbox/.state.json
+
+# agent worktrees
+.claude/worktrees/
