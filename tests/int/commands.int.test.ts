@@ -5,7 +5,7 @@ import { DEFAULT_EXTRACT } from "@/lib/ai/fake";
 import { CODE_RE } from "@/lib/deal/code";
 import { CODE_CONDITION } from "@/lib/deal/terms";
 import type { Command, ConditionInput } from "@/lib/deal/types";
-import { assertEventsInC6, dealBuilder, dealRow, events, expectError, parties, resetDb, testDeps, type Parties, type TestDeps } from "./helpers";
+import { assertEventsInC6, dealBuilder, dealRow, events, expectError, parties, resetDb, testDeps, type Parties, type TestDeps, signedAccept } from "./helpers";
 
 let deps: TestDeps;
 let p: Parties;
@@ -53,8 +53,8 @@ describe("create", () => {
 
 describe("edit_terms", () => {
   test("draft with buyer accepted: version 2, both acceptances cleared, one event with changed[]", async () => {
-    const code = await build.draft();
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    const code = await build.joined(); // trust spec §6: both parties are named before anyone signs
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     const v = await handle(code, p.asBuyer, TERMS, deps);
     expect(v).toMatchObject({ status: "draft", terms_version: 2, buyer_accepted_version: null, seller_accepted_version: null, item_title: "Jacket", amount_minor: 9000, deadline_days: 10 });
     const ev = (await events(code)).at(-1)!;
@@ -130,9 +130,9 @@ describe("join", () => {
 describe("accept", () => {
   test("seller then buyer: draft, then terms_agreed, two accept events", async () => {
     const code = await build.joined();
-    const afterSeller = await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
+    const afterSeller = await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
     expect(afterSeller).toMatchObject({ status: "draft", seller_accepted_version: 1, buyer_accepted_version: null });
-    const afterBuyer = await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    const afterBuyer = await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     expect(afterBuyer).toMatchObject({ status: "terms_agreed", seller_accepted_version: 1, buyer_accepted_version: 1 });
     const ev = (await events(code)).slice(-2);
     expect(ev[0]).toMatchObject({ from_status: "draft", to_status: "draft", actor: "seller", cause: "accept", payload: { terms_version: 1 } });
@@ -142,46 +142,46 @@ describe("accept", () => {
     const code = await build.joined();
     await deps.db.user.update({ where: { id: p.seller.id }, data: { paypal_email: null } });
     const before = (await events(code)).length;
-    await expectError(handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps), "paypal_email_required");
+    await expectError(handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps), "paypal_email_required");
     expect((await dealRow(code)).seller_accepted_version).toBeNull();
     expect(await events(code)).toHaveLength(before);
   });
   test("the buyer's completing accept also needs the seller's paypal_email", async () => {
     const code = await build.joined();
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
     await deps.db.user.update({ where: { id: p.seller.id }, data: { paypal_email: null } });
-    await expectError(handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps), "paypal_email_required");
+    await expectError(handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps), "paypal_email_required");
     expect((await dealRow(code)).status).toBe("draft");
   });
   test("version mismatch, null amount, same version twice, wrong state, non-party", async () => {
     const code = await build.joined();
     await handle(code, p.asBuyer, TERMS, deps); // version 2
-    await expectError(handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps), "terms_version_mismatch");
+    await expectError(handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps), "terms_version_mismatch");
 
     deps.ai.extractWith({ item_title: "Lamp", amount_minor: null, currency: null, deadline_days: null, conditions: [{ text: "Photo shows the lamp", evidence_type: "photo" }], rejected: [] });
     const noAmount = await build.draft("pay for the lamp");
-    const e = await expectError(handle(noAmount, p.asBuyer, { type: "accept", terms_version: 1 }, deps), "invalid_input");
+    const e = await expectError(handle(noAmount, p.asBuyer, await signedAccept(noAmount, p.asBuyer, 1), deps), "invalid_input");
     expect(e.message).toBe("Set the amount and the deadline before accepting.");
     deps.ai.extractWith(DEFAULT_EXTRACT);
 
     const agreedCode = await build.agreed();
-    await expectError(handle(agreedCode, p.asBuyer, { type: "accept", terms_version: 1 }, deps), "invalid_state");
-    await expectError(handle(code, p.asThird, { type: "accept", terms_version: 2 }, deps), "not_a_party");
+    await expectError(handle(agreedCode, p.asBuyer, await signedAccept(agreedCode, p.asBuyer, 1), deps), "invalid_state");
+    await expectError(handle(code, p.asThird, await signedAccept(code, p.asThird, 2), deps), "not_a_party");
 
     const twice = await build.joined();
-    await handle(twice, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(twice, p.asBuyer, await signedAccept(twice, p.asBuyer, 1), deps);
     const n = (await events(twice)).length;
-    await handle(twice, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(twice, p.asBuyer, await signedAccept(twice, p.asBuyer, 1), deps);
     expect(await events(twice)).toHaveLength(n);
   });
   test("terms versioning: a new deal is at 1 with null acceptances; after an edit the seller's accept of 2 leaves draft", async () => {
     const code = await build.joined();
     expect(await dealRow(code)).toMatchObject({ terms_version: 1, buyer_accepted_version: null, seller_accepted_version: null });
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     await handle(code, p.asBuyer, TERMS, deps);
-    const v = await handle(code, p.asSeller, { type: "accept", terms_version: 2 }, deps);
+    const v = await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 2), deps);
     expect(v).toMatchObject({ status: "draft", terms_version: 2, seller_accepted_version: 2, buyer_accepted_version: null });
-    expect((await handle(code, p.asBuyer, { type: "accept", terms_version: 2 }, deps)).status).toBe("terms_agreed");
+    expect((await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 2), deps)).status).toBe("terms_agreed");
   });
 });
 

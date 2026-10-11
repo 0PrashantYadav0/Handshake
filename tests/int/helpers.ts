@@ -8,10 +8,14 @@ import { fakePaypal, type FakePaypal } from "@/lib/paypal/fake";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
 import { newTotpSecret } from "@/lib/auth/totp";
 import { aad, seal } from "@/lib/crypto/seal";
+import { signingMessage } from "@/lib/contract/canonical";
+import { bytesToB64url, type PublicKey } from "@/lib/contract/signature";
+import { DEAL_INCLUDE } from "@/lib/deal/access";
+import { contractDocOf, hashOf } from "@/lib/deal/contract";
 import { addFile, createDeal, DealError, handle } from "@/lib/deal";
 import type { JudgeMode } from "@/lib/ai/fake";
 import { openDealRow, openPayload } from "@/lib/deal/sealed";
-import type { Actor, DealView, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
+import type { Actor, Command, DealView, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
 import { expect } from "vitest";
 
 process.env.SESSION_SECRET ??= "test-session-secret-at-least-32-characters-long";
@@ -23,7 +27,7 @@ export type TestDeps = { db: typeof prisma; paypal: FakePaypal; ai: FakeAi; emai
 
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "webhook_events", "deal_events", "payouts", "payments", "verdicts",
+    `TRUNCATE TABLE "webhook_events", "contract_signatures", "signing_keys", "deal_events", "payouts", "payments", "verdicts",
       "evidence", "files", "conditions", "deals", "users" RESTART IDENTITY CASCADE`,
   );
 }
@@ -42,6 +46,26 @@ export function testDeps(overrides: Partial<TestDeps> = {}): TestDeps {
 export function makeUser(email: string, opts: { display_name?: string; paypal_email?: string; verified?: boolean } = {}) {
   const verified = opts.paypal_email && opts.verified !== false ? new Date() : null;
   return prisma.user.create({ data: { email, display_name: opts.display_name ?? null, paypal_email: opts.paypal_email ?? null, paypal_email_verified_at: verified } });
+}
+
+// ---------- trust spec §6: each test user signs with its own P-256 key, like a browser would ----------
+const testKeys = new Map<string, CryptoKeyPair>();
+export async function testKeyFor(userId: string): Promise<CryptoKeyPair> {
+  let k = testKeys.get(userId);
+  if (!k) testKeys.set(userId, (k = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])));
+  return k;
+}
+export async function signHash(pair: CryptoKeyPair, hash: string): Promise<{ signature: string; public_key: PublicKey }> {
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(signingMessage(hash)));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+  return { signature: bytesToB64url(sig), public_key: { x: jwk.x!, y: jwk.y! } };
+}
+/** The accept command a party's browser would send: its key's signature over the deal's current contract hash. */
+export async function signedAccept(code: string, actor: Actor, terms_version = 1): Promise<Extract<Command, { type: "accept" }>> {
+  const row = await prisma.deal.findUnique({ where: { public_code: code }, include: DEAL_INCLUDE });
+  const doc = row ? contractDocOf(openDealRow(row)) : null;
+  const contract_hash = doc ? hashOf(doc) : "0".repeat(64); // nothing to sign yet: the command fails before the signature check
+  return { type: "accept", terms_version, contract_hash, ...(await signHash(await testKeyFor(actor.user_id), contract_hash)) };
 }
 
 /** Turns 2FA on with a fresh secret (trust spec §4); returns the secret for totpAt(). */
@@ -137,8 +161,8 @@ export function dealBuilder(deps: TestDeps, p: Parties) {
     },
     async agreed(): Promise<string> {
       const code = await b.joined();
-      await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-      await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+      await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+      await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
       return code;
     },
     async held(): Promise<string> {

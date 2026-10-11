@@ -10,6 +10,17 @@ export type { PayPal } from "@/lib/paypal/types";
 export { PayPalError } from "@/lib/paypal/types";
 export type { Email } from "@/lib/email/types";
 export type { Clock } from "@/lib/clock";
+import type { PublicKey } from "@/lib/contract/signature";
+import type { ContractDoc } from "@/lib/contract/canonical";
+export type { PublicKey } from "@/lib/contract/signature";
+export type { ContractDoc } from "@/lib/contract/canonical";
+
+/** trust spec §6: what a party sees and signs, and who has signed this version. */
+export type ContractSignatureView = {
+  role: Role; terms_version: number; contract_hash: string; signature: string; signed_at: string;
+  key_fingerprint: string; public_key: PublicKey;
+};
+export type ContractView = { document: ContractDoc; hash: string; signatures: ContractSignatureView[] };
 
 export type DealStatus =
   | "draft" | "terms_agreed" | "held" | "proof_submitted"
@@ -37,7 +48,7 @@ export type ConditionInput = { text: string; evidence_type: EvidenceType };
 export type Command =
   | { type: "edit_terms"; item_title: string; amount_minor: number | null; deadline_days: number | null; conditions: ConditionInput[] }
   | { type: "join" }
-  | { type: "accept"; terms_version: number }
+  | { type: "accept"; terms_version: number; contract_hash: string; signature: string; public_key: PublicKey; key_label?: string | null } // trust spec §6: accepting is signing
   | { type: "start_payment" }
   | { type: "confirm_approval"; order_id: string }
   | { type: "submit_evidence"; file_ids: string[]; tracking_number: string | null; note: string | null }
@@ -156,6 +167,7 @@ export type DealView = {
   submissions: Submission[];
   payment: Payment | null;
   payouts: Payout[]; // ascending by attempt
+  contract: ContractView | null; // null until the seller has joined and the amount and deadline are set
   seeded: boolean;
   created_at: string;
   updated_at: string;

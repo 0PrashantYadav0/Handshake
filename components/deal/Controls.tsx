@@ -3,11 +3,12 @@
 // data-primary-action marks the button the mobile sticky bar (Deal.tsx) forwards to.
 import { useState, useSyncExternalStore } from "react";
 import type { DealView } from "@/lib/deal/types";
-import { api, ApiError } from "@/lib/client-api";
+import { api } from "@/lib/client-api";
 import { money } from "@/lib/ledger-columns";
 import { confirm } from "@/components/ConfirmDialog";
 import { CopyButton, ShareButton } from "@/components/ShareLink";
 import { PayoutEmailForm } from "@/components/PayoutEmailForm";
+import { SignContract } from "./SignContract";
 
 export { CopyButton };
 
@@ -38,23 +39,11 @@ export function Join({ code, onDone, fail }: { code: string; onDone: Done; fail:
   );
 }
 
-export function AcceptTerms({ deal, onDone, fail }: { deal: DealView; onDone: Done; fail: Fail }) {
-  const [busy, run] = useBusy(fail);
+/** trust spec §6, §8: a seller without a verified payout address confirms it first; then either party signs. */
+export function AcceptTerms({ deal, onDone }: { deal: DealView; onDone: Done; fail?: Fail }) {
   const [needEmail, setNeedEmail] = useState(deal.role === "seller" && !deal.seller?.payout_email_verified);
-  const accept = () =>
-    run(
-      async () => onDone(await api(`/api/deals/${deal.code}/accept`, { json: { terms_version: deal.terms_version } })),
-      (e) => (e instanceof ApiError && (e.code === "paypal_email_required" || e.code === "payout_email_unverified") && deal.role === "seller" ? setNeedEmail(true) : fail(e)),
-    );
-  if (!needEmail) {
-    return (
-      <button type="button" data-testid="accept-terms" data-primary-action className="hs-btn" disabled={busy} onClick={accept}>
-        {busy ? "Accepting…" : "Accept terms"}
-      </button>
-    );
-  }
-  // trust spec §8: the seller confirms where they're paid, then the accept goes through.
-  return <PayoutEmailForm current={deal.seller?.paypal_email ?? null} verified={false} onVerified={async () => { setNeedEmail(false); await accept(); }} />;
+  if (needEmail) return <PayoutEmailForm current={deal.seller?.paypal_email ?? null} verified={false} onVerified={() => setNeedEmail(false)} />;
+  return <SignContract deal={deal} onDone={onDone} />;
 }
 
 export function CancelDeal({ deal, onDone, fail }: { deal: DealView; onDone: Done; fail: Fail }) {

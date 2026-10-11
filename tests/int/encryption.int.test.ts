@@ -7,7 +7,7 @@ import { keyring, SealError } from "@/lib/crypto/seal";
 import { addFile, getDeal, getEvents, getEvidencePack, handle, listDeals, type DealView } from "@/lib/deal";
 import { EVENT_SEALED_KEYS } from "@/lib/deal/sealed";
 import { reseal } from "../../scripts/reseal";
-import { callRoute, dealBuilder, DEFAULT_TEXT, makeJpeg, parties, resetDb, signIn, testDeps, TRACKING, type Parties, type TestDeps } from "./helpers";
+import { callRoute, dealBuilder, DEFAULT_TEXT, makeJpeg, parties, resetDb, signIn, testDeps, TRACKING, type Parties, type TestDeps, signedAccept } from "./helpers";
 
 const NOTE = "Shipped Monday in the original box";
 const REASON = "The jacket in e1 matches the listing photo r1.";
@@ -31,8 +31,8 @@ afterEach(() => {
 async function fullDeal(): Promise<{ code: string; id: string; view: DealView }> {
   const code = await build.joined();
   await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: REF }, deps);
-  await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-  await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+  await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+  await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
   const v = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
   await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v.payment!.paypal_order_id }, deps);
   deps.ai.judgeWith([{ result: "pass", confidence: 0.95, reason: REASON }]);

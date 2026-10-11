@@ -5,7 +5,7 @@ import { addFile, handle } from "@/lib/deal";
 import { captureKey, payoutBatchId } from "@/lib/deal/keys";
 import { openRaw, openText, openVerdict } from "@/lib/deal/sealed";
 import type { Command } from "@/lib/deal/types";
-import { assertEventsInC6, dealBuilder, dealRow, events, expectError, makeJpeg, parties, resetDb, testDeps, TRACKING, type Parties, type TestDeps } from "./helpers";
+import { assertEventsInC6, dealBuilder, dealRow, events, expectError, makeJpeg, parties, resetDb, testDeps, TRACKING, type Parties, type TestDeps, signedAccept } from "./helpers";
 
 let deps: TestDeps;
 let p: Parties;
@@ -128,8 +128,8 @@ describe("submit_evidence", () => {
     const code = await build.draft();
     const ref = await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: makeJpeg(1) }, deps);
     await handle(code, p.asSeller, { type: "join" }, deps);
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     const v0 = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
     await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v0.payment!.paypal_order_id }, deps);
     const copy = await addFile(code, p.asSeller, { purpose: "evidence", mime: "image/jpeg", bytes: makeJpeg(1) }, deps);

@@ -17,6 +17,7 @@ export const DEAL_INCLUDE = {
   payment: true,
   payouts: { orderBy: { attempt: "asc" } },
   events: { orderBy: { id: "asc" } },
+  signatures: { include: { key: true }, orderBy: [{ signed_at: "asc" }, { id: "asc" }] }, // trust spec §6
 } satisfies Prisma.DealInclude;
 
 export type DealRow = Prisma.DealGetPayload<{ include: typeof DEAL_INCLUDE }>;

@@ -90,7 +90,7 @@ export function timelineSentence(e: Pick<DealEvent, "cause" | "actor" | "payload
     case "create": return "Buyer created the deal from one sentence.";
     case "edit_terms": return `Buyer edited the terms (now version ${p.terms_version}).`;
     case "join": return "Seller joined.";
-    case "accept": return `${actor} accepted version ${p.terms_version}.`;
+    case "accept": return `${actor} signed version ${p.terms_version}.`;
     case "start_payment": return `Buyer started PayPal checkout (order attempt ${p.order_attempt}).`;
     case "submit_evidence": return `Seller submitted proof (attempt ${p.submission_no}).`;
     case "verdict": return `Claude judged attempt ${p.submission_no}.`;
@@ -144,7 +144,7 @@ const CHECKING_HELPER = "This usually takes under 15 seconds, at most about 40. 
 /** The "What happens next" heading and helper (08 section 7.4) for every status. `events` keys the voided reason. */
 export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean; now?: number; events?: DealEvent[] } = {}): NextCopy {
   if (d.role === "preview") {
-    return { heading: `${partyName(d.buyer, "The buyer")} invited you to a deal`, helper: "Joining doesn't commit you. You'll accept the terms in the next step." };
+    return { heading: `${partyName(d.buyer, "The buyer")} invited you to a deal`, helper: "Joining doesn't commit you. You'll review and sign the terms in the next step." };
   }
   const buyer = partyName(d.buyer, "the buyer");
   const seller = partyName(d.seller, "the seller");
@@ -157,15 +157,20 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
 
   switch (d.status) {
     case "draft":
+      // trust spec §6: accepting is signing, and both parties sign once the seller has joined.
       if (d.role === "buyer") {
-        if (!d.seller) return { heading: "Share the link with your seller", helper: "They sign in, add their PayPal email and accept. You'll approve the hold after that." };
-        if (d.seller_accepted_version !== v) return { heading: `Waiting for ${seller} to accept`, helper: `They're looking at version ${v}. You can still edit; editing clears both acceptances.` };
-        return { heading: `${seller} accepted. Accept to continue.`, helper: `Once you accept version ${v}, you'll approve the hold with PayPal.` };
+        if (!d.seller) return { heading: "Share the link with your seller", helper: "They sign in, confirm their PayPal email and sign the contract. You sign too, then approve the hold." };
+        if (d.buyer_accepted_version !== v) {
+          return d.seller_accepted_version === v
+            ? { heading: `${seller} signed. Sign to continue.`, helper: `Once you sign version ${v}, you'll approve the hold with PayPal.` }
+            : { heading: "Sign the contract", helper: `${seller} has joined. You both sign version ${v} with this device's key and your authenticator code. You can still edit; editing clears both signatures.` };
+        }
+        return { heading: `Waiting for ${seller} to sign`, helper: `You signed version ${v}. You can still edit; editing clears both signatures.` };
       }
       if (d.seller_accepted_version !== v) {
-        return { heading: "Review the terms", helper: `Accepting means you'll prove each condition with photos or tracking before ${d.deadline_days ?? "the agreed"} days after the hold is placed. Nothing is charged to anyone yet.` };
+        return { heading: "Review and sign the terms", helper: `Signing means you'll prove each condition with photos or tracking within ${d.deadline_days ?? "the agreed"} days after the hold is placed. Nothing is charged to anyone yet.` };
       }
-      return { heading: `You accepted version ${v}`, helper: `Waiting for ${buyer} to accept and approve the hold.` };
+      return { heading: `You signed version ${v}`, helper: `Waiting for ${buyer} to sign and approve the hold.` };
     case "terms_agreed": {
       if (d.role === "seller") return { heading: `Waiting for ${buyer} to approve the hold`, helper: "You'll be told here when the money is held. Don't ship before that." };
       const p = d.payment;
@@ -227,7 +232,7 @@ export function primaryAction(d: DealView | DealPreview): string | null {
   switch (d.status) {
     case "draft": {
       const mine = d.role === "buyer" ? d.buyer_accepted_version : d.seller_accepted_version;
-      return mine === d.terms_version ? null : "Accept terms";
+      return mine === d.terms_version || !d.seller ? null : "Sign contract";
     }
     case "terms_agreed":
       return d.role === "buyer" && d.payment?.status !== "approved" ? "Pay with PayPal" : null;

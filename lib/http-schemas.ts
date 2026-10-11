@@ -14,7 +14,15 @@ export const Terms = z
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), "Send at least one of item_title, amount_minor, deadline_days, conditions.");
 
-export const Accept = z.object({ terms_version: z.number().int().min(1) });
+// trust spec §6: the signature over the contract hash, the device public key, and the step-up code.
+const B64URL = (n: number) => z.string().regex(new RegExp(`^[A-Za-z0-9_-]{${n}}$`), "base64url");
+export const Accept = z.object({
+  terms_version: z.number().int().min(1),
+  contract_hash: z.string().regex(/^[0-9a-f]{64}$/, "sha-256 hex"),
+  signature: B64URL(86),
+  public_key: z.object({ x: B64URL(43), y: B64URL(43) }),
+  totp: z.string().max(12).optional(),
+});
 
 export const Authorize = z.object({ order_id: z.string().min(1) });
 

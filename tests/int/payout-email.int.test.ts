@@ -6,7 +6,7 @@ import { POST as resendRoute } from "@/app/api/me/paypal-email/resend/route";
 import { handle } from "@/lib/deal";
 import { payoutBatchId } from "@/lib/deal/keys";
 import { totpAt } from "@/lib/auth/totp";
-import { callRoute, dealBuilder, enrollTotp, expectError, makeUser, parties, resetDb, signIn, testDeps, type TestDeps } from "./helpers";
+import { callRoute, dealBuilder, enrollTotp, expectError, makeUser, parties, resetDb, signIn, testDeps, type TestDeps, signedAccept } from "./helpers";
 
 let deps: TestDeps;
 beforeEach(async () => {
@@ -109,8 +109,8 @@ describe("money only goes to a verified address", () => {
     await deps.db.user.update({ where: { id: p.seller.id }, data: { paypal_email_verified_at: null } });
     const b = dealBuilder(deps, p);
     const code = await b.joined();
-    await expectError(handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps), "payout_email_unverified");
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await expectError(handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps), "payout_email_unverified");
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     expect((await deps.db.deal.findUniqueOrThrow({ where: { public_code: code } })).status).toBe("draft");
   });
 
