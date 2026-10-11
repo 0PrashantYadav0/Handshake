@@ -111,6 +111,7 @@ export function Deal({ initial, demo, paypalClientId }: Props) {
             <Timeline events={events} />
             <section className="hs-card grid gap-2 text-sm" aria-labelledby="more-h">
               <h2 id="more-h" className="font-semibold">Records</h2>
+              {view.contract && <a className="hs-link" href={`/deal/${view.code}/contract`} data-testid="contract-link">Contract and signatures</a>}
               <a className="hs-link" href={`/api/deals/${view.code}/evidence-pack`}>Download evidence pack (JSON)</a>
               <p className="hs-help">Everything about this deal in one file: terms and versions, photo hashes, each verdict with its reason, PayPal ids, and the full timeline. Built from the database, so it can be reproduced.</p>
               {canCancel && <div className="mt-2 border-t border-[var(--hs-border)] pt-3"><CancelDeal deal={view} onDone={setDeal} fail={fail} /></div>}

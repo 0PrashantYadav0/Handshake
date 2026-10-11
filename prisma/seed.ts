@@ -8,9 +8,12 @@ import { PrismaClient, type Prisma } from "../generated/prisma/client";
 import { newPublicCode } from "../lib/deal/code";
 import { sealPayload, sealRaw, sealText } from "../lib/deal/sealed";
 import { CODE_CONDITION } from "../lib/deal/terms";
+import { contractDocOf, hashOf } from "../lib/deal/contract";
+import { signingMessage } from "../lib/contract/canonical";
+import { bytesToB64url, fingerprint } from "../lib/contract/signature";
 import type { DealStatus, EventActor, VerdictResult } from "../lib/deal/types";
 
-type Db = Pick<PrismaClient, "user" | "deal" | "$transaction">;
+type Db = Pick<PrismaClient, "user" | "deal" | "signingKey" | "$transaction">;
 
 type Ev = { from_status: DealStatus | null; to_status: DealStatus; actor: EventActor; cause: string; payload: Prisma.InputJsonObject; created_at: Date };
 type Row = { result: VerdictResult; confidence: number; reason: string };
@@ -134,6 +137,16 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
     return { users: 2, deals: existing };
   }
 
+  // trust spec §6: the sample deals carry real signatures, made here with one key per persona that exists only for this run.
+  const signer = async (userId: string) => {
+    const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+    const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+    const pk = { x: jwk.x!, y: jwk.y! };
+    const key = await db.signingKey.create({ data: { user_id: userId, fingerprint: await fingerprint(pk), x: pk.x, y: pk.y, label: "Seed key (sample deals)", created_at: now } });
+    return { key, sign: async (hash: string) => bytesToB64url(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(signingMessage(hash)))) };
+  };
+  const signers = { buyer: await signer(buyer.id), seller: await signer(seller.id) };
+
   await db.$transaction(async (tx) => {
     for (const [i, [kind, item, amount_minor, deadline_days, age]] of DEALS.entries()) {
       let public_code = newPublicCode();
@@ -157,6 +170,16 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
         },
       });
       await tx.dealEvent.createMany({ data: t.events.map((e) => ({ deal_id: id, ...e, payload: sealPayload(id, e.payload) })) });
+      if (joined) {
+        const doc = contractDocOf({ public_code, terms_version: 1, item_title: item, amount_minor, deadline_days, conditions, buyer, seller })!;
+        const hash = hashOf(doc);
+        for (const e of t.events.filter((x) => x.cause === "accept")) {
+          const role = e.actor as "buyer" | "seller";
+          await tx.contractSignature.create({
+            data: { deal_id: id, user_id: role === "buyer" ? buyer.id : seller.id, role, terms_version: 1, contract_hash: hash, key_id: signers[role].key.id, signature: await signers[role].sign(hash), signed_at: e.created_at },
+          });
+        }
+      }
       await tx.verdict.createMany({
         data: t.verdicts.flatMap((v) => v.rows.map((r, k) => ({
           deal_id: id, condition_id: conditions[k].id, submission_no: v.submission_no, ...r, reason: sealText("verdicts.reason", id, r.reason),

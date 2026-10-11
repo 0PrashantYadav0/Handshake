@@ -1,4 +1,6 @@
 // T-34: the seed is idempotent, obeys the CHECKs (inserts would fail otherwise), chains events (C2) and renders through lib/deal.
+import { DEAL_INCLUDE } from "@/lib/deal/access";
+import { verifyContract } from "@/lib/deal/contract";
 import { beforeEach, describe, expect, test } from "vitest";
 import { getDeal, listDeals } from "@/lib/deal";
 import { openDealRow } from "@/lib/deal/sealed";
@@ -65,6 +67,15 @@ describe("npm run seed", () => {
       for (const v of d.verdicts) expect(v).toMatchObject({ model: "seed", prompt_version: "judge-v1", evidence_used: [], raw_response: { seeded: true } });
       expect(d.fix_attempts_used).toBe(judged === 2 ? 1 : 0);
     }
+
+    // trust spec §6: every agreed sample deal carries two signatures that verify; a joined draft carries the buyer's only.
+    const full = (await deps.db.deal.findMany({ include: DEAL_INCLUDE })).map(openDealRow);
+    for (const d of full) {
+      const agreed = d.buyer_accepted_version === 1 && d.seller_accepted_version === 1;
+      expect(d.signatures.length, d.public_code).toBe((d.buyer_accepted_version ? 1 : 0) + (d.seller_accepted_version ? 1 : 0));
+      if (agreed) expect(await verifyContract(d), d.public_code).toBeNull();
+    }
+    expect(await deps.db.signingKey.count()).toBe(2);
 
     // Second run: only the persona upsert changes.
     process.env.DEMO_SELLER_PAYPAL_EMAIL = "";

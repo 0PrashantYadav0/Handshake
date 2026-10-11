@@ -78,6 +78,9 @@ h1 { font-family: var(--hs-font-display); font-weight: 500; letter-spacing: -0.0
   display: inline-block; padding: 0 0.5rem; border-radius: 0.3rem; font-size: 0.75rem; font-weight: 500; line-height: 1.5;
   color: var(--hs-muted); border: 1px dashed var(--hs-border); background: var(--hs-bg);
 }
+/* trust spec §6: verification results on the contract page */
+.hs-badge[data-tone="ok"] { color: var(--hs-status-paid); border-color: var(--hs-status-paid); background: color-mix(in srgb, var(--hs-status-paid) 8%, white); }
+.hs-badge[data-tone="bad"] { color: var(--hs-status-voided); border-color: var(--hs-status-voided); background: color-mix(in srgb, var(--hs-status-voided) 8%, white); }
 
 /* Buttons: 44 px tall on phones (08 section 1), 40 px from md. One accent for primary, outlined secondary, text-style danger. */
 .hs-btn, .hs-btn-secondary, .hs-chip, .hs-btn-danger {

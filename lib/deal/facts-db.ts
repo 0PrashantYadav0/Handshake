@@ -4,6 +4,7 @@
 import type { Payout } from "@/generated/prisma/client";
 import { PayPalError } from "@/lib/paypal/types";
 import { DEAL_INCLUDE, type DealRow } from "./access";
+import { recordContractFailure, requireContract, verifyContract } from "./contract";
 import { deadlineAt } from "./dates";
 import { DealError } from "./errors";
 import { applyFact, type PaypalFact } from "./facts";
@@ -64,6 +65,7 @@ export type Captured = { key: string; cap: { capture_id: string; status: string;
 /** capture-{code}-{n} on the stored authorization (8.2). A 422 AUTHORIZATION_EXPIRED / AUTHORIZATION_VOIDED applies authorization_voided
  *  and returns null (02 section 7); any other failure is paypal_error with nothing written. The caller writes Tx-after. */
 export async function captureHold(deal: DealRow, deps: Deps): Promise<Captured | null> {
+  await requireContract(deal, deps, "capture"); // trust spec §7: no capture unless both signatures still verify
   const p = deal.payment!;
   const key = captureKey(deal.public_code, p.capture_attempts);
   try {
@@ -174,6 +176,27 @@ export async function applyFactTx(tx: Tx, deps: Deps, deal: DealRow, fact: Paypa
   return { outcome: "applied", after: { payout, declined: type === "capture_declined" && !r.detailOnly } };
 }
 
+/** failure_reason of a payout stopped by the contract gate (trust spec §7). */
+export const CONTRACT_INVALID = "CONTRACT_INVALID";
+
+/** trust spec §7, §8: the signed contract still verifies, and the row pays the contract amount to the seller's verified address.
+ * Otherwise the row is failed with CONTRACT_INVALID, the refusal is recorded, and PayPal is not called. Never throws. */
+async function payoutAllowed(deps: Deps, row: Payout): Promise<boolean> {
+  try {
+    const found = await deps.db.deal.findUniqueOrThrow({ where: { id: row.deal_id }, include: DEAL_INCLUDE });
+    const deal = openDealRow(found);
+    const problem = (await verifyContract(deal))
+      ?? (row.amount_minor !== deal.amount_minor ? "the payout amount differs from the contract" : null)
+      ?? (!deal.seller?.paypal_email_verified_at || row.recipient_email !== deal.seller.paypal_email ? "the payout address is not the seller's verified PayPal email" : null);
+    if (!problem) return true;
+    await deps.db.payout.updateMany({ where: { id: row.id, status: "pending" }, data: { status: "failed", failure_reason: CONTRACT_INVALID } });
+    await recordContractFailure(deal.id, deps, "payout", problem);
+  } catch (e) {
+    console.error("[payout] contract check failed; the row stays pending", row.sender_batch_id, e);
+  }
+  return false;
+}
+
 /** failure_reason of a payout held back because the seller's PayPal email is not verified (trust spec §8). */
 export const PAYOUT_EMAIL_UNVERIFIED = "PAYOUT_EMAIL_UNVERIFIED";
 
@@ -186,6 +209,7 @@ export async function afterCommit(deps: Deps, deal: DealRow, result: FactResult)
 
 /** 02 section 5.3 sendPayout: the row is pending with paypal_batch_id null. 4xx with a PayPal name -> failed; else the row stays pending. */
 export async function sendPayout(deps: Deps, row: Payout, code: string): Promise<void> {
+  if (!(await payoutAllowed(deps, row))) return;
   try {
     const r = await deps.paypal.createPayout(
       { sender_batch_id: row.sender_batch_id, sender_item_id: row.sender_batch_id, receiver: row.recipient_email, amount_minor: row.amount_minor, note: `Handshake deal ${code}` },

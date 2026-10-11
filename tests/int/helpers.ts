@@ -203,6 +203,7 @@ export const C6: Record<string, EventActor[]> = {
   "fact:authorization_created": ["paypal"], "fact:late_authorization_voided": ["paypal"], "fact:capture_completed": ["paypal"],
   "fact:capture_pending": ["paypal"], "fact:capture_declined": ["paypal"], "fact:authorization_voided": ["paypal"],
   "fact:payout_succeeded": ["paypal"], "fact:payout_failed": ["paypal"],
+  "contract:verification_failed": ["system"], // trust spec §7
 };
 
 /** afterEach: every cause written by the test is a C6 string with a C6 actor, and the per-deal chain is unbroken (06 "Audit log"). */

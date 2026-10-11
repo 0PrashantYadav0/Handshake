@@ -224,4 +224,7 @@ export type EvidencePack = {
   events: DealEvent[];
   webhook_events: { paypal_event_id: string; event_type: string; verified: boolean; processed_at: string | null; created_at: string }[];
   extraction: { model: string; prompt_version: string; rejected: { text: string; suggestion: string }[] } | null;
+  /** trust spec §6: the current contract with its signatures, and every signature ever made on this deal (all versions). */
+  contract: ContractView | null;
+  signature_history: ContractSignatureView[];
 };

@@ -128,6 +128,9 @@ export function payoutCopy(d: Pick<DealView, "role" | "amount_minor" | "seller" 
       : { heading: "Payment released", helper: `${amount} is being charged to your PayPal and paid to ${partyName(d.seller, "the seller")}. The deal is complete once the payout lands.` };
   }
   const email = d.seller?.paypal_email ?? "your PayPal email";
+  if (p?.status === "failed" && p.failure_reason === "CONTRACT_INVALID") {
+    return { heading: "Payout stopped", helper: "The deal's records no longer match the contract you both signed, so no money was sent. The captured funds stay with Handshake until this is resolved; contact support with the deal code." };
+  }
   if (p?.status === "failed" && p.failure_reason === "PAYOUT_EMAIL_UNVERIFIED") {
     return { heading: "Verify your PayPal email", helper: `The money is captured and waiting for you. Confirm ${email} on your profile with the code we emailed, then retry the payout.` };
   }

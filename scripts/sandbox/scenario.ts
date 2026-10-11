@@ -1,6 +1,6 @@
 // Sandbox scenarios over the HTTP API of a running Handshake (06 "Sandbox scenarios > Scripts"; T-22, T-31).
 // Two cookie jars (demo personas, needs DEMO_LOGIN=true on the server); browser steps pause (--wait) or are polled for.
-//   tsx scripts/sandbox/scenario.ts SB-1  --base <url> [--full] [--upload] [--set good] [--seller-email <email>]
+//   tsx scripts/sandbox/scenario.ts SB-1  --base <url> [--full] [--upload] [--set good]
 //   tsx scripts/sandbox/scenario.ts SB-6  --base <url>
 //   tsx scripts/sandbox/scenario.ts SB-7  --base <url> --code <code> [--fixture tests/fixtures/webhooks/PAYMENT.CAPTURE.COMPLETED.1.json]
 //   tsx scripts/sandbox/scenario.ts SB-8  --base <url>
@@ -13,12 +13,14 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import type { DealEvent, DealView, EvidencePack } from "@/lib/deal/types";
 import type { Preset, Presets } from "@/lib/demo-kit";
+import { contractHash, signingMessage } from "@/lib/contract/canonical";
+import { bytesToB64url } from "@/lib/contract/signature";
 
 // ---------- pure helpers (unit-tested) ----------
 
 export const SCENARIOS = ["SB-1", "SB-6", "SB-7", "SB-8", "SB-11"] as const;
 export type Scenario = (typeof SCENARIOS)[number];
-export type Flags = { base: string; dry: boolean; wait: boolean; full: boolean; upload: boolean; set: string; "seller-email"?: string; code?: string; fixture?: string };
+export type Flags = { base: string; dry: boolean; wait: boolean; full: boolean; upload: boolean; set: string; code?: string; fixture?: string };
 
 export function parseScenarioArgs(argv: string[]): { id: Scenario; flags: Flags } {
   const { positionals, values } = parseArgs({
@@ -31,7 +33,6 @@ export function parseScenarioArgs(argv: string[]): { id: Scenario; flags: Flags 
       full: { type: "boolean", default: false },
       upload: { type: "boolean", default: false },
       set: { type: "string", default: "good" },
-      "seller-email": { type: "string" },
       code: { type: "string" },
       fixture: { type: "string" },
     },
@@ -50,7 +51,7 @@ export function plan(id: Scenario, f: Flags): string[] {
   const toHeld = [
     "sign in buyer and seller (POST /api/auth/demo)",
     `buyer creates the deal from the demo kit sentence (set ${f.set})`,
-    "seller has a PayPal email (GET /api/me, PATCH with --seller-email if empty), joins, accepts; buyer accepts -> terms_agreed",
+    "seller has a verified PayPal email (GET /api/me), joins and signs; buyer signs -> terms_agreed",
     "buyer starts payment (POST payment) -> approve link printed",
   ];
   switch (id) {
@@ -122,6 +123,22 @@ async function must(p: Promise<Reply>, what: string): Promise<Record<string, unk
   return body;
 }
 
+// trust spec §6: each persona signs with its own P-256 key (made here, like a browser would) and a fresh demo code.
+const keys = new Map<string, CryptoKeyPair>();
+async function signContract(base: string, jar: Jar, code: string): Promise<DealView> {
+  const v = (await must(api(base, jar, "GET", `/api/deals/${code}`), `${jar.who} read`)) as unknown as DealView;
+  if (!v.contract) throw new Error("no contract to sign: has the seller joined?");
+  const hash = await contractHash(v.contract.document);
+  if (hash !== v.contract.hash) throw new Error("the contract document does not match its hash");
+  let pair = keys.get(jar.who);
+  if (!pair) keys.set(jar.who, (pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])));
+  const signature = bytesToB64url(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(signingMessage(hash))));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+  const { code: totp } = (await must(api(base, jar, "GET", "/api/auth/2fa/demo-code"), `${jar.who} demo code`)) as { code: string };
+  const body = { terms_version: v.terms_version, contract_hash: hash, signature, public_key: { x: jwk.x, y: jwk.y }, totp };
+  return (await must(api(base, jar, "POST", `/api/deals/${code}/accept`, body), `${jar.who} sign`)) as unknown as DealView;
+}
+
 async function signIn(base: string, persona: "buyer" | "seller"): Promise<Jar> {
   const res = await fetch(`${base}/api/auth/demo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ persona }) });
   const cookie = /hs_session=[^;]+/.exec(res.headers.get("set-cookie") ?? "")?.[0];
@@ -170,15 +187,12 @@ async function toHeld(f: Flags, confirm: boolean): Promise<{ buyer: Jar; seller:
   const code = created.code;
   console.log(`deal ${code}  ${b}/deal/${code}  (${preset.id}, ${created.amount_minor} minor, ${created.conditions.length} conditions)`);
 
-  const me = (await must(api(b, seller, "GET", "/api/me"), "GET /api/me")).user as { paypal_email: string | null };
-  if (!me.paypal_email) {
-    const email = f["seller-email"] ?? process.env.DEMO_SELLER_PAYPAL_EMAIL;
-    if (!email) throw new Error("the demo seller has no PayPal email: set DEMO_SELLER_PAYPAL_EMAIL on the server or pass --seller-email");
-    await must(api(b, seller, "PATCH", "/api/me", { paypal_email: email }), "PATCH /api/me");
-  }
+  const me = (await must(api(b, seller, "GET", "/api/me"), "GET /api/me")).user as { paypal_email: string | null; paypal_email_verified: boolean };
+  // trust spec §8: a payout address is verified by an emailed code; the demo seller's sandbox address is verified by configuration.
+  if (!me.paypal_email_verified) throw new Error("the demo seller has no verified PayPal email: set DEMO_SELLER_PAYPAL_EMAIL on the server and sign in again");
   await must(api(b, seller, "POST", `/api/deals/${code}/join`), "join");
-  await must(api(b, seller, "POST", `/api/deals/${code}/accept`, { terms_version: created.terms_version }), "seller accept");
-  const agreed = (await must(api(b, buyer, "POST", `/api/deals/${code}/accept`, { terms_version: created.terms_version }), "buyer accept")) as unknown as DealView;
+  await signContract(b, seller, code);
+  const agreed = await signContract(b, buyer, code);
   if (agreed.status !== "terms_agreed") throw new Error(`expected terms_agreed after both accepts, got ${agreed.status}`);
   console.log("terms_agreed");
 

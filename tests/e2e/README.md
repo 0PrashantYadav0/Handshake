@@ -1,6 +1,20 @@
-# End-to-end test
+# End-to-end tests
 
-One Playwright test (`happy-path.spec.ts`) runs the ten steps of the judge happy path from docs/06-test-plan.md "End to end" against the real UI, the real PayPal sandbox and the real Claude API. Each run places one $18 sandbox hold and spends about $0.08 of Claude.
+Two Playwright specs:
+
+- `two-party.spec.ts` needs no external service. It makes a draft with the fake model (`make-draft.ts`), signs in both demo personas through the demo second factor, joins, signs the contract on both sides with browser keys, checks the deal reaches `terms_agreed`, verifies both signatures on the contract page and downloads the signed bundle, and finds the seller's key on `/security`. Run it on every change to sign-in, signing or the deal page.
+- `happy-path.spec.ts` runs the ten steps of the judge happy path from docs/06-test-plan.md "End to end" against the real UI, the real PayPal sandbox and the real Claude API. Each run places one $18 sandbox hold and spends about $0.08 of Claude.
+
+Shared steps (demo 2FA, signing) live in `flows.ts`.
+
+## Two-party run
+
+The server needs `DEMO_LOGIN=true` and `DEMO_SELLER_PAYPAL_EMAIL` (the demo seller's address counts as verified). `make-draft.ts` writes to `E2E_DATABASE_URL`, else `DATABASE_URL` from `.env`; it must be the server's database.
+
+```sh
+npm run build && npm run start &                                  # or any running server
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party
+```
 
 ## Runner variables
 
@@ -11,7 +25,7 @@ One Playwright test (`happy-path.spec.ts`) runs the ten steps of the judge happy
 
 The app under test uses its normal `.env`: `DEMO_LOGIN=true`, `DEMO_SELLER_PAYPAL_EMAIL`, `ANTHROPIC_API_KEY`, PayPal sandbox keys, a reachable database. Steps 2 and 7 call Claude, so the key must be set even for the partial run.
 
-## Run
+## Happy-path run
 
 ```sh
 npx playwright install chromium                                  # once

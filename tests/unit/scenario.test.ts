@@ -8,9 +8,9 @@ describe("parseScenarioArgs()", () => {
     expect(parseScenarioArgs(["SB-6", "--base", "https://x.onrender.com/"]).flags.base).toBe("https://x.onrender.com");
   });
   it("reads the flags of the 06 table", () => {
-    const { id, flags } = parseScenarioArgs(["SB-1", "--dry", "--wait", "--full", "--upload", "--set", "blurry", "--seller-email", "s@example.com"]);
+    const { id, flags } = parseScenarioArgs(["SB-1", "--dry", "--wait", "--full", "--upload", "--set", "blurry"]);
     expect(id).toBe("SB-1");
-    expect(flags).toMatchObject({ dry: true, wait: true, full: true, upload: true, set: "blurry", "seller-email": "s@example.com" });
+    expect(flags).toMatchObject({ dry: true, wait: true, full: true, upload: true, set: "blurry" });
   });
   it("rejects an unknown scenario and SB-7 without --code", () => {
     expect(() => parseScenarioArgs(["SB-2"])).toThrow(/scenario must be one of/);
