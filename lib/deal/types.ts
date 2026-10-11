@@ -150,7 +150,7 @@ export type DealView = {
   seller_accepted_version: number | null;
   fix_attempts_used: 0 | 1;
   buyer: Party;
-  seller: (Party & { has_paypal_email: boolean; paypal_email: string | null }) | null; // paypal_email only when role = "seller"
+  seller: (Party & { has_paypal_email: boolean; payout_email_verified: boolean; paypal_email: string | null }) | null; // paypal_email only when role = "seller"
   conditions: Condition[];
   reference_files: FileRef[];
   submissions: Submission[];

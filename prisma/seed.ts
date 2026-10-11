@@ -121,10 +121,11 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
     create: { email: "demo-buyer@handshake.demo", display_name: "Demo Buyer" },
   });
   const paypal_email = process.env.DEMO_SELLER_PAYPAL_EMAIL || null;
+  const paypal_email_verified_at = paypal_email ? new Date() : null; // the sandbox seller account (trust spec §8)
   const seller = await db.user.upsert({
     where: { email: "demo-seller@handshake.demo" },
-    update: { display_name: "Demo Seller", paypal_email },
-    create: { email: "demo-seller@handshake.demo", display_name: "Demo Seller", paypal_email },
+    update: { display_name: "Demo Seller", paypal_email, paypal_email_verified_at },
+    create: { email: "demo-seller@handshake.demo", display_name: "Demo Seller", paypal_email, paypal_email_verified_at },
   });
 
   const existing = await db.deal.count({ where: { seeded: true } });

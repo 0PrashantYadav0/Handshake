@@ -6,6 +6,8 @@ import { fakeAi, type FakeAi } from "@/lib/ai/fake";
 import { fakeEmail, type RecordingEmail } from "@/lib/email/console";
 import { fakePaypal, type FakePaypal } from "@/lib/paypal/fake";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
+import { newTotpSecret } from "@/lib/auth/totp";
+import { aad, seal } from "@/lib/crypto/seal";
 import { addFile, createDeal, DealError, handle } from "@/lib/deal";
 import type { JudgeMode } from "@/lib/ai/fake";
 import { openDealRow, openPayload } from "@/lib/deal/sealed";
@@ -36,8 +38,17 @@ export function testDeps(overrides: Partial<TestDeps> = {}): TestDeps {
   return deps;
 }
 
-export function makeUser(email: string, opts: { display_name?: string; paypal_email?: string } = {}) {
-  return prisma.user.create({ data: { email, display_name: opts.display_name ?? null, paypal_email: opts.paypal_email ?? null } });
+/** A paypal_email is verified unless verified: false (trust spec §8). */
+export function makeUser(email: string, opts: { display_name?: string; paypal_email?: string; verified?: boolean } = {}) {
+  const verified = opts.paypal_email && opts.verified !== false ? new Date() : null;
+  return prisma.user.create({ data: { email, display_name: opts.display_name ?? null, paypal_email: opts.paypal_email ?? null, paypal_email_verified_at: verified } });
+}
+
+/** Turns 2FA on with a fresh secret (trust spec §4); returns the secret for totpAt(). */
+export async function enrollTotp(userId: string): Promise<string> {
+  const secret = newTotpSecret();
+  await prisma.user.update({ where: { id: userId }, data: { totp_secret: seal(secret, aad("users.totp_secret", userId)), totp_enabled_at: new Date(), totp_last_step: null } });
+  return secret;
 }
 
 export async function signIn(userId: string): Promise<string> {

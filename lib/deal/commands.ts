@@ -4,6 +4,7 @@
 // Contract text and photo bytes are sealed on write (trust spec §5); the rows loaded here are already open.
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
+import { requireVerifiedPayout } from "@/lib/auth/payout-email";
 import { carrierStatus } from "@/lib/carrier";
 import { validateFile } from "@/lib/files/validate";
 import { loadDeal, requireLive, requireRole, type Loaded } from "./access";
@@ -166,9 +167,7 @@ async function accept(code: string, actor: Actor, terms_version: number, deps: D
     const field = role === "buyer" ? "buyer_accepted_version" : "seller_accepted_version";
     if (deal[field] === terms_version) return; // the same version twice: a no-op that still answers 200
     const to = acceptanceOutcome({ ...deal, [field]: terms_version });
-    if ((role === "seller" || to === "terms_agreed") && !deal.seller?.paypal_email) {
-      throw new DealError("paypal_email_required", "The seller must add a PayPal email before the terms can be agreed.");
-    }
+    if (role === "seller" || to === "terms_agreed") requireVerifiedPayout(deal.seller); // trust spec §8
     await tx.deal.update({ where: { id: deal.id }, data: { [field]: terms_version } });
     await transition(tx, deal, to, role, "accept", { terms_version });
   });
@@ -342,18 +341,18 @@ async function retryPayout(code: string, actor: Actor, deps: Deps): Promise<void
   if (deal.status !== "captured" || deal.payment?.status !== "captured" || !latest) throw new DealError("invalid_state", "There is no payout to retry.");
   const resend = latest.status === "pending" && latest.paypal_batch_id === null;
   if (!resend && latest.status !== "failed") throw new DealError("invalid_state", "PayPal has this payout; its result will arrive by webhook.");
-  if (!deal.seller?.paypal_email) throw new DealError("paypal_email_required", "Add a PayPal email before retrying the payout.");
+  requireVerifiedPayout(deal.seller, "You"); // trust spec §8
   const cancelled_item_id = !resend && latest.failure_reason === "UNCLAIMED" && latest.paypal_item_id ? latest.paypal_item_id : null;
   if (cancelled_item_id) await deps.paypal.cancelPayoutItem(cancelled_item_id).catch((e) => rethrowPaypal(e, "cancel payout item"));
 
   const row = await inTx(deps, async (tx) => {
     const { deal: d } = await loadLocked(tx, code, actor);
     const cur = d.payouts.at(-1);
-    const email = d.seller?.paypal_email;
+    const email = d.seller?.paypal_email_verified_at ? d.seller.paypal_email : null;
     if (d.status !== "captured" || !cur || cur.id !== latest.id || cur.status !== latest.status || cur.paypal_batch_id !== latest.paypal_batch_id) {
       throw new DealError("invalid_state", "The payout changed; reload the deal.");
     }
-    if (!email) throw new DealError("paypal_email_required");
+    if (!email) throw new DealError("payout_email_unverified");
     const row = resend
       ? cur
       : await tx.payout.create({
