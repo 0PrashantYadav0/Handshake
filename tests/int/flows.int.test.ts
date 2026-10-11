@@ -86,7 +86,7 @@ describe("SB-2 wrong item, no fix", () => {
 
     deps.clock.set("2026-10-27T10:00:01Z");
     const report = await tick(deps.clock.now(), deps);
-    expect(report).toEqual({ voided: [code], verdicts_rerun: [], errors: [] });
+    expect(report).toEqual({ voided: [code], verdicts_rerun: [], reconciled: [], errors: [] });
     expect(calls("voidAuthorization")).toEqual([{ op: "voidAuthorization", requestId: voidKey(code), args: { authorization_id: "AUTH-1" } }]);
     expect(await dealRow(code)).toMatchObject({ status: "voided", payment: { status: "voided" } });
     const tail = (await events(code)).slice(-2);

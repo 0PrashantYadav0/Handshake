@@ -147,8 +147,8 @@ describe("POST /api/jobs/tick", () => {
     deps.clock.set("2026-10-27T10:00:01Z");
     const res = await call(`Bearer ${SECRET}`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ voided: [code], verdicts_rerun: [], errors: [] });
+    expect(await res.json()).toEqual({ voided: [code], verdicts_rerun: [], reconciled: [], errors: [] });
     expect((await dealRow(code)).status).toBe("voided");
-    expect(await (await call(`Bearer ${SECRET}`)).json()).toEqual({ voided: [], verdicts_rerun: [], errors: [] });
+    expect(await (await call(`Bearer ${SECRET}`)).json()).toEqual({ voided: [], verdicts_rerun: [], reconciled: [], errors: [] });
   });
 });

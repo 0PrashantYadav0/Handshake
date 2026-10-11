@@ -4,7 +4,7 @@
 import { PayPalError } from "@/lib/paypal/types";
 import { DEAL_INCLUDE, type DealRow } from "./access";
 import type { PaypalFact } from "./facts";
-import { afterCommit, applyFactTx, type FactResult, type FactSource } from "./facts-db";
+import { afterCommit, applyFactTx, payoutItemFact, type FactResult, type FactSource } from "./facts-db";
 import { authKey, strayVoidKey } from "./keys";
 import { openDealRow } from "./sealed";
 import { lockDeal, TX_OPTIONS, writeEvent, type Tx } from "./transition";
@@ -32,18 +32,10 @@ export function toFact(event: PaypalWebhookEvent): Mapped {
   if (type.startsWith(PAYOUT_PREFIX)) {
     const sender_item_id = str(obj(r.payout_item).sender_item_id);
     if (!sender_item_id) return NOOP;
-    const lookup: Lookup = { kind: "sender_item_id", value: sender_item_id };
-    const payout_batch_id = str(r.payout_batch_id);
-    const payout_item_id = str(r.payout_item_id);
-    const word = type.slice(PAYOUT_PREFIX.length);
-    if (word === "SUCCEEDED") {
-      return payout_batch_id && payout_item_id ? { lookup, fact: { type: "payout_succeeded", sender_item_id, payout_batch_id, payout_item_id } } : NOOP;
-    }
-    if (word === "FAILED" || word === "BLOCKED" || word === "RETURNED" || word === "UNCLAIMED") {
-      const failure_reason = word === "UNCLAIMED" ? word : (str(obj(r.errors).name) ?? word);
-      return { lookup, fact: { type: "payout_failed", sender_item_id, payout_batch_id, payout_item_id, failure_reason } };
-    }
-    return NOOP;
+    const fact = payoutItemFact(type.slice(PAYOUT_PREFIX.length), {
+      sender_item_id, payout_batch_id: str(r.payout_batch_id), payout_item_id: str(r.payout_item_id), error_name: str(obj(r.errors).name),
+    });
+    return fact ? { lookup: { kind: "sender_item_id", value: sender_item_id }, fact } : NOOP;
   }
   const code = str(r.custom_id);
   if (!id || !code) return NOOP;
