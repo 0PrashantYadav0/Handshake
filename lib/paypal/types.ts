@@ -1,8 +1,10 @@
-// The PayPal port (02 section 3.4). Seven methods (E1). Every write sends the given idempotency key as
-// PayPal-Request-Id and throws PayPalError on any non-2xx except the cases named on the method.
+// The PayPal port (02 section 3.4). Seven methods (E1) plus three reads for reconciliation (E12). Every write sends the
+// given idempotency key as PayPal-Request-Id; every call throws PayPalError on any non-2xx except the cases named on the method.
 export type AuthorizationStatus = "CREATED" | "PENDING" | "DENIED" | "CAPTURED" | "PARTIALLY_CAPTURED" | "VOIDED";
 export type CaptureStatus = "COMPLETED" | "PENDING" | "DECLINED" | "FAILED" | "PARTIALLY_REFUNDED" | "REFUNDED";
 export type PayoutBatchStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "DENIED" | "CANCELED";
+export type PayoutItemStatus = "SUCCESS" | "FAILED" | "PENDING" | "UNCLAIMED" | "RETURNED" | "ONHOLD" | "BLOCKED" | "REFUNDED" | "REVERSED";
+export type PayoutItem = { payout_item_id: string; sender_item_id: string | null; transaction_status: PayoutItemStatus; error_name: string | null };
 
 export interface PayPal {
   createAuthorizeOrder(
@@ -32,6 +34,17 @@ export interface PayPal {
 
   /** Raw fetch POST /v1/payments/payouts-item/{id}/cancel (E1, E7). Already cancelled or returned resolves as success. */
   cancelPayoutItem(payout_item_id: string): Promise<void>;
+
+  /** GET /v2/payments/captures/{id} (E12). reason = status_details.reason unless COMPLETED. */
+  getCapture(capture_id: string): Promise<{ capture_id: string; status: CaptureStatus; reason: string | null }>;
+
+  /** GET /v2/payments/authorizations/{id} (E12). reason = status_details.reason when PENDING. */
+  getAuthorization(
+    authorization_id: string,
+  ): Promise<{ authorization_id: string; status: AuthorizationStatus; expiration_time: string; reason: string | null }>;
+
+  /** Raw fetch GET /v1/payments/payouts/{payout_batch_id} (E12). error_name = items[].errors.name. */
+  getPayoutBatch(payout_batch_id: string): Promise<{ payout_batch_id: string; batch_status: PayoutBatchStatus; items: PayoutItem[] }>;
 
   /** E6 self-verification (02 section 9.4). Never throws; a cert that cannot be fetched is reported as fetch_failed. */
   verifyWebhook(

@@ -1,4 +1,4 @@
-// Real PayPal adapter (E1; 02 section 3.4). SDK for Orders and Payments, raw fetch for Payouts (the SDK has neither
+// Real PayPal adapter (E1, E12; 02 section 3.4). SDK for Orders and Payments, raw fetch for Payouts (the SDK has neither
 // Payouts nor webhook verification, dependencies.md trap 18), lib/paypal/verify.ts for webhooks. Every write sends
 // the given key as PayPal-Request-Id. Responses are parsed from the wire JSON (SDK `body` is the raw text) by the pure
 // helpers below so the fixtures in tests/fixtures/paypal are what the adapter actually reads.
@@ -9,7 +9,7 @@ import {
 import { toPaypalValue } from "@/lib/money";
 import { getToken } from "./token";
 import { verifyWebhook } from "./verify";
-import { PayPalError, type AuthorizationStatus, type CaptureStatus, type PayPal, type PayoutBatchStatus } from "./types";
+import { PayPalError, type AuthorizationStatus, type CaptureStatus, type PayPal, type PayoutBatchStatus, type PayoutItemStatus } from "./types";
 
 export * from "./types";
 
@@ -20,6 +20,8 @@ type AuthorizationBody = { id?: string; status?: AuthorizationStatus; status_det
 type OrderAuthorizeBody = { purchase_units?: Array<{ payments?: { authorizations?: AuthorizationBody[] } }> };
 type CaptureBody = { id?: string; status?: CaptureStatus; status_details?: { reason?: string } };
 type PayoutBody = { batch_header?: { payout_batch_id?: string; batch_status?: PayoutBatchStatus } };
+type PayoutItemBody = { payout_item_id?: string; transaction_status?: PayoutItemStatus; payout_item?: { sender_item_id?: string }; errors?: { name?: string } };
+type PayoutBatchBody = PayoutBody & { items?: PayoutItemBody[] };
 
 export function parseJson<T>(text: unknown): T | null {
   if (typeof text !== "string") return (text ?? null) as T | null;
@@ -27,7 +29,11 @@ export function parseJson<T>(text: unknown): T | null {
 }
 
 export function parseAuthorization(body: OrderAuthorizeBody) {
-  const a = body.purchase_units?.[0]?.payments?.authorizations?.[0];
+  return parseAuthorizationResource(body.purchase_units?.[0]?.payments?.authorizations?.[0], body);
+}
+
+/** One authorization resource: purchase_units[0].payments.authorizations[0] of an order, or the GET authorization body. */
+export function parseAuthorizationResource(a: AuthorizationBody | undefined, body: unknown = a) {
   if (!a?.id || !a.status || !a.expiration_time) throw new PayPalError(200, "NO_AUTHORIZATION", null, body);
   return { authorization_id: a.id, status: a.status, expiration_time: a.expiration_time, reason: a.status === "PENDING" ? (a.status_details?.reason ?? null) : null };
 }
@@ -41,6 +47,16 @@ export function parsePayout(body: PayoutBody) {
   const h = body.batch_header;
   if (!h?.payout_batch_id || !h.batch_status) throw new PayPalError(200, "NO_PAYOUT_BATCH", null, body);
   return { payout_batch_id: h.payout_batch_id, batch_status: h.batch_status };
+}
+
+/** GET payout batch: the header plus every item that carries an id and a status. */
+export function parsePayoutBatch(body: PayoutBatchBody) {
+  const items = (body.items ?? []).flatMap((i) =>
+    i.payout_item_id && i.transaction_status
+      ? [{ payout_item_id: i.payout_item_id, sender_item_id: i.payout_item?.sender_item_id ?? null, transaction_status: i.transaction_status, error_name: i.errors?.name ?? null }]
+      : [],
+  );
+  return { ...parsePayout(body), items };
 }
 
 const isTimeout = (e: { code?: unknown; name?: unknown; message?: unknown }) =>
@@ -164,6 +180,21 @@ export function realPaypal(env: NodeJS.ProcessEnv = process.env): PayPal {
           if (!(err instanceof PayPalError) || !/ALREADY_CANCEL|RETURNED/.test(err.name_ ?? "")) throw err; // already cancelled or returned is success
         }
       }),
+
+    getCapture: (capture_id) =>
+      call("getCapture", async () => {
+        const res = await payments.getCapturedPayment({ captureId: capture_id });
+        return parseCapture(parseJson<CaptureBody>(res.body) ?? {});
+      }),
+
+    getAuthorization: (authorization_id) =>
+      call("getAuthorization", async () => {
+        const res = await payments.getAuthorizedPayment({ authorizationId: authorization_id });
+        return parseAuthorizationResource(parseJson<AuthorizationBody>(res.body) ?? {});
+      }),
+
+    getPayoutBatch: (payout_batch_id) =>
+      call("getPayoutBatch", async () => parsePayoutBatch(await raw<PayoutBatchBody>("GET", `${base}/v1/payments/payouts/${encodeURIComponent(payout_batch_id)}`))),
 
     verifyWebhook,
   };

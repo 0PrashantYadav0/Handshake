@@ -64,6 +64,7 @@ export type PaypalWebhookEvent = {
 export type TickReport = {
   voided: string[]; // deal codes voided for a passed deadline
   verdicts_rerun: string[]; // deal codes whose verdict step was finished
+  reconciled: string[]; // deal codes where a PayPal fact was applied by reconcile() (E12), once per fact
   errors: { code: string; message: string }[];
 };
 

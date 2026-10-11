@@ -114,3 +114,59 @@ test("cancelPayoutItem: already cancelled resolves; cancel success resolves", as
   await expect(pp.cancelPayoutItem("G2A4L7B3F8JQW")).resolves.toBeUndefined();
   expect(fetchMock.mock.calls[1]![0]).toBe("https://api-m.sandbox.paypal.com/v1/payments/payouts-item/G2A4L7B3F8JQW/cancel");
 });
+
+// ---------- reads for reconciliation (E12) ----------
+
+const sdkRes = (body: string) => ({ statusCode: 200, headers: {}, result: {}, body });
+/** The authorization resource of the authorize-order fixture, as GET /v2/payments/authorizations/{id} answers it. */
+const authResource = (patch: Record<string, unknown> = {}) => ({ ...json("authorize-order.created").purchase_units[0].payments.authorizations[0], ...patch });
+
+test("getCapture: SDK GET capture by id, parsed like the capture answer; a 404 throws PayPalError and logs one line", async () => {
+  const spy = vi.spyOn(PaymentsController.prototype, "getCapturedPayment").mockResolvedValue(sdkRes(fixture("capture.completed")) as never);
+  expect(await realPaypal(env).getCapture("5KA38057EC136584R")).toEqual({ capture_id: "5KA38057EC136584R", status: "COMPLETED", reason: null });
+  expect(spy).toHaveBeenCalledWith({ captureId: "5KA38057EC136584R" });
+  spy.mockResolvedValue(sdkRes(fixture("capture.declined")) as never);
+  expect(await realPaypal(env).getCapture("X")).toMatchObject({ status: "DECLINED", reason: "DECLINED_BY_RISK_FRAUD_FILTERS" });
+
+  const body = '{"name":"RESOURCE_NOT_FOUND","debug_id":"d404","details":[{"issue":"INVALID_RESOURCE_ID"}]}';
+  spy.mockRejectedValue(new ApiError({ request: { method: "GET", url: "u" }, response: { statusCode: 404, body, headers: {} } }, "HTTP 404"));
+  await expect(realPaypal(env).getCapture("NOPE")).rejects.toMatchObject({ status: 404, name_: "INVALID_RESOURCE_ID", debug_id: "d404" });
+  expect(String(vi.mocked(console.error).mock.calls.at(-1)![0])).toBe("paypal getCapture failed status=404 name=INVALID_RESOURCE_ID debug_id=d404");
+});
+
+test("getAuthorization: SDK GET authorization by id; reason only when PENDING; a body without an id throws NO_AUTHORIZATION", async () => {
+  const spy = vi.spyOn(PaymentsController.prototype, "getAuthorizedPayment").mockResolvedValue(sdkRes(JSON.stringify(authResource())) as never);
+  expect(await realPaypal(env).getAuthorization("66P728836U784324A")).toEqual({ authorization_id: "66P728836U784324A", status: "CREATED", expiration_time: "2026-11-18T15:57:51Z", reason: null });
+  expect(spy).toHaveBeenCalledWith({ authorizationId: "66P728836U784324A" });
+  spy.mockResolvedValue(sdkRes(JSON.stringify(authResource({ status: "PENDING", status_details: { reason: "PENDING_REVIEW" } }))) as never);
+  expect(await realPaypal(env).getAuthorization("A")).toMatchObject({ status: "PENDING", reason: "PENDING_REVIEW" });
+  spy.mockResolvedValue(sdkRes(JSON.stringify(authResource({ status: "VOIDED", status_details: { reason: "X" } }))) as never);
+  expect(await realPaypal(env).getAuthorization("A")).toMatchObject({ status: "VOIDED", reason: null });
+  spy.mockResolvedValue(sdkRes("{}") as never);
+  await expect(realPaypal(env).getAuthorization("A")).rejects.toMatchObject({ name_: "NO_AUTHORIZATION" });
+});
+
+test("getPayoutBatch: raw GET /v1/payments/payouts/{id} with the bearer and no request id; items with sender_item_id, status, errors.name", async () => {
+  const failed = json("payout.batch");
+  failed.items[0] = { ...failed.items[0], transaction_status: "FAILED", errors: { name: "RECEIVER_UNREGISTERED", message: "x" } };
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(res(200, fixture("token")))
+    .mockResolvedValueOnce(res(200, fixture("payout.batch")))
+    .mockResolvedValueOnce(res(200, JSON.stringify(failed)))
+    .mockResolvedValueOnce(res(404, '{"name":"INVALID_RESOURCE_ID","debug_id":"d9"}'));
+  vi.stubGlobal("fetch", fetchMock);
+  const pp = realPaypal(env);
+  expect(await pp.getPayoutBatch("3TRXJ4Z8XJ8QY")).toEqual({
+    payout_batch_id: "3TRXJ4Z8XJ8QY", batch_status: "SUCCESS",
+    items: [{ payout_item_id: "G2A4L7B3F8JQW", sender_item_id: "payout-HS-7K2Q-1", transaction_status: "SUCCESS", error_name: null }],
+  });
+  const [url, init] = fetchMock.mock.calls[1]! as [string, RequestInit];
+  expect(url).toBe("https://api-m.sandbox.paypal.com/v1/payments/payouts/3TRXJ4Z8XJ8QY");
+  expect(init.method).toBe("GET");
+  expect(init.body).toBeUndefined();
+  expect(init.headers).toMatchObject({ Authorization: `Bearer ${TOKEN}` });
+  expect(init.headers).not.toHaveProperty("PayPal-Request-Id");
+  expect((await pp.getPayoutBatch("3TRXJ4Z8XJ8QY")).items[0]).toMatchObject({ transaction_status: "FAILED", error_name: "RECEIVER_UNREGISTERED" });
+  await expect(pp.getPayoutBatch("NOPE")).rejects.toMatchObject({ status: 404, name_: "INVALID_RESOURCE_ID", debug_id: "d9" });
+  expect(String(vi.mocked(console.error).mock.calls.at(-1)![0])).toBe("paypal getPayoutBatch failed status=404 name=INVALID_RESOURCE_ID debug_id=d9");
+});

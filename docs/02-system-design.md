@@ -49,7 +49,7 @@ Each component has one job and a short list of things it must never do.
 | Browser (pages in `app/`, client components in `components/`) | Role-aware pages; downscale photos before upload; compose the handwritten-code demo photo on a canvas (F5); host the PayPal buttons; AG Grid ledger and AG Studio dashboard | Call `/api/*`; open the PayPal popup via the JS SDK with the public `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | Call PayPal REST or Anthropic; hold any secret; decide anything about a deal |
 | Route handlers (`app/api/**/route.ts`) | HTTP edge | Read the session; validate the body with Zod; call `lib/deal`, `lib/auth`, `lib/files`; map `DealError` to HTTP (H2); read the raw webhook body | Contain a business rule; touch `deals.status`; call PayPal or Anthropic directly |
 | `lib/deal` | Everything about a deal: commands, PayPal facts, `tick()`, queries, access check, transition table, `decide()`, idempotency keys, event writing, evidence pack | Read and write every table; call the `paypal`, `ai`, `email`, `clock` deps | Import Next.js request APIs (`cookies()`, `headers()`); know about HTTP; let model output reach a PayPal argument |
-| `lib/paypal` | Adapter with seven methods (E1): create order, authorize order, capture authorization, void authorization over `@paypal/paypal-server-sdk` 2.5.0; create payout, cancel payout item and webhook signature verification over raw `fetch`; OAuth token cache for the raw calls (E1, E6) | Send `PayPal-Request-Id` on every write; throw `PayPalError` carrying PayPal's `debug_id` read as in 3.4 | Retry a POST on its own (the SDK's `maxNumberOfRetries` stays 0); decide which call to make; be called from anywhere except `lib/deal` (money calls) and the webhook route (verification) |
+| `lib/paypal` | Adapter with seven methods (E1): create order, authorize order, capture authorization, void authorization over `@paypal/paypal-server-sdk` 2.5.0; create payout, cancel payout item and webhook signature verification over raw `fetch`; plus three reads for reconciliation (E12): get capture and get authorization over the SDK, get payout batch over raw `fetch`; OAuth token cache for the raw calls (E1, E6) | Send `PayPal-Request-Id` on every write; throw `PayPalError` carrying PayPal's `debug_id` read as in 3.4 | Retry a POST on its own (the SDK's `maxNumberOfRetries` stays 0); decide which call to make; be called from anywhere except `lib/deal` (money calls) and the webhook route (verification) |
 | `lib/ai` | Adapter over `@anthropic-ai/sdk` as specified in [05-ai-spec.md](05-ai-spec.md): prompts `extract-v1` and `judge-v1`, hand-written JSON schemas, Zod validation, timeouts (D1 to D5, D10, D11). The D8 hash check is not here: `lib/deal/verdict.ts` runs `hashCheck()` before `judge()` | `extract()` throws `DealError` (`ai_unavailable`, `unsupported_currency`, `condition_not_checkable`); `judge()` returns a verdict for every condition on every input, including timeout, refusal, API error and invalid JSON | Throw from `judge()`; see a PayPal id or key; call PayPal; recommend an action |
 | `lib/auth` | `hs_session` JWT cookie, magic-link token, demo personas (F1 to F3) | Sign and verify `jose` HS256 tokens; set and clear the cookie; upsert `users` by email | Know anything about deals |
 | `lib/files` | Upload validation (mime by magic bytes, size, sha256) and HMAC-signed file URLs (B6) | Sign and verify `exp` and `sig` with `FILE_URL_SECRET` | Decide who may upload (that is `lib/deal`'s access check) |
@@ -120,6 +120,7 @@ export type PaypalWebhookEvent = {
 export type TickReport = {
   voided: string[];                   // deal codes voided for a passed deadline
   verdicts_rerun: string[];           // deal codes whose verdict step was finished
+  reconciled: string[];               // deal codes where reconcile() applied a PayPal fact (E12; 5.7)
   errors: { code: string; message: string }[];
 };
 ```
@@ -224,7 +225,7 @@ export interface Email {
   send(msg: { to: string; subject: string; text: string }): Promise<void>;
 }
 
-/** Seven methods (E1). Every write sends the given idempotency key as PayPal-Request-Id and throws PayPalError on any non-2xx
+/** Seven methods (E1) plus three reads (E12). Every write sends the given idempotency key as PayPal-Request-Id and throws PayPalError on any non-2xx
  *  except the cases named on the method. */
 export interface PayPal {
   createAuthorizeOrder(
@@ -263,6 +264,14 @@ export interface PayPal {
   /** Raw fetch POST /v1/payments/payouts-item/{id}/cancel (E1, E7). An item that is already cancelled or returned resolves
    *  as success; anything else non-2xx throws PayPalError. */
   cancelPayoutItem(payout_item_id: string): Promise<void>;
+
+  /** Reads for reconcile() (E12, 5.7). No request id; any non-2xx throws PayPalError. SDK GET /v2/payments/captures/{id}
+   *  and GET /v2/payments/authorizations/{id}; raw fetch GET /v1/payments/payouts/{batch_id}. */
+  getCapture(capture_id: string): Promise<{ capture_id: string; status: CaptureStatus; reason: string | null }>;   // status unions as in lib/paypal/types.ts
+  getAuthorization(authorization_id: string):
+    Promise<{ authorization_id: string; status: AuthorizationStatus; expiration_time: string; reason: string | null }>;
+  getPayoutBatch(payout_batch_id: string): Promise<{ payout_batch_id: string; batch_status: PayoutBatchStatus;
+    items: { payout_item_id: string; sender_item_id: string | null; transaction_status: PayoutItemStatus; error_name: string | null }[] }>;
 
   /** E6 self-verification (9.4). Never throws; a cert that cannot be fetched is reported as fetch_failed so the route answers 500. */
   verifyWebhook(rawBody: string, headers: Record<string, string | null>):
@@ -581,10 +590,10 @@ Status change and `deal_events` row are always in the same transaction (C6). Eve
 
 ### 5.3 The fact-applied-once rule (C3, C4)
 
-A PayPal fact is one of `authorization_created`, `capture_completed`, `capture_pending`, `capture_declined`, `authorization_voided`, `payout_succeeded`, `payout_failed`. It may come from an API response (`source: "api"`, with `paypal_request_id`) or a webhook (`source: "webhook"`, with `paypal_event_id`). The first arrival is applied; a later arrival with the same PayPal id is a no-op, never `invalid_state`. A fact that fits no C2 row writes a detail-only event or nothing; nothing is deferred or discarded.
+A PayPal fact is one of `authorization_created`, `capture_completed`, `capture_pending`, `capture_declined`, `authorization_voided`, `payout_succeeded`, `payout_failed`. It may come from an API response (`source: "api"`, with `paypal_request_id`) or a webhook (`source: "webhook"`, with `paypal_event_id`), or from `reconcile()` reading the resource back from PayPal (`source: "reconcile"`, no id; 5.7, E12). The first arrival is applied; a later arrival with the same PayPal id is a no-op, never `invalid_state`. A fact that fits no C2 row writes a detail-only event or nothing; nothing is deferred or discarded.
 
 ```ts
-export type FactSource = { source: "api"; paypal_request_id: string } | { source: "webhook"; paypal_event_id: string };
+export type FactSource = { source: "api"; paypal_request_id: string } | { source: "webhook"; paypal_event_id: string } | { source: "reconcile" };
 
 export type PaypalFact =
   | { type: "authorization_created"; authorization_id: string; auth_expires_at: string }   // authorized_at is clock.now() at apply time (04 section 7.2)
@@ -721,7 +730,7 @@ Two rules around the void call keep the money safe:
 | `fact:authorization_voided` | paypal | PayPal reports the void | `authorization_id` |
 | `fact:payout_succeeded`, `fact:payout_failed` | paypal | payout item result recorded | `payout_item_id`, `payout_batch_id`, `sender_item_id`, `attempt`, `failure_reason` for failed |
 
-Every `fact:*` payload also carries `source` (`"api"` or `"webhook"`) and either `paypal_request_id` (source `api`) or `paypal_event_id` (source `webhook`). Tests detect which source won a race by `payload.source`, never by `cause`. `retry_payout` is also written when attempt `n` is re-sent (5.1), with the same `attempt` and `cancelled_item_id` null.
+Every `fact:*` payload also carries `source` (`"api"`, `"webhook"` or `"reconcile"`) and either `paypal_request_id` (source `api`) or `paypal_event_id` (source `webhook`); source `reconcile` carries no id (E12). Tests detect which source won a race by `payload.source`, never by `cause`. `retry_payout` is also written when attempt `n` is re-sent (5.1), with the same `attempt` and `cancelled_item_id` null.
 
 ### 5.5 Webhook event to fact
 
@@ -751,11 +760,11 @@ Exactly two deal notices exist (C2, FR-32; 04 section 16: "No other endpoint sen
 | decision `buyer_review` (`proof_submitted -> in_review`) | buyer | "Your decision is needed on {code}" |
 | fact `capture_declined` (`captured -> in_review`) | both | "PayPal declined the capture" |
 
-### 5.7 What `tick()` does (B7)
+### 5.7 What `tick()` does (B7, E12)
 
 ```
 tick(now):
-  report = { voided: [], verdicts_rerun: [], errors: [] }
+  report = { voided: [], verdicts_rerun: [], reconciled: [], errors: [] }
 
   for deal in SELECT ... FROM deals WHERE status IN ('held', 'in_review') AND deadline_at < now AND seeded = false:
     try:
@@ -771,10 +780,22 @@ tick(now):
       runVerdict(code); report.verdicts_rerun.push(code)
     catch e:  report.errors.push({ code, message })
 
+  reconcile(now):                                        # lib/deal/reconcile.ts (E12): late or lost webhooks; seeded = false throughout
+    payments capture_pending, updated_at < now - 10 min:   fact = captureFact(paypal.getCapture(capture_id))      # COMPLETED / PENDING / DECLINED as the webhook
+    payments approved with authorization_id, deal terms_agreed, updated_at < now - 10 min:
+                                                           paypal.getAuthorization(id): CREATED -> authorization_created; VOIDED or DENIED -> authorization_voided; PENDING -> nothing
+    payouts pending with paypal_batch_id, updated_at < now - 30 min:
+                                                           paypal.getPayoutBatch(id), item with sender_item_id = sender_batch_id: SUCCESS / FAILED / BLOCKED / RETURNED / UNCLAIMED
+                                                           -> the PAYMENT.PAYOUTS-ITEM.* fact (5.5); anything else -> nothing
+    for each fact:
+      try:  tx: lock deal; applyFactTx(fact, { source: "reconcile" }); after commit: sendPayout / declined notice (5.3)
+            report.reconciled.push(code) when applied        # a fact already applied by a webhook is a no-op, and the webhook after a reconcile is too
+      catch e:  report.errors.push({ code, message })
+
   return report
 ```
 
-`runVerdict()` is idempotent: when verdict rows already exist for the current `submission_no` it skips the model call and goes straight to `decide()` (5.8), so a rerun after a crash never re-judges and never changes its mind. There is no reauthorize job (B7): reauthorization is blocked for the first 3 days and allowed effectively once per hold (research/paypal.md, "3. Payments v2 authorizations: capture, void, reauthorize"), so deals are capped at 21 days inside the 29-day validity, and `in_review` past `deadline_at` is voided (C5). `tick()` is safe to run twice: the second run finds nothing to do. No email is sent on a deadline void (5.6).
+`runVerdict()` is idempotent: when verdict rows already exist for the current `submission_no` it skips the model call and goes straight to `decide()` (5.8), so a rerun after a crash never re-judges and never changes its mind. There is no reauthorize job (B7): reauthorization is blocked for the first 3 days and allowed effectively once per hold (research/paypal.md, "3. Payments v2 authorizations: capture, void, reauthorize"), so deals are capped at 21 days inside the 29-day validity, and `in_review` past `deadline_at` is voided (C5). `tick()` is safe to run twice: the second run finds nothing to do. No email is sent on a deadline void (5.6). A deal still waiting at PayPal (capture or authorization `PENDING`, payout item `PENDING`) keeps its `updated_at` and is asked again on every run.
 
 ### 5.8 The verdict step
 
@@ -898,7 +919,7 @@ Money never moves on a failure: every failure leaves the deal in a state from wh
 | PayPal 5xx on capture from `review { approve }` | `502`; "Could not capture. Try again" | `in_review` | Buyer clicks Approve again, same key |
 | Capture `DECLINED` in the API response | Both notified; buyer sees "PayPal declined the capture" with Approve (retry) and Reject | Tx B: `proof_submitted -> captured -> in_review` (two events); `payments.status = declined`; `capture_attempts + 1` | Buyer approves again with `capture-{code}-{n+1}` or rejects (void) |
 | Capture `DECLINED` by webhook after `PENDING` | Same | `captured -> in_review` | Same |
-| Capture `PENDING` | "Payment is processing at PayPal" | `captured`; `payments.status = capture_pending`; no payout yet | `PAYMENT.CAPTURE.COMPLETED` (then payout) or `PAYMENT.CAPTURE.DECLINED`; no polling (research/paypal.md, "11. Rate limits and sandbox gotchas") |
+| Capture `PENDING` | "Payment is processing at PayPal" | `captured`; `payments.status = capture_pending`; no payout yet | `PAYMENT.CAPTURE.COMPLETED` (then payout) or `PAYMENT.CAPTURE.DECLINED`; if neither arrives, `tick` reads the capture once per run after 10 minutes (5.7, E12); no tighter polling (research/paypal.md, "11. Rate limits and sandbox gotchas") |
 | Capture returns `AUTHORIZATION_EXPIRED` or `AUTHORIZATION_VOIDED` (422) | "The hold is no longer available" | Fact `authorization_voided` -> `voided` | Nothing; the deal is over |
 | Void refused because the money is already captured (422, C4) | "The payment was already captured" (`409 invalid_state`) | `capture-{code}-{n}` re-sent; fact `capture_completed` or `capture_pending` -> `captured` | Nothing; the capture path continues |
 | PayPal 5xx on void (cancel, reject, tick) | `502` "Could not release the hold. Try again" | Unchanged | The user clicks again; `tick()` the next day for deadline voids; `PAYMENT.AUTHORIZATION.VOIDED` if PayPal did void |
@@ -1024,7 +1045,7 @@ Every dependency with a network behind it has a fake that records calls and can 
 
 | Fake | File | What it records | What it can simulate |
 | --- | --- | --- | --- |
-| `FakePayPal` | `lib/paypal/fake.ts` | Every call of the seven methods with its arguments and `requestId`, in order; a map `requestId -> first result`, so a repeated key returns the first result without a new "call"; a repeated `sender_batch_id` on `createPayout` returns the original batch (the duplicate rule in 3.4) | `failNext(method, PayPalError)` (5xx, 422 `AUTHORIZATION_VOIDED`, `PREVIOUSLY_VOIDED`, a void refused after capture, a failed `cancelPayoutItem`); `authorizeStatus = "CREATED" or "PENDING" or "DENIED"`; `captureStatus = "COMPLETED" or "PENDING" or "DECLINED"`; a hang until a given `Promise` (to test the dies-between cases); `event(type, resource)` to build a `PaypalWebhookEvent` for any resource it has issued; `verifyWebhook` answers `verified` unless told otherwise |
+| `FakePayPal` | `lib/paypal/fake.ts` | Every call of the ten methods with its arguments and `requestId`, in order; a map `requestId -> first result`, so a repeated key returns the first result without a new "call"; a repeated `sender_batch_id` on `createPayout` returns the original batch (the duplicate rule in 3.4) | `failNext(method, PayPalError)` (5xx, 422 `AUTHORIZATION_VOIDED`, `PREVIOUSLY_VOIDED`, a void refused after capture, a failed `cancelPayoutItem`); `authorizeStatus = "CREATED" or "PENDING" or "DENIED"`; `captureStatus = "COMPLETED" or "PENDING" or "DECLINED"`; a hang until a given `Promise` (to test the dies-between cases); `event(type, resource)` to build a `PaypalWebhookEvent` for any resource it has issued; `verifyWebhook` answers `verified` unless told otherwise; the `get*` reads answer from its `captures`, `authorizations` and `payouts` maps, whose `status` / `itemStatus` a test sets to play PayPal moving on without a webhook |
 | fake `AiDep` | `lib/ai/fake.ts` | Every `ExtractInput` and `JudgeInput` (so tests assert labels, delimiting and that no PayPal id is present) | `extractWith(result or "timeout" or "refusal" or "invalid")`, `judgeWith(verdicts or "timeout" or "refusal" or "invalid" or "missing_c2")`, named as in 06; defaults: a fixed extraction, every condition `pass` at 0.95 |
 | `RecordingEmail` | `lib/email/console.ts` | Every message | Nothing fails; tests assert who was told what |
 | `FixedClock` | `lib/clock.ts` | | `set(date)`, `advance(ms)`: deadline voids, the 2-minute stuck rule, URL expiry |
