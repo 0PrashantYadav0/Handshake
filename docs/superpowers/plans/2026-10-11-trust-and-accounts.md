@@ -1,7 +1,7 @@
 # Trust and accounts: implementation plan (2026-10-11)
 
 Design: `docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md` (cited below as "spec §n").
-Each task is one GitHub issue (label `trust`) and one PR, squash-merged after CI passes.
+Each task is one GitHub issue (label `trust`; TR-n is issue #(55+n), so TR-1 = #56 and TR-12 = #67) and one PR, squash-merged after CI passes. Tracking issue: #68.
 
 ## Order
 
