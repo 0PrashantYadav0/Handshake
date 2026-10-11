@@ -15,6 +15,9 @@ export const openRaw = (dealId: string, v: Prisma.JsonValue) => openJson(v, aad(
 /** deal_events.payload keys that carry contract content; each is sealed on its own so the rest of the payload stays queryable. */
 export const EVENT_SEALED_KEYS = ["source_text", "note", "tracking_number", "item_title"] as const;
 
+/** Structured payload keys with contract content (the create event's rejected sentence fragments), sealed as JSON text. */
+export const EVENT_SEALED_JSON_KEYS = ["rejected"] as const;
+
 function mapPayload(dealId: string, payload: unknown, f: (v: string, binding: string) => string): Record<string, unknown> {
   const out = { ...(payload as Record<string, unknown>) };
   for (const k of EVENT_SEALED_KEYS) {
@@ -23,8 +26,16 @@ function mapPayload(dealId: string, payload: unknown, f: (v: string, binding: st
   }
   return out;
 }
-export const sealPayload = (dealId: string, payload: Record<string, unknown>) => mapPayload(dealId, payload, seal) as Prisma.InputJsonObject;
-export const openPayload = (dealId: string, payload: unknown) => mapPayload(dealId, payload, open) as Prisma.JsonObject;
+export function sealPayload(dealId: string, payload: Record<string, unknown>): Prisma.InputJsonObject {
+  const out = mapPayload(dealId, payload, seal);
+  for (const k of EVENT_SEALED_JSON_KEYS) if (out[k] !== undefined) out[k] = seal(JSON.stringify(out[k]), aad(`deal_events.payload.${k}`, dealId));
+  return out as Prisma.InputJsonObject;
+}
+export function openPayload(dealId: string, payload: unknown): Prisma.JsonObject {
+  const out = mapPayload(dealId, payload, open);
+  for (const k of EVENT_SEALED_JSON_KEYS) if (typeof out[k] === "string") out[k] = JSON.parse(open(out[k] as string, aad(`deal_events.payload.${k}`, dealId)));
+  return out as Prisma.JsonObject;
+}
 
 export function openVerdict<V extends { reason: string; raw_response: Prisma.JsonValue }>(dealId: string, v: V): V {
   return { ...v, reason: openText("verdicts.reason", dealId, v.reason), raw_response: openRaw(dealId, v.raw_response) };

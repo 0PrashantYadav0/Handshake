@@ -71,7 +71,7 @@ Prompts to type into the `/dashboard` agent panel (for example "Why was HS-7K2Q 
     verdicts)      capture, void,   JSON in, JSON out)
                    Payouts, webhooks)
         ^
-   cron 06:00 UTC -> POST /api/jobs/tick (void past deadline, re-run stuck verdicts)
+   cron every 10 min -> POST /api/jobs/tick (void past deadline, re-run stuck verdicts, reconcile with PayPal)
 ```
 
 Deal states: `draft` -> `terms_agreed` -> `held` -> `proof_submitted` -> `captured` -> `paid`, with `in_review` (the buyer decides) and `voided` (hold released) as the two side exits. Every transition writes one row to `deal_events` in the same transaction, with actor, cause and the PayPal ids needed to explain it.

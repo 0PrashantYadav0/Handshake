@@ -4,6 +4,7 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { DealError } from "@/lib/deal/errors";
 import type { Deps } from "@/lib/deal/types";
 import { allow } from "@/lib/rate-limit";
+import { requireNotDemo } from "./demo";
 import { requireStepUp } from "./mfa";
 
 const CODE_TTL_MS = 15 * 60_000;
@@ -18,6 +19,7 @@ export async function setPayoutEmail(userId: string, email: string, totp: string
   const u = await deps.db.user.findUnique({ where: { id: userId }, select: { paypal_email: true, paypal_email_verified_at: true } });
   if (!u) throw new DealError("not_signed_in");
   if (u.paypal_email === to && u.paypal_email_verified_at) return;
+  await requireNotDemo(userId, deps.db);
   await requireStepUp(userId, totp, deps.db, deps.clock.now());
   await deps.db.user.update({ where: { id: userId }, data: { paypal_email: to, paypal_email_verified_at: null } });
   await issueCode(userId, to, deps);
@@ -53,13 +55,15 @@ export async function verifyPayoutEmail(userId: string, code: string, deps: D): 
   if (!u.paypal_email || !u.paypal_email_code_hash || !u.paypal_email_code_expires_at) throw new DealError("invalid_state", "Ask for a new code.");
   if (u.paypal_email_verified_at) return;
   const bad = (msg: string) => new DealError("invalid_input", msg);
-  if (u.paypal_email_code_attempts >= MAX_ATTEMPTS) throw bad("Too many wrong codes. Ask for a new code.");
   if (now >= u.paypal_email_code_expires_at) throw bad("That code has expired. Ask for a new code.");
+  // Review finding 7: claim the attempt atomically before comparing, so parallel guesses cannot exceed the limit.
+  const claimed = await deps.db.user.updateMany({
+    where: { id: userId, paypal_email_code_hash: u.paypal_email_code_hash, paypal_email_code_attempts: { lt: MAX_ATTEMPTS } },
+    data: { paypal_email_code_attempts: { increment: 1 } },
+  });
+  if (claimed.count !== 1) throw bad("Too many wrong codes. Ask for a new code.");
   const ok = /^\d{6}$/.test(code) && timingSafeEqual(Buffer.from(hashCode(userId, u.paypal_email, code)), Buffer.from(u.paypal_email_code_hash));
-  if (!ok) {
-    await deps.db.user.update({ where: { id: userId }, data: { paypal_email_code_attempts: { increment: 1 } } });
-    throw bad("That code is wrong. Check the email we sent to your PayPal address.");
-  }
+  if (!ok) throw bad("That code is wrong. Check the email we sent to your PayPal address.");
   // Conditional on the same hash, so a concurrent change of address cannot be verified with the old code.
   const done = await deps.db.user.updateMany({
     where: { id: userId, paypal_email: u.paypal_email, paypal_email_code_hash: u.paypal_email_code_hash },

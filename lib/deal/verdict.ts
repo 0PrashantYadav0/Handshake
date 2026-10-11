@@ -7,6 +7,7 @@ import { carrierStatus } from "@/lib/carrier";
 import { DEAL_INCLUDE, type Db, type DealRow } from "./access";
 import { decide, limitsFromEnv, type Decision, type DecisionReason, type Limits } from "./decide";
 import { DealError } from "./errors";
+import { ruleOf } from "./contract";
 import { afterCommit, applyFactTx, captureHold, lockAndLoad, voidHold } from "./facts-db";
 import { voidKey } from "./keys";
 import { notifyBuyerReview } from "./notify";
@@ -99,7 +100,7 @@ export async function runVerdict(code: string, deps: Deps): Promise<void> {
       return (await tx.verdict.findMany({ where: { deal_id: d.id, submission_no: no } })).map((v) => openVerdict(d.id, v));
     });
   }
-  const { decision, reason } = decide(rows, { amount_minor: deal.amount_minor!, fix_attempts_used: deal.fix_attempts_used, conditions: deal.conditions }, getLimits());
+  const { decision, reason } = decide(rows, { amount_minor: deal.amount_minor!, fix_attempts_used: deal.fix_attempts_used, conditions: deal.conditions }, ruleOf(deal)); // the signed rule (contract format 2)
   await act(deal, no, decision, reason, deps);
 }
 

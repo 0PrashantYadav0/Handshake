@@ -5,6 +5,7 @@ import { PayPalError } from "@/lib/paypal/types";
 import { DEAL_INCLUDE, type DealRow } from "./access";
 import type { PaypalFact } from "./facts";
 import { afterCommit, applyFactTx, payoutItemFact, type FactResult, type FactSource } from "./facts-db";
+import { recordContractFailure, verifyContract } from "./contract";
 import { authKey, strayVoidKey } from "./keys";
 import { openDealRow } from "./sealed";
 import { lockDeal, TX_OPTIONS, writeEvent, type Tx } from "./transition";
@@ -111,15 +112,20 @@ async function process(event: PaypalWebhookEvent, deps: Deps): Promise<WebhookOu
 async function applyApprovedOrder(lookup: Lookup, order_id: string, eventId: string, deps: Deps): Promise<WebhookOutcome> {
   const code = lookup.value;
   const src: FactSource = { source: "webhook", paypal_event_id: eventId };
+  let refused = null as { dealId: string; problem: string } | null;
   const intent = await inTx(deps, async (tx) => {
     const deal = await lockAndLoad(tx, lookup);
     const p = deal?.payment;
     const wanted = deal?.status === "terms_agreed" && p?.paypal_order_id === order_id && (p.status === "created" || p.status === "approved");
+    // trust spec §7, review finding 4: this path places a hold too, so it passes the same contract gate as confirm_approval.
+    const problem = deal && wanted ? await verifyContract(deal) : null;
+    if (deal && problem) refused = { dealId: deal.id, problem };
     if (!deal) await markProcessed(tx, deps, eventId);
-    else if (wanted) await tx.payment.update({ where: { id: p.id }, data: { status: "approved" } });
-    else await markProcessed(tx, deps, eventId); // voided after a cancel, already held, another order: a stale popup places no hold
-    return !deal ? "unknown_deal" : wanted ? "proceed" : "noop";
+    else if (wanted && !problem) await tx.payment.update({ where: { id: p.id }, data: { status: "approved" } });
+    else await markProcessed(tx, deps, eventId); // voided after a cancel, already held, another order, a contract that no longer verifies: no hold
+    return !deal ? "unknown_deal" : wanted && !problem ? "proceed" : "noop";
   });
+  if (refused) await recordContractFailure(refused.dealId, deps, "confirm_approval", refused.problem);
   if (intent !== "proceed") return intent;
 
   const key = authKey(code);

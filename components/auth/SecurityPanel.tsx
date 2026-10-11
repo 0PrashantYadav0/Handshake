@@ -1,5 +1,6 @@
 "use client";
 // /security: 2FA status and new recovery codes under step-up (trust spec §4).
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/client-api";
 import type { MfaStatus } from "@/lib/auth/mfa";
@@ -7,6 +8,7 @@ import { CodeInput, codeError } from "./CodeInput";
 import { RecoveryCodes } from "./RecoveryCodes";
 
 export function SecurityPanel({ status }: { status: MfaStatus }) {
+  const router = useRouter();
   const [code, setCode] = useState("");
   const [codes, setCodes] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,6 +21,16 @@ export function SecurityPanel({ status }: { status: MfaStatus }) {
         <p className="mt-1" data-testid="mfa-status">
           {status.enabled ? `On since ${new Date(status.enabled_at!).toLocaleDateString()}.` : "Off."} {left} recovery {left === 1 ? "code" : "codes"} left.
         </p>
+      </section>
+      <section className="hs-card" aria-labelledby="everywhere-h">
+        <h2 id="everywhere-h" className="font-semibold">Signed in somewhere else?</h2>
+        <p className="hs-help mt-1">Ends every session of this account on every device, this one too. You sign in again with your email and code.</p>
+        <button
+          type="button" className="hs-btn-danger mt-2" data-testid="sign-out-everywhere"
+          onClick={() => void api("/api/auth/sign-out-everywhere", { method: "POST" }).then(() => { router.push("/signin"); router.refresh(); }).catch((e) => setError(codeError(e)))}
+        >
+          Sign out everywhere
+        </button>
       </section>
       {codes ? (
         <RecoveryCodes codes={codes} />

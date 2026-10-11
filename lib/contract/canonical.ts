@@ -1,7 +1,8 @@
 // The signed contract (trust spec §6). Pure and browser-safe: the server builds the document from the database, the
 // browser re-hashes the document it shows, and both sign or verify the same bytes. Never change a field's meaning; add a
 // new format version instead, since stored signatures cover the old one.
-export const CONTRACT_FORMAT = 1;
+// Format 2 (review finding 6) adds the listing photos' SHA-256 and the decision rule, both of which decide where the money goes.
+export const CONTRACT_FORMAT = 2;
 
 export type ContractDoc = {
   v: typeof CONTRACT_FORMAT;
@@ -14,6 +15,8 @@ export type ContractDoc = {
   conditions: { position: number; text: string; evidence_type: "photo" | "tracking" }[];
   buyer: { id: string; email: string };
   seller: { id: string; email: string };
+  reference_photos: { position: number; sha256: string }[];
+  rule: { pass_threshold: number; auto_capture_max_minor: number };
 };
 
 /** JSON with object keys sorted at every level and no whitespace. Arrays keep their order. */

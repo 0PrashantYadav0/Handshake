@@ -32,22 +32,23 @@ export async function readToken(token: string, purpose: Purpose, secret = secret
   return (await readClaims(token, purpose, secret))?.sub ?? null;
 }
 
-export type Claims = { sub: string; jti: string | null; exp: number; mfa: boolean };
+export type Claims = { sub: string; jti: string | null; exp: number; mfa: boolean; sv: number };
 /** Subject, token id, expiry and the mfa flag. */
 export async function readClaims(token: string, purpose: Purpose, secret = secretFromEnv()): Promise<Claims | null> {
   try {
     const { payload } = await jwtVerify(token, key(secret), { algorithms: ["HS256"] });
     if (payload.purpose !== purpose || typeof payload.sub !== "string") return null;
-    return { sub: payload.sub, jti: payload.jti ?? null, exp: payload.exp ?? 0, mfa: payload.mfa === true };
+    return { sub: payload.sub, jti: payload.jti ?? null, exp: payload.exp ?? 0, mfa: payload.mfa === true, sv: typeof payload.sv === "number" ? payload.sv : 0 };
   } catch {
     return null;
   }
 }
 
 /** mfa false = partial session: it can only reach the second-factor screens (trust spec §4). */
-export const signSession = (userId: string, mfa: boolean, secret?: string) =>
-  signToken(userId, "session", mfa ? SESSION_TTL_SEC : PARTIAL_TTL_SEC, secret, { mfa });
-/** The user id of a full (second-factor) session; null for a partial or invalid one. */
+/** sv = the user's session_version when issued; bumping it ("sign out everywhere") ends every older session. */
+export const signSession = (userId: string, mfa: boolean, secret?: string, sv = 0) =>
+  signToken(userId, "session", mfa ? SESSION_TTL_SEC : PARTIAL_TTL_SEC, secret, { mfa, sv });
+/** The user id of a full (second-factor) session; null for a partial or invalid one. Pages also check the version (current.ts). */
 export async function readSession(token: string, secret?: string): Promise<string | null> {
   const c = await readClaims(token, "session", secret);
   return c?.mfa ? c.sub : null;

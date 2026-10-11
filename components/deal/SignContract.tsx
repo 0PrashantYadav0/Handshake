@@ -49,6 +49,8 @@ export function SignContract({ deal, onDone }: { deal: DealView; onDone: (d: Dea
         <dt className="text-[var(--hs-muted)]">Seller</dt><dd>{doc.seller.email}</dd>
         <dt className="text-[var(--hs-muted)]">Conditions</dt>
         <dd><ol className="list-decimal pl-5">{doc.conditions.map((x) => <li key={x.position}>{x.text}</li>)}</ol></dd>
+        <dt className="text-[var(--hs-muted)]">Listing photos</dt><dd>{doc.reference_photos.length || "None"}{doc.reference_photos.length ? " (fingerprinted in the contract)" : ""}</dd>
+        <dt className="text-[var(--hs-muted)]">Rule</dt><dd>Released only if every condition passes at confidence {doc.rule.pass_threshold} or more, up to {money(doc.rule.auto_capture_max_minor)}; above that the buyer decides.</dd>
         <dt className="text-[var(--hs-muted)]">Contract fingerprint</dt><dd className="font-mono" data-testid="contract-fingerprint">{shortHash(c.hash)}</dd>
       </dl>
       <p className="hs-help">

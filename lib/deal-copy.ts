@@ -142,7 +142,7 @@ export function payoutCopy(d: Pick<DealView, "role" | "amount_minor" | "seller" 
   return { heading: "Payment released to you", helper: `PayPal is sending ${amount} to ${email}. This usually takes a minute.` };
 }
 
-const CHECKING_HELPER = "This usually takes under 15 seconds, at most about 40. If the check could not finish, Handshake re-runs it at the next daily check (06:00 UTC) or when an operator runs it; nothing is charged until then.";
+const CHECKING_HELPER = "This usually takes under 15 seconds, at most about 40. If the check could not finish, Handshake re-runs it within 10 minutes; nothing is charged until then.";
 
 /** The "What happens next" heading and helper (08 section 7.4) for every status. `events` keys the voided reason. */
 export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean; now?: number; events?: DealEvent[] } = {}): NextCopy {

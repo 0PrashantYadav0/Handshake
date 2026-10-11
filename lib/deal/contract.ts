@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { canonicalJson, CONTRACT_FORMAT, signingMessage, type ContractDoc } from "@/lib/contract/canonical";
 import { fingerprint, verifySignature, type PublicKey } from "@/lib/contract/signature";
 import type { DealRow } from "./access";
+import { limitsFromEnv, type Limits } from "./decide";
 import { DealError } from "./errors";
 import { lockDeal, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps } from "./types";
@@ -12,7 +13,16 @@ type DocSource = {
   public_code: string; terms_version: number; item_title: string; amount_minor: number | null; deadline_days: number | null;
   conditions: { position: number; text: string; evidence_type: "photo" | "tracking" }[];
   buyer: { id: string; email: string }; seller: { id: string; email: string } | null;
+  files: { purpose: "reference" | "evidence"; sha256: string }[]; // in upload order
+  rule_pass_threshold: number | null; rule_auto_capture_max_minor: number | null;
 };
+
+/** The rule a deal is decided by: its snapshot from creation, else (deals made before the snapshot existed) the deploy's. */
+export function ruleOf(deal: Pick<DocSource, "rule_pass_threshold" | "rule_auto_capture_max_minor">): Limits {
+  return deal.rule_pass_threshold !== null && deal.rule_auto_capture_max_minor !== null
+    ? { passThreshold: deal.rule_pass_threshold, autoCaptureMaxMinor: deal.rule_auto_capture_max_minor }
+    : limitsFromEnv();
+}
 export function contractDocOf(deal: DocSource): ContractDoc | null {
   if (!deal.seller || deal.amount_minor === null || deal.deadline_days === null) return null;
   return {
@@ -21,6 +31,8 @@ export function contractDocOf(deal: DocSource): ContractDoc | null {
     conditions: deal.conditions.map((c) => ({ position: c.position, text: c.text, evidence_type: c.evidence_type })),
     buyer: { id: deal.buyer.id, email: deal.buyer.email },
     seller: { id: deal.seller.id, email: deal.seller.email },
+    reference_photos: deal.files.filter((f) => f.purpose === "reference").map((f, i) => ({ position: i + 1, sha256: f.sha256 })),
+    rule: { pass_threshold: ruleOf(deal).passThreshold, auto_capture_max_minor: ruleOf(deal).autoCaptureMaxMinor },
   };
 }
 

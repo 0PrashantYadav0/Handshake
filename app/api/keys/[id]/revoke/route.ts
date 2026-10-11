@@ -1,6 +1,7 @@
 // POST /api/keys/{id}/revoke { totp } -> the key can no longer sign (trust spec §6). Step-up required.
 import { z } from "zod";
 import { revokeKey, listKeys } from "@/lib/auth/keys";
+import { requireNotDemo } from "@/lib/auth/demo";
 import { requireStepUp } from "@/lib/auth/mfa";
 import { DealError } from "@/lib/deal/errors";
 import { getDeps } from "@/lib/deps";
@@ -14,6 +15,7 @@ export const POST = route(async (req: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   const { db, clock } = getDeps();
   if (!z.uuid().safeParse(id).success) throw new DealError("invalid_input", "Bad key id.");
+  await requireNotDemo(user_id, db);
   await requireStepUp(user_id, totp, db, clock.now());
   await revokeKey(user_id, id, db, clock.now());
   return json({ keys: await listKeys(user_id, db) });

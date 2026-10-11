@@ -21,6 +21,8 @@ const PERSONAS: Record<Persona, { email: string; display_name: string }> = {
 const demoOn = () => process.env.DEMO_LOGIN === "true";
 export const personaOf = (email: string): Persona | null =>
   (Object.keys(PERSONAS) as Persona[]).find((p) => PERSONAS[p].email === email) ?? null;
+/** A demo account while demo mode is on: shared, with a published second factor (review finding 5). */
+export const isDemoPersona = (email: string) => demoOn() && personaOf(email) !== null;
 
 /** Returns the persona's user id. Throws invalid_input unless DEMO_LOGIN=true. */
 export async function signInDemoPersona(persona: Persona, db: PrismaClient, now = new Date()): Promise<string> {
@@ -48,4 +50,10 @@ export async function demoCode(userId: string, db: PrismaClient, now: Date): Pro
   const step = u.totp_last_step === null || u.totp_last_step < cur ? cur : u.totp_last_step + 1;
   if (step > cur + 1) throw new DealError("invalid_state", "Wait a few seconds for the next code.");
   return { code: hotp(key, step), valid_for_sec: (step + 1) * STEP_SEC - Math.floor(now.getTime() / 1000) };
+}
+
+/** Payout address, signing keys and recovery codes stay fixed on the shared demo accounts: their second factor is public. */
+export async function requireNotDemo(userId: string, db: PrismaClient): Promise<void> {
+  const u = await db.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (u && isDemoPersona(u.email)) throw new DealError("invalid_state", "The demo accounts are shared, so this setting is locked. Sign in with your own email to change it.");
 }

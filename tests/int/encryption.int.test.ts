@@ -141,7 +141,7 @@ describe("contract data at rest", () => {
     process.env.DATA_KEYS = `k2:${"rotated-test-key-".repeat(3)},${KEYS}`;
 
     const first = await reseal(deps.db);
-    expect(first).toEqual({ deals: 1, values: 2 + 3 * view.conditions.length + 2 + 3, event_kids: [oldKid] });
+    expect(first).toEqual({ deals: 1, values: 2 + 3 * view.conditions.length + 2 + 3, event_kids: [oldKid], events_sealed: 0 });
 
     const raw = await rawRows(id);
     const enc2 = expect.stringMatching(/^enc1\.k2\./);
@@ -156,7 +156,7 @@ describe("contract data at rest", () => {
     expect(after).toEqual(view);
     expect((await fetchFile(after.reference_files[0]!.url, after.reference_files[0]!.id)).equals(Buffer.from(REF))).toBe(true);
 
-    expect(await reseal(deps.db)).toEqual({ deals: 1, values: 0, event_kids: [oldKid] });
+    expect(await reseal(deps.db)).toEqual({ deals: 1, values: 0, event_kids: [oldKid], events_sealed: 0 });
 
     // Why the old kid must stay while events use it: without it the deal no longer opens.
     process.env.DATA_KEYS = `k2:${"rotated-test-key-".repeat(3)}`;
