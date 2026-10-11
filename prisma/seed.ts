@@ -1,10 +1,12 @@
 // Seed (03 "Seed"; decisions F3, F6): the two demo personas, upserted on every run, and 25 historical deals written
 // once (skipped when any deals.seeded row exists). Events only, no PayPal objects, no photos: conditions and verdicts
-// are enough for the deal page, the ledger and the dashboard. Run: npm run seed (tsx prisma/seed.ts).
+// are enough for the deal page, the ledger and the dashboard. Contract text is sealed like any deal's (trust spec §5).
+// Run: npm run seed (tsx prisma/seed.ts).
 import { pathToFileURL } from "node:url";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Prisma } from "../generated/prisma/client";
 import { newPublicCode } from "../lib/deal/code";
+import { sealPayload, sealRaw, sealText } from "../lib/deal/sealed";
 import { CODE_CONDITION } from "../lib/deal/terms";
 import type { DealStatus, EventActor, VerdictResult } from "../lib/deal/types";
 
@@ -141,21 +143,23 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
       const t = trail(kind, start, { seller_id: seller.id, amount_minor, deadline_days, source_text, conditionIds: conditions.map((c) => c.id) });
       const joined = kind !== "draft";
       const agreed = joined && kind !== "draft_joined";
-      const deal = await tx.deal.create({
+      const id = crypto.randomUUID(); // the AAD needs the deal id before the insert
+      await tx.deal.create({
         data: {
-          public_code, seeded: true, buyer_id: buyer.id, seller_id: joined ? seller.id : null,
-          status: t.status, source_text, item_title: item, amount_minor, deadline_days, deadline_at: t.deadline_at,
+          id, public_code, seeded: true, buyer_id: buyer.id, seller_id: joined ? seller.id : null,
+          status: t.status, source_text: sealText("deals.source_text", id, source_text), item_title: sealText("deals.item_title", id, item),
+          amount_minor, deadline_days, deadline_at: t.deadline_at,
           terms_version: 1, buyer_accepted_version: joined ? 1 : null, seller_accepted_version: agreed ? 1 : null,
           fix_attempts_used: t.verdicts.length === 2 ? 1 : 0,
           created_at: t.events[0].created_at, updated_at: t.events.at(-1)!.created_at,
-          conditions: { create: conditions },
+          conditions: { create: conditions.map((c) => ({ ...c, text: sealText("conditions.text", id, c.text) })) },
         },
       });
-      await tx.dealEvent.createMany({ data: t.events.map((e) => ({ deal_id: deal.id, ...e })) });
+      await tx.dealEvent.createMany({ data: t.events.map((e) => ({ deal_id: id, ...e, payload: sealPayload(id, e.payload) })) });
       await tx.verdict.createMany({
         data: t.verdicts.flatMap((v) => v.rows.map((r, k) => ({
-          deal_id: deal.id, condition_id: conditions[k].id, submission_no: v.submission_no, ...r,
-          evidence_used: [], model: "seed", prompt_version: "judge-v1", raw_response: { seeded: true }, created_at: v.created_at,
+          deal_id: id, condition_id: conditions[k].id, submission_no: v.submission_no, ...r, reason: sealText("verdicts.reason", id, r.reason),
+          evidence_used: [], model: "seed", prompt_version: "judge-v1", raw_response: sealRaw(id, { seeded: true }), created_at: v.created_at,
         }))),
       });
     }

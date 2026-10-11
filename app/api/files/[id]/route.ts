@@ -1,7 +1,7 @@
 // GET /api/files/{id}?exp=&sig= -> the stored bytes; the signature is the credential, no session (04 section 8.2).
-// lib/db omits file.bytes globally, so this route selects them explicitly.
+// lib/db omits file.bytes globally, so this route selects them explicitly and opens them (sealed at rest, trust spec §5).
 import { z } from "zod";
-import { DealError } from "@/lib/deal";
+import { DealError, openFile } from "@/lib/deal";
 import { getDeps } from "@/lib/deps";
 import { verifyFileUrl } from "@/lib/files/urls";
 import { route } from "@/lib/http";
@@ -14,9 +14,9 @@ export const GET = route(async (req: Request, { params }: { params: Promise<{ id
   if (!query.success) throw new DealError("invalid_input", "Missing or malformed exp or sig.");
   const { db, clock } = getDeps();
   if (!verifyFileUrl(id, query.data.exp, query.data.sig, clock.now())) throw new DealError("not_a_party", "This link has expired.");
-  const file = z.uuid().safeParse(id).success ? await db.file.findUnique({ where: { id }, select: { mime: true, bytes: true } }) : null;
+  const file = z.uuid().safeParse(id).success ? await db.file.findUnique({ where: { id }, select: { deal_id: true, mime: true, bytes: true } }) : null;
   if (!file) throw new DealError("deal_not_found", "File not found.");
-  const bytes = new Uint8Array(file.bytes);
+  const bytes = openFile(file.deal_id, file.bytes);
   return new Response(bytes, {
     headers: { "content-type": file.mime, "content-length": String(bytes.length), "cache-control": "private, max-age=600", "content-disposition": "inline" },
   });
