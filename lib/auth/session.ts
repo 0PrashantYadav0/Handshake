@@ -1,4 +1,5 @@
 // jose HS256 tokens: the hs_session cookie (30 days) and the magic-link token (15 min), told apart by `purpose` (F1, F2).
+import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 
 export const SESSION_COOKIE = "hs_session";
