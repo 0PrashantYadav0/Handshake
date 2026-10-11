@@ -14,7 +14,7 @@ export async function pass2fa(page: Page) {
 export async function signContract(page: Page) {
   await page.getByTestId("sign-contract").waitFor();
   await page.getByTestId("sign-agree").check();
-  const { code } = (await (await page.request.get("/api/auth/2fa/demo-code")).json()) as { code: string };
-  await page.locator("#sign-totp").fill(code);
+  await page.getByTestId("sign-demo-code").click();
+  await expect(page.locator("#sign-totp")).toHaveValue(/^\d{6}$/);
   await page.getByTestId("accept-terms").click();
 }

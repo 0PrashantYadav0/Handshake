@@ -10,7 +10,9 @@ import { contractHash, shortHash, signingMessage } from "@/lib/contract/canonica
 import { signWithDevice } from "@/lib/contract/device-key";
 import { CodeInput, codeError } from "@/components/auth/CodeInput";
 
-export function SignContract({ deal, onDone }: { deal: DealView; onDone: (d: DealView) => void }) {
+const PERSONA_EMAILS = ["demo-buyer@handshake.demo", "demo-seller@handshake.demo"];
+
+export function SignContract({ deal, demo = false, onDone }: { deal: DealView; demo?: boolean; onDone: (d: DealView) => void }) {
   const [totp, setTotp] = useState("");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -20,6 +22,16 @@ export function SignContract({ deal, onDone }: { deal: DealView; onDone: (d: Dea
   const doc = c.document;
   const other = deal.role === "buyer" ? "seller" : "buyer";
   const otherSigned = c.signatures.some((s) => s.role === other);
+  // Demo accounts have a published authenticator secret, so their current code can be filled in (trust spec §4).
+  const persona = demo && PERSONA_EMAILS.includes(deal.role === "buyer" ? doc.buyer.email : doc.seller.email);
+  const fillDemo = async () => {
+    setError(null);
+    try {
+      setTotp((await api<{ code: string }>("/api/auth/2fa/demo-code")).code);
+    } catch (e) {
+      setError(codeError(e));
+    }
+  };
 
   const sign = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -62,6 +74,7 @@ export function SignContract({ deal, onDone }: { deal: DealView; onDone: (d: Dea
         <span>I agree to these terms. Money moves only as the rule on the contract page describes.</span>
       </label>
       <CodeInput id="sign-totp" value={totp} onChange={setTotp} label="Code from your authenticator app" />
+      {persona && <button type="button" className="hs-link self-start text-sm" data-testid="sign-demo-code" onClick={() => void fillDemo()}>Use demo code</button>}
       {error && <p className="hs-banner" role="alert">{error}</p>}
       <button type="submit" className="hs-btn self-start" data-testid="accept-terms" data-primary-action disabled={busy || !agree}>
         {busy ? "Signing…" : "Sign contract"}

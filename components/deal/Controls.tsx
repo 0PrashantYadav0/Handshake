@@ -40,10 +40,10 @@ export function Join({ code, onDone, fail }: { code: string; onDone: Done; fail:
 }
 
 /** trust spec §6, §8: a seller without a verified payout address confirms it first; then either party signs. */
-export function AcceptTerms({ deal, onDone }: { deal: DealView; onDone: Done; fail?: Fail }) {
+export function AcceptTerms({ deal, demo = false, onDone }: { deal: DealView; demo?: boolean; onDone: Done; fail?: Fail }) {
   const [needEmail, setNeedEmail] = useState(deal.role === "seller" && !deal.seller?.payout_email_verified);
   if (needEmail) return <PayoutEmailForm current={deal.seller?.paypal_email ?? null} verified={false} onVerified={() => setNeedEmail(false)} />;
-  return <SignContract deal={deal} onDone={onDone} />;
+  return <SignContract deal={deal} demo={demo} onDone={onDone} />;
 }
 
 export function CancelDeal({ deal, onDone, fail }: { deal: DealView; onDone: Done; fail: Fail }) {

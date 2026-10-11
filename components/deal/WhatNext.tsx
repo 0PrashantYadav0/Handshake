@@ -78,7 +78,7 @@ export function WhatNext({ deal, demo, paypalClientId, pollExpired, events, chec
       <>
         {view.role === "buyer" && !view.seller && <ShareLink code={view.code} title={view.item_title} />}
         {view.seller && (mine !== view.terms_version
-          ? <AcceptTerms deal={view} onDone={setDeal} fail={fail} />
+          ? <AcceptTerms deal={view} demo={demo} onDone={setDeal} fail={fail} />
           : <p className="text-sm">You signed v{mine}. <a className="hs-link" href={`/deal/${view.code}/contract`}>View the contract</a></p>)}
       </>
     );
