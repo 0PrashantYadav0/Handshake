@@ -8,7 +8,12 @@ import { lockDeal, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps } from "./types";
 
 /** null until both parties are named and the amount and deadline are set: there is nothing to sign yet. */
-export function contractDocOf(deal: Pick<DealRow, "public_code" | "terms_version" | "item_title" | "amount_minor" | "deadline_days" | "conditions" | "buyer" | "seller">): ContractDoc | null {
+type DocSource = {
+  public_code: string; terms_version: number; item_title: string; amount_minor: number | null; deadline_days: number | null;
+  conditions: { position: number; text: string; evidence_type: "photo" | "tracking" }[];
+  buyer: { id: string; email: string }; seller: { id: string; email: string } | null;
+};
+export function contractDocOf(deal: DocSource): ContractDoc | null {
   if (!deal.seller || deal.amount_minor === null || deal.deadline_days === null) return null;
   return {
     v: CONTRACT_FORMAT, code: deal.public_code, terms_version: deal.terms_version, item_title: deal.item_title,
