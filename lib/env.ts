@@ -8,6 +8,7 @@ const EnvZ = z.object({
   DATABASE_URL: z.string().min(1),
   APP_URL: z.url(),
   SESSION_SECRET: z.string().min(32),
+  DATA_KEYS: z.string().min(32), // field encryption keyring (trust spec §5); parsed by lib/crypto/seal.ts
   FILE_URL_SECRET: z.string().min(32),
   PAYPAL_CLIENT_ID: z.string().min(1),
   PAYPAL_CLIENT_SECRET: z.string().min(1),

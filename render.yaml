@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: FILE_URL_SECRET
         generateValue: true
+      - key: DATA_KEYS # field encryption; never change it in place, prepend a new kid:secret to rotate
+        generateValue: true
       - key: CRON_SECRET
         generateValue: true
       - key: PAYPAL_CLIENT_ID
