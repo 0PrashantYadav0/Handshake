@@ -1,17 +1,10 @@
 // The one e2e: real UI, real PayPal sandbox, real Claude (06 "End to end", ten steps). Testids from 08 section 4.7.
 import { expect, test, type Page } from "@playwright/test";
 import { approveInPopup } from "./paypal-popup";
+import { pass2fa, signContract } from "./flows";
 
 const CODE = /^HS-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/;
 const status = (page: Page) => page.getByTestId("deal-status").first();
-/** Demo persona second factor (trust spec §4): fill the published code and continue. */
-async function pass2fa(page: Page) {
-  await page.waitForURL(/\/signin\/2fa/);
-  await page.getByTestId("demo-code").click();
-  await expect(page.locator("#code")).toHaveValue(/^\d{6}$/);
-  await page.getByTestId("verify-2fa").click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
-}
 
 test("judge happy path: sentence to released payment", async ({ page: buyer, browser }) => {
   // 1. Buyer persona
@@ -31,13 +24,13 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   expect(code).toMatch(CODE);
   await buyer.getByTestId("save-terms").click();
 
-  // 3. Sample listing photos -> accept -> share link
+  // 3. Sample listing photos -> save -> share link (nobody signs before the seller joins: trust spec §6)
   await buyer.getByTestId("use-sample-reference").click();
   await expect(buyer.locator('img[alt^="Listing photo"]')).toHaveCount(2);
   await buyer.getByTestId("accept-and-share").click();
   await expect(buyer.locator("#share-url")).toHaveValue(new RegExp(`/deal/${code}$`));
 
-  // 4. Seller in a second context: sign in, preview, join, accept
+  // 4. Seller in a second context: sign in (demo 2FA), preview, join, sign
   const sellerContext = await browser.newContext();
   const seller = await sellerContext.newPage();
   await seller.goto(`/deal/${code}`);
@@ -45,11 +38,12 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   await pass2fa(seller);
   await expect(seller.getByTestId("deal-code")).toHaveText(code);
   await seller.getByTestId("join").click();
-  await seller.getByTestId("accept-terms").click();
-  await expect(status(seller)).toHaveText("terms_agreed");
+  await signContract(seller);
+  await expect(seller.getByText(/You signed v1/)).toBeVisible();
 
-  // 5. Buyer sees terms_agreed and the PayPal buttons iframe
+  // 5. Buyer signs, sees terms_agreed and the PayPal buttons iframe
   await buyer.goto(`/deal/${code}`);
+  await signContract(buyer);
   await expect(status(buyer)).toHaveText("terms_agreed");
   const buttons = buyer.frameLocator('iframe[name^="__zoid__paypal_buttons"]').first();
   await expect(buttons.locator('[data-funding-source="paypal"]')).toBeVisible({ timeout: 30_000 });
