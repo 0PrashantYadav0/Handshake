@@ -28,8 +28,7 @@ export function SignInPanel({ demo, dev, name, next, invalidLink }: Props) {
   const persona = (p: "buyer" | "seller") =>
     run(async () => {
       await api("/api/auth/demo", { json: { persona: p } });
-      router.push(next ?? (p === "buyer" ? "/new" : "/ledger"));
-      router.refresh();
+      router.push(`/signin/2fa?next=${encodeURIComponent(next ?? (p === "buyer" ? "/new" : "/ledger"))}`);
     });
   const magic = (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -75,7 +74,7 @@ export function SignInPanel({ demo, dev, name, next, invalidLink }: Props) {
           <label htmlFor="email" className="hs-label">Email</label>
           <input id="email" type="email" required className="hs-input" value={email} onChange={(e) => setEmail(e.target.value)} aria-describedby="email-help" />
           <button type="submit" className="hs-btn mt-1 justify-center" disabled={busy}>{busy ? "Sending…" : "Email me a sign-in link"}</button>
-          <p id="email-help" className="hs-help">No password. The link signs you in on this device for 30 days.</p>
+          <p id="email-help" className="hs-help">No password. After the link you enter a code from your authenticator app; then you stay signed in on this device for 30 days.</p>
         </form>
       )}
     </section>

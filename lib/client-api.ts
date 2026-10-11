@@ -43,6 +43,11 @@ const COPY: Partial<Record<DealErrorCode, string>> = {
   too_many_files: "Too many photos.",
   rate_limited: "Too many questions in a row. Wait a few minutes and ask again.",
   ai_unavailable: "The model didn't answer. Try again.",
+  mfa_required: "Enter the code from your authenticator app to continue.",
+  totp_invalid: "That code is wrong or already used. Check your authenticator app and try the new code.",
+  signature_invalid: "Your signature didn't match this version of the contract. Reload and sign again.",
+  contract_invalid: "The contract no longer matches what you both signed, so no money was moved. Contact the other party and start a new deal.",
+  payout_email_unverified: "Verify the PayPal email where you'll be paid, then try again.",
 };
 
 /** The 08 section 4.4 copy for a thrown ApiError; anything else reads as the generic line. */

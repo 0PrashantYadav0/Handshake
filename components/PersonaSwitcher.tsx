@@ -1,5 +1,6 @@
 "use client";
 // Header right side (08 sections 3.3, 4.1): the Demo badge with the Buyer | Seller control, and Sign out.
+// Switching persona passes through the second factor like any sign-in (trust spec §4).
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, errorCopy } from "@/lib/client-api";
@@ -39,7 +40,7 @@ export function PersonaSwitcher({ demo, email }: { demo: boolean; email: string 
               aria-pressed={active === p}
               className="hs-chip"
               disabled={busy}
-              onClick={() => active !== p && run(() => api("/api/auth/demo", { json: { persona: p } }))}
+              onClick={() => active !== p && run(() => api("/api/auth/demo", { json: { persona: p } }), `/signin/2fa?next=${encodeURIComponent(location.pathname)}`)}
             >
               {p === "buyer" ? "Buyer" : "Seller"}
             </button>

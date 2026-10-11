@@ -41,7 +41,7 @@ export function makeUser(email: string, opts: { display_name?: string; paypal_em
 }
 
 export async function signIn(userId: string): Promise<string> {
-  return `${SESSION_COOKIE}=${await signSession(userId)}`;
+  return `${SESSION_COOKIE}=${await signSession(userId, true)}`;
 }
 
 type Handler = (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response> | Response;

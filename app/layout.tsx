@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description: "Pay on proof: money is held until the evidence checks out.",
 };
 
-const NAV = [["/new", "New deal"], ["/ledger", "Ledger"], ["/dashboard", "Dashboard"]] as const;
+const NAV = [["/new", "New deal"], ["/ledger", "Ledger"], ["/dashboard", "Dashboard"], ["/security", "Security"]] as const;
 
 // Header per 08 section 4.1: wordmark, nav (behind a native <details> menu on mobile), name, demo switcher, sign out.
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </details>
               </>
             )}
-            {!me && <Link href="/" className="hs-link ml-auto">Sign in</Link>}
+            {!me && <Link href="/signin" className="hs-link ml-auto">Sign in</Link>}
           </nav>
         </header>
         <div id="main" tabIndex={-1} className="outline-none">{children}</div>

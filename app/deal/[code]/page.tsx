@@ -1,4 +1,4 @@
-// /deal/[code]: first paint from getDeal on the server (08 sections 4.2, 7). Signed out -> /?next=; 403 and 404 per 08 section 4.4.
+// /deal/[code]: first paint from getDeal on the server (08 sections 4.2, 7). Signed out -> /signin?next=; 403 and 404 per 08 section 4.4.
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { currentUserId } from "@/lib/auth/current";
@@ -9,7 +9,7 @@ import { Deal } from "@/components/deal/Deal";
 export default async function DealPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const user_id = await currentUserId();
-  if (!user_id) redirect(`/?next=/deal/${code}`);
+  if (!user_id) redirect(`/signin?next=/deal/${code}`);
 
   let deal: DealView | DealPreview;
   try {

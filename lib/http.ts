@@ -1,7 +1,7 @@
 // Route-handler helpers: session, body parsing, error mapping (02 section 4; 04 section 1).
 import { z } from "zod";
 import { DealError, HTTP_STATUS } from "@/lib/deal/errors";
-import { readSession, sessionFromCookieHeader } from "@/lib/auth/session";
+import { readSessionClaims, sessionFromCookieHeader } from "@/lib/auth/session";
 
 export type Actor = { user_id: string };
 
@@ -9,11 +9,19 @@ export function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
 }
 
+/** A full session (second factor passed). A partial one gets mfa_required (trust spec §4). */
 export async function requireSession(req: Request): Promise<Actor> {
-  const token = sessionFromCookieHeader(req.headers.get("cookie"));
-  const user_id = token ? await readSession(token) : null;
-  if (!user_id) throw new DealError("not_signed_in");
+  const { user_id, mfa } = await requireAnySession(req);
+  if (!mfa) throw new DealError("mfa_required");
   return { user_id };
+}
+
+/** Full or partial: only the second-factor routes accept a partial session. */
+export async function requireAnySession(req: Request): Promise<Actor & { mfa: boolean }> {
+  const token = sessionFromCookieHeader(req.headers.get("cookie"));
+  const c = token ? await readSessionClaims(token) : null;
+  if (!c) throw new DealError("not_signed_in");
+  return { user_id: c.sub, mfa: c.mfa };
 }
 
 /** JSON body -> trimmed strings -> Zod. Throws invalid_input on a bad body. Unknown fields are ignored. */
