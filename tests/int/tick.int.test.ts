@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { applyPaypalEvent, tick } from "@/lib/deal";
 import { captureKey, voidKey } from "@/lib/deal/keys";
+import { sealPayload, sealText } from "@/lib/deal/sealed";
 import { assertEventsInC6, dealBuilder, dealRow, events, expectError, parties, resetDb, testDeps, TRACKING, webhookEvent, type Parties, type TestDeps } from "./helpers";
 
 let deps: TestDeps;
@@ -42,12 +43,12 @@ async function diedBeforeJudging(): Promise<string> {
   await deps.db.evidence.createMany({
     data: [
       ...ids.map((file_id, i) => ({ deal_id: d.id, submission_no: 1, kind: "photo" as const, position: i + 1, file_id, uploaded_by: p.seller.id })),
-      { deal_id: d.id, submission_no: 1, kind: "tracking" as const, position: 0, value: TRACKING, uploaded_by: p.seller.id },
+      { deal_id: d.id, submission_no: 1, kind: "tracking" as const, position: 0, value: sealText("evidence.value", d.id, TRACKING), uploaded_by: p.seller.id },
     ],
   });
   await deps.db.deal.update({ where: { id: d.id }, data: { status: "proof_submitted" } });
   await deps.db.dealEvent.create({
-    data: { deal_id: d.id, from_status: "held", to_status: "proof_submitted", actor: "seller", cause: "submit_evidence", payload: { submission_no: 1, file_ids: ids, tracking_number: TRACKING, carrier_status: "delivered" } },
+    data: { deal_id: d.id, from_status: "held", to_status: "proof_submitted", actor: "seller", cause: "submit_evidence", payload: sealPayload(d.id, { submission_no: 1, file_ids: ids, tracking_number: TRACKING, carrier_status: "delivered" }) },
   });
   return code;
 }

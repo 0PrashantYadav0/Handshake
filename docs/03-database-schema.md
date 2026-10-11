@@ -94,8 +94,8 @@ CHECK constraints (full SQL in the `constraints` migration):
 | deals_buyer_accepted_range | `buyer_accepted_version IS NULL OR buyer_accepted_version BETWEEN 1 AND terms_version` |
 | deals_seller_accepted_range | same for `seller_accepted_version` |
 | deals_fix_attempts_range | `fix_attempts_used IN (0, 1)` |
-| deals_source_text_len | `char_length(source_text) BETWEEN 1 AND 500` |
-| deals_item_title_len | `char_length(item_title) BETWEEN 1 AND 80` |
+| deals_source_text_len | `char_length(source_text) BETWEEN 1 AND 500` (replaced by `deals_source_text_sealed`, see migration `sealed_columns`) |
+| deals_item_title_len | `char_length(item_title) BETWEEN 1 AND 80` (replaced by `deals_item_title_sealed`) |
 | deals_parties_differ | `seller_id IS NULL OR seller_id <> buyer_id` |
 | deals_complete_after_draft | `status IN ('draft', 'voided') OR (seller_id IS NOT NULL AND amount_minor IS NOT NULL AND deadline_days IS NOT NULL)` |
 | deals_deadline_at_after_held | `status IN ('draft', 'terms_agreed', 'voided') OR deadline_at IS NOT NULL` |
@@ -394,6 +394,10 @@ ALTER TABLE "webhook_events"
 ```
 
 The trigger is row-level, so `TRUNCATE` still works for test resets (stack.md section 3 cites the Postgres TRUNCATE docs). `REVOKE` would not help because the Render app user owns the tables.
+
+## Migration `sealed_columns`: contract data sealed at rest (trust spec §5)
+
+`deals.source_text`, `deals.item_title`, `conditions.text`, `evidence.value`, `files.bytes`, `verdicts.reason` and `verdicts.raw_response` hold sealed values (`lib/deal/sealed.ts`), as do the `source_text`, `note`, `tracking_number` and `item_title` keys of `deal_events.payload`. The migration drops `deals_source_text_len`, `deals_item_title_len`, `conditions_text_len`, `evidence_value_len` and `files_size_matches_bytes` (a ciphertext is longer than its plaintext; the app enforces the same limits before sealing, and `size_bytes` stays the plaintext size) and adds `NOT VALID` checks that every new value is sealed: `enc1.` strings, bytes starting `E1`, `{ "sealed": "enc1…" }` JSON. `npm run reseal` (`scripts/reseal.ts`) re-seals the mutable columns with the active key; `deal_events` is append-only, so event payloads keep the key they were written with and that kid must stay in `DATA_KEYS` while such events exist.
 
 ## prisma/schema.prisma
 

@@ -13,6 +13,7 @@
     "test:int": "vitest run --project int --no-file-parallelism",
     "test:e2e": "playwright test",
     "seed": "tsx prisma/seed.ts",
+    "reseal": "tsx scripts/reseal.ts",
     "eval": "tsx eval/run.ts",
     "sandbox": "tsx scripts/sandbox/scenario.ts",
     "demo:placeholders": "tsx scripts/demo/make-placeholders.ts"
@@ -34,6 +35,7 @@
     "react-dom": "19.3.0",
     "resend": "6.32.1",
     "server-only": "0.0.1",
+    "uqr": "0.1.3",
     "zod": "4.6.5"
   },
   "devDependencies": {

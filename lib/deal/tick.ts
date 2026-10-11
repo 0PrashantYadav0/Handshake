@@ -6,6 +6,7 @@ import { toIso } from "./dates";
 import { afterCommit, applyFactTx, lockAndLoad, voidHold, type FactResult } from "./facts-db";
 import { voidKey } from "./keys";
 import { reconcile } from "./reconcile";
+import { openDealRow } from "./sealed";
 import { selectTickWork } from "./tick-select";
 import { transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps, TickReport } from "./types";
@@ -38,7 +39,7 @@ export async function tick(now: Date, deps: Deps): Promise<TickReport> {
 
 /** void-{code} first (C4 on a refusal), then tick:deadline and the authorization_voided fact under the lock. false when nothing was done. */
 async function deadlineVoid(id: string, now: Date, deps: Deps): Promise<boolean> {
-  const deal = await deps.db.deal.findUniqueOrThrow({ where: { id }, include: DEAL_INCLUDE });
+  const deal = openDealRow(await deps.db.deal.findUniqueOrThrow({ where: { id }, include: DEAL_INCLUDE }));
   const authorization_id = deal.payment?.authorization_id ?? null;
   if (authorization_id && (await voidHold(deal, deps)) === "captured") return false; // the money was captured: the capture path continues
   const done = await inTx(deps, async (tx) => {

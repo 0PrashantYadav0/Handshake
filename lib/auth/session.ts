@@ -1,10 +1,12 @@
-// jose HS256 tokens: the hs_session cookie (30 days) and the magic-link token (15 min), told apart by `purpose` (F1, F2).
+// jose HS256 tokens: the hs_session cookie and the magic-link token (15 min), told apart by `purpose` (F1, F2).
+// A session carries `mfa`: true after the second factor (30 days), false before it (15 min, trust spec §4).
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 
 export const SESSION_COOKIE = "hs_session";
 export const SESSION_TTL_SEC = 30 * 24 * 3600;
 export const LOGIN_TTL_SEC = 15 * 60;
+export const PARTIAL_TTL_SEC = 15 * 60;
 
 type Purpose = "session" | "login";
 
@@ -15,8 +17,8 @@ const secretFromEnv = () => {
   return s;
 };
 
-export async function signToken(sub: string, purpose: Purpose, ttlSec: number, secret = secretFromEnv()): Promise<string> {
-  return new SignJWT({ purpose })
+export async function signToken(sub: string, purpose: Purpose, ttlSec: number, secret = secretFromEnv(), claims: Record<string, unknown> = {}): Promise<string> {
+  return new SignJWT({ ...claims, purpose })
     .setProtectedHeader({ alg: "HS256" })
     .setJti(crypto.randomUUID())
     .setSubject(sub)
@@ -30,22 +32,31 @@ export async function readToken(token: string, purpose: Purpose, secret = secret
   return (await readClaims(token, purpose, secret))?.sub ?? null;
 }
 
-/** Subject plus the token id and expiry, for single-use checks. */
-export async function readClaims(token: string, purpose: Purpose, secret = secretFromEnv()): Promise<{ sub: string; jti: string | null; exp: number } | null> {
+export type Claims = { sub: string; jti: string | null; exp: number; mfa: boolean };
+/** Subject, token id, expiry and the mfa flag. */
+export async function readClaims(token: string, purpose: Purpose, secret = secretFromEnv()): Promise<Claims | null> {
   try {
     const { payload } = await jwtVerify(token, key(secret), { algorithms: ["HS256"] });
     if (payload.purpose !== purpose || typeof payload.sub !== "string") return null;
-    return { sub: payload.sub, jti: payload.jti ?? null, exp: payload.exp ?? 0 };
+    return { sub: payload.sub, jti: payload.jti ?? null, exp: payload.exp ?? 0, mfa: payload.mfa === true };
   } catch {
     return null;
   }
 }
 
-export const signSession = (userId: string, secret?: string) => signToken(userId, "session", SESSION_TTL_SEC, secret);
-export const readSession = (token: string, secret?: string) => readToken(token, "session", secret);
+/** mfa false = partial session: it can only reach the second-factor screens (trust spec §4). */
+export const signSession = (userId: string, mfa: boolean, secret?: string) =>
+  signToken(userId, "session", mfa ? SESSION_TTL_SEC : PARTIAL_TTL_SEC, secret, { mfa });
+/** The user id of a full (second-factor) session; null for a partial or invalid one. */
+export async function readSession(token: string, secret?: string): Promise<string | null> {
+  const c = await readClaims(token, "session", secret);
+  return c?.mfa ? c.sub : null;
+}
+/** Full or partial. */
+export const readSessionClaims = (token: string, secret?: string) => readClaims(token, "session", secret);
 
-export function sessionCookie(token: string): string {
-  return cookie(token, SESSION_TTL_SEC);
+export function sessionCookie(token: string, mfa = true): string {
+  return cookie(token, mfa ? SESSION_TTL_SEC : PARTIAL_TTL_SEC);
 }
 export function clearSessionCookie(): string {
   return cookie("", 0);

@@ -9,6 +9,7 @@ import { DealError } from "./errors";
 import { applyFact, type PaypalFact } from "./facts";
 import { captureKey, payoutBatchId, strayVoidKey, voidKey } from "./keys";
 import { notifyCaptureDeclined } from "./notify";
+import { openDealRow } from "./sealed";
 import { lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps } from "./types";
 
@@ -55,7 +56,7 @@ const inTx = <T>(deps: Deps, fn: (tx: Tx) => Promise<T>) => deps.db.$transaction
 /** The deal locked and reloaded inside the caller's transaction (8.2 Tx-after). */
 export async function lockAndLoad(tx: Tx, id: string): Promise<DealRow> {
   await lockDeal(tx, id);
-  return tx.deal.findUniqueOrThrow({ where: { id }, include: DEAL_INCLUDE });
+  return openDealRow(await tx.deal.findUniqueOrThrow({ where: { id }, include: DEAL_INCLUDE }));
 }
 
 export type Captured = { key: string; cap: { capture_id: string; status: string; reason: string | null }; fact: PaypalFact };

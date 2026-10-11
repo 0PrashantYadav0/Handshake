@@ -1,6 +1,7 @@
 // T-34: the seed is idempotent, obeys the CHECKs (inserts would fail otherwise), chains events (C2) and renders through lib/deal.
 import { beforeEach, describe, expect, test } from "vitest";
 import { getDeal, listDeals } from "@/lib/deal";
+import { openDealRow } from "@/lib/deal/sealed";
 import { seed } from "../../prisma/seed";
 import { resetDb, testDeps, type TestDeps } from "./helpers";
 
@@ -43,7 +44,7 @@ describe("npm run seed", () => {
     expect(spanDays).toBeLessThan(61);
 
     // C2 chaining and C6 actors per deal.
-    const deals = await deps.db.deal.findMany({ include: { events: { orderBy: { id: "asc" } }, verdicts: true, conditions: true } });
+    const deals = (await deps.db.deal.findMany({ include: { events: { orderBy: { id: "asc" } }, verdicts: true, conditions: true } })).map(openDealRow);
     for (const d of deals) {
       expect(d.events.length).toBeGreaterThan(0);
       expect(d.events[0]).toMatchObject({ from_status: null, to_status: "draft", cause: "create", actor: "buyer" });

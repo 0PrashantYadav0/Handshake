@@ -1,6 +1,8 @@
 // createDeal, addFile and one function per Command variant (02 sections 3.1, 5.1, 5.2, 8.2; 04 sections 6 to 9).
 // Every command: one interactive transaction that locks the deal row, validates against the table, writes the change and its
 // deal_events row. Commands that call PayPal follow "write intent, call, write result" with no lock held during the call.
+// Contract text and photo bytes are sealed on write (trust spec §5); the rows loaded here are already open.
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { carrierStatus } from "@/lib/carrier";
 import { validateFile } from "@/lib/files/validate";
@@ -9,8 +11,9 @@ import { newPublicCode } from "./code";
 import { DealError } from "./errors";
 import { afterCommit, applyFactTx, captureHold, rethrowPaypal, sendPayout, voidHold, type FactResult } from "./facts-db";
 import { authKey, orderKey, payoutBatchId, strayVoidKey, voidKey } from "./keys";
+import { sealFile, sealText } from "./sealed";
 import { acceptanceOutcome, appendCodeCondition, validateTerms } from "./terms";
-import { lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
+import { insertEvent, lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import { commandError, nextStatus } from "./transitions";
 import type { Actor, AddFileInput, Command, CreateDealInput, DealView, Deps, FileRef } from "./types";
 import { runVerdict } from "./verdict";
@@ -51,19 +54,15 @@ export async function createDeal(actor: Actor, input: CreateDealInput, deps: Dep
     const conditions = appendCodeCondition(code, out.conditions);
     try {
       await inTx(deps, async (tx) => {
-        const deal = await tx.deal.create({
+        const id = randomUUID(); // the AAD needs the deal id before the insert
+        await tx.deal.create({
           data: {
-            public_code: code, buyer_id: actor.user_id, source_text: text, item_title: out.item_title,
+            id, public_code: code, buyer_id: actor.user_id, source_text: sealText("deals.source_text", id, text), item_title: sealText("deals.item_title", id, out.item_title),
             amount_minor: out.amount_minor, deadline_days: out.deadline_days,
-            conditions: { create: conditions.map((c, i) => ({ position: i + 1, text: c.text, evidence_type: c.evidence_type })) },
+            conditions: { create: conditions.map((c, i) => ({ position: i + 1, text: sealText("conditions.text", id, c.text), evidence_type: c.evidence_type })) },
           },
         });
-        await tx.dealEvent.create({
-          data: {
-            deal_id: deal.id, from_status: null, to_status: "draft", actor: "buyer", cause: "create",
-            payload: { source_text: text, model: out.model, prompt_version: out.prompt_version, rejected: out.rejected } as Prisma.InputJsonObject,
-          },
-        });
+        await insertEvent(tx, id, null, "draft", "buyer", "create", { source_text: text, model: out.model, prompt_version: out.prompt_version, rejected: out.rejected });
       });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && attempt < 10) continue; // I4: code collision
@@ -93,7 +92,7 @@ export async function addFile(code: string, actor: Actor, input: AddFileInput, d
     if (deal.files.filter((f) => f.purpose === "evidence" && !used.has(f.id)).length >= 6) throw new DealError("too_many_files", "At most 6 evidence photos per submission.");
   }
   const file = await deps.db.file.create({
-    data: { deal_id: deal.id, uploaded_by: actor.user_id, purpose: input.purpose, mime: meta.mime, size_bytes: meta.size_bytes, sha256: meta.sha256, bytes: new Uint8Array(input.bytes) },
+    data: { deal_id: deal.id, uploaded_by: actor.user_id, purpose: input.purpose, mime: meta.mime, size_bytes: meta.size_bytes, sha256: meta.sha256, bytes: sealFile(deal.id, input.bytes) },
   });
   return toFileRef(file, now);
 }
@@ -135,11 +134,11 @@ async function editTerms(code: string, actor: Actor, cmd: Extract<Command, { typ
     const terms_version = deal.terms_version + 1;
     await tx.deal.update({
       where: { id: deal.id },
-      data: { item_title: cmd.item_title, amount_minor: cmd.amount_minor, deadline_days: cmd.deadline_days, terms_version, buyer_accepted_version: null, seller_accepted_version: null },
+      data: { item_title: sealText("deals.item_title", deal.id, cmd.item_title), amount_minor: cmd.amount_minor, deadline_days: cmd.deadline_days, terms_version, buyer_accepted_version: null, seller_accepted_version: null },
     });
     if (!sameConditions) {
       await tx.condition.deleteMany({ where: { deal_id: deal.id } });
-      await tx.condition.createMany({ data: conditions.map((c, i) => ({ deal_id: deal.id, position: i + 1, text: c.text, evidence_type: c.evidence_type })) });
+      await tx.condition.createMany({ data: conditions.map((c, i) => ({ deal_id: deal.id, position: i + 1, text: sealText("conditions.text", deal.id, c.text), evidence_type: c.evidence_type })) });
     }
     await transition(tx, deal, "draft", "buyer", "edit_terms", { terms_version, changed });
   });
@@ -287,7 +286,7 @@ async function submitEvidence(code: string, actor: Actor, cmd: Extract<Command, 
     const submission_no = deal.fix_attempts_used + 1;
     const carrier_status = tracking_number ? carrierStatus(tracking_number) : null;
     const row = (kind: "photo" | "tracking" | "note", position: number, file_id: string | null, value: string | null) =>
-      ({ deal_id: deal.id, submission_no, kind, position, file_id, value, uploaded_by: actor.user_id });
+      ({ deal_id: deal.id, submission_no, kind, position, file_id, value: value === null ? null : sealText("evidence.value", deal.id, value), uploaded_by: actor.user_id });
     await tx.evidence.createMany({
       data: [
         ...files.map((f, i) => row("photo", i + 1, f.id, null)),

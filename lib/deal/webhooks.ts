@@ -6,6 +6,7 @@ import { DEAL_INCLUDE, type DealRow } from "./access";
 import type { PaypalFact } from "./facts";
 import { afterCommit, applyFactTx, payoutItemFact, type FactResult, type FactSource } from "./facts-db";
 import { authKey, strayVoidKey } from "./keys";
+import { openDealRow } from "./sealed";
 import { lockDeal, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps, PaypalWebhookEvent } from "./types";
 
@@ -84,7 +85,7 @@ async function lockAndLoad(tx: Tx, lookup: Lookup): Promise<DealRow | null> {
       : await tx.deal.findUnique({ where: { public_code: lookup.value }, select: { id: true, seeded: true } });
   if (!found || found.seeded) return null;
   await lockDeal(tx, found.id);
-  return tx.deal.findUniqueOrThrow({ where: { id: found.id }, include: DEAL_INCLUDE });
+  return openDealRow(await tx.deal.findUniqueOrThrow({ where: { id: found.id }, include: DEAL_INCLUDE }));
 }
 
 async function process(event: PaypalWebhookEvent, deps: Deps): Promise<WebhookOutcome> {
