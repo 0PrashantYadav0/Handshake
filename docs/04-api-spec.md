@@ -50,7 +50,7 @@ Every error, from every endpoint, has one shape:
 | 422 | `condition_not_checkable` | Extraction found no checkable condition in the sentence. The message carries the model's suggested rewordings. |
 | 422 | `unsupported_currency` | Extraction returned a currency other than `"USD"` or `null`. |
 | 422 | `too_many_files` | More than 4 reference photos on a deal, more than 6 evidence photos in one submission, or more than 6 unsubmitted evidence files on a deal. |
-| 429 | `rate_limited` | `POST /api/studio/agent` only: more than 30 turns per 10 minutes per user (section 15; 09 section 6.3). |
+| 429 | `rate_limited` | Per user, per 10 minutes, in memory (`lib/rate-limit.ts`): 20 `POST /api/deals` extractions, 120 `GET /api/deals/{code}` reads, 30 `POST /api/studio/agent` turns (section 15). `POST /api/auth/magic-link` is limited too (3 per email, 10 per IP) but stays `200` so addresses cannot be probed (decisions H2). |
 | 500 | `internal_error` | Any unhandled exception, or a webhook processing failure. Never carries internals. |
 | 502 | `paypal_error` | PayPal rejected or failed a call. The message ends with PayPal's `debug_id`, e.g. `"PayPal declined the capture (debug id 7a1b2c3d4e5f6)."`. |
 | 503 | `ai_unavailable` | Extraction failed after its one retry (timeout, 429/5xx, refusal or output that failed the schema). Message `"The model did not answer; try again."`. |
@@ -77,6 +77,7 @@ All limits come from decisions H3 and B6.
 | Evidence photos | 6 per submission; at most 6 uploaded-but-unsubmitted evidence files per deal | `too_many_files` |
 | Verdict budget | Inside `POST /api/deals/{code}/evidence`: model 17 s per attempt within a 19 s abort signal, then capture up to 10 s (SDK `timeout: 10_000`), then payout up to 10 s; about 40 s worst case, typically 6 to 12 s; the UI waits 45 s (decisions B5, D4). Whether Render's proxy allows a 40 s response is UNVERIFIED (02 section 12, spike 4). | n/a |
 | Signed file URL | 10 minutes | `not_a_party` |
+| Rate limits | Per 10 minutes: 20 extractions per user, 120 deal reads per user, 30 Studio turns per user, 3 magic links per email and 10 per IP | `rate_limited`; the magic link answers `200` |
 
 ## 2. Endpoints
 
@@ -562,7 +563,7 @@ Response: `200 DealView` with `status = "held"`, `payment.status = "authorized"`
 
 If the `PAYMENT.AUTHORIZATION.CREATED` webhook (or `CHECKOUT.ORDER.APPROVED`, decisions E8) already moved the deal to `held`, the response is the same `200 DealView` and nothing is written (decisions C3).
 
-Errors: `not_signed_in`, `invalid_input` (`order_id` does not match), `deal_not_found`, `not_a_party`, `terms_not_accepted` (status `draft`: both accepted versions do not equal `terms_version`; 02 section 3.3), `invalid_state` (any other status than `terms_agreed`), `paypal_error` (PayPal error, or the authorization came back in any status other than `CREATED`; the message carries that status and the debug id).
+Errors: `not_signed_in`, `invalid_input` (`order_id` does not match), `deal_not_found`, `not_a_party`, `terms_not_accepted` (status `draft`: both accepted versions do not equal `terms_version`; 02 section 3.3), `invalid_state` (any other status than `terms_agreed`; in `held` this wins over the `order_id` check, so only the stored order id takes the no-op path above), `paypal_error` (PayPal error, or the authorization came back in any status other than `CREATED`; the message carries that status and the debug id).
 
 Side effects (decisions C2 row 7, E3; 02 section 8.2):
 
@@ -606,7 +607,7 @@ Verification: `exp` must be all digits and not in the past; `sig` must match wit
 
 Response: `200` with the stored bytes, headers `Content-Type: {mime}`, `Content-Length`, `Cache-Control: private, max-age=600`, `Content-Disposition: inline`.
 
-Errors: `invalid_input` (missing or malformed `exp`/`sig`), `not_a_party` (expired or wrong signature; message `"This link has expired."`), `deal_not_found` (unknown file id; message `"File not found."`).
+Errors: `invalid_input` (missing or malformed `exp`/`sig`), `not_a_party` (expired or wrong signature; message `"This link has expired."`), `deal_not_found` (unknown file id, including an id that is not a UUID; message `"File not found."`). The signature is checked before the lookup, so an unknown id with a bad signature is `not_a_party`.
 
 Side effects: none.
 
@@ -1007,8 +1008,8 @@ Source: paypal.md section 6, "Self-verification".
 | Situation | `webhook_events` write | Response |
 | --- | --- | --- |
 | Signature bad | insert `{ paypal_event_id: id, event_type, verified: false, processed_at: null, body }` if no row exists; an existing row is left as is | `400 { error: { code: "invalid_input", message: "Signature verification failed." } }` |
-| Signature good, row exists with `processed_at` set | none | `200 { "ok": true, "outcome": "duplicate" }` (SB-7) |
-| Signature good, no row or row with `processed_at` null | insert or update `verified: true`; process inside one transaction with `applyPaypalEvent(event, deps)`; set `processed_at` | `200 { "ok": true, "outcome": "processed" }` or `"ignored"` (no deal, no fact) |
+| Signature good, row exists with `processed_at` set | none | `200 { "ok": true, "outcome": "already_processed" }` (SB-7) |
+| Signature good, no row or row with `processed_at` null | insert or update `verified: true`; process inside one transaction with `applyPaypalEvent(event, deps)`; set `processed_at` | `200 { "ok": true, "outcome": "applied" }`, `"noop"` (no fact for this event, or the resource lacks the field the lookup needs) or `"unknown_deal"` (no deal for the lookup). The values are `WebhookOutcome` in `lib/deal/webhooks.ts` |
 | Processing throws | row stays with `processed_at` null, `last_error` = the message | `500 { error: { code: "internal_error", message: "Processing failed." } }` |
 
 Retry semantics: PayPal retries any non-2xx response up to 25 times over 3 days (paypal.md section 6, "Delivery and retries"). A `500` therefore means "deliver again", and because `processed_at` is still null the next delivery is processed again; every fact is applied at most once per PayPal resource id (decisions C3), so re-processing is safe. A `400` is also retried by PayPal; each retry re-verifies, and a later delivery that verifies is processed normally. No work is deferred past the response.
@@ -1131,17 +1132,17 @@ Errors: `not_signed_in`. Side effects: none.
 
 ## 15. `POST /api/studio/agent` (could)
 
-Who: signed in. Preconditions: none. This is the server half of the Claude adapter for the AG Studio Agent Framework (decisions G3). The route, its request and response mapping and its code are in [09-ag-studio.md](09-ag-studio.md) section 6.3; this section only fixes the HTTP contract. It is built only after every "must" and "should" ships.
+Who: signed in. Preconditions: none. This is the server half of the Claude adapter for the AG Studio Agent Framework (decisions G3). The route, its request and response mapping and its code are in [09-ag-studio.md](09-ag-studio.md) section 6.3; this section only fixes the HTTP contract. Built in T-39 (Studio 3.0.0).
 
 Request: JSON, the `AgLlmRequest` the Studio `directLlmRunner` hands to the adapter: `{ instructions?: string (≤ 60,000 chars); input: AgAiConversationItem[] (≤ 80); tools: { name; description?; parameters }[] (≤ 40) }`. `toolChoice`, `responseFormat` and `model` are accepted and ignored.
 
-Response: `200` JSON, the `AgLlmResponse` `{ id, createdAt, status: "completed" | "failed", output: AgAiOutputItem[], error?: { message } }`. A model failure (timeout, 429, 529, refusal, `max_tokens`) is still `200` with `status: "failed"`, so the chat panel shows a message instead of a crashed page. The client adapter replays `output` as stream events (09 Assumption 11). The exact `status` enum of `AgLlmResponse` is UNVERIFIED (09 section 6.3).
+Response: `200` JSON, the `AgLlmResponse` `{ id, createdAt, status: "completed" | "incomplete" | "failed", output: AgAiOutputItem[], error?: { code, message }, incompleteDetails? }`. A model failure (timeout, 429, 529, refusal) is still `200` with `status: "failed"`, so the chat panel shows a message instead of a crashed page; `stop_reason: "max_tokens"` is `status: "incomplete"` with `incompleteDetails: { reason: "max_output_tokens" }`. The client adapter replays `output` as stream events (09 Assumption 11). The `status` enum is verified against `agLlmAdapter.d.ts` in ag-studio 3.0.0 (09 section 6.3).
 
-Model and settings (decisions D3; claude-api.md section 5): fixed `claude-sonnet-5-5` regardless of `AI_MODEL`, because `thinking: { type: "between_tools" }`, the only way to turn thinking off, is "Sonnet 5.5 only (other models return a 400)"; `output_config: { effort: "low" }`; `max_tokens` 2000; no `temperature`; SDK `timeout: 30_000`, `maxRetries: 1`. The server never executes tools; Studio does. Rate limit: 30 turns per 10 minutes per user, in memory (09 section 6.3; every judge shares one demo persona).
+Model and settings (decisions D3; claude-api.md section 5): fixed `claude-sonnet-5-5` regardless of `AI_MODEL`, because `thinking: { type: "between_tools" }`, the only way to turn thinking off, is "Sonnet 5.5 only (other models return a 400)"; `output_config: { effort: "low" }`; `max_tokens` 2000; no `temperature`; SDK `timeout: 30_000`, `maxRetries: 1`. Studio executes its own tools in the browser; the one `kind: "server"` tool, `explain_verdict`, runs inside this route (`lib/studio-tools.ts`, as the signed-in user) in a loop of at most 3 tool rounds per turn (`MAX_TOOL_ROUNDS` in `lib/studio-agent.ts`), each round one more Claude call. Rate limit: 30 turns per 10 minutes per user, in memory (09 section 6.3; every judge shares one demo persona).
 
-Errors: `not_signed_in`, `invalid_input` (shape or size), `rate_limited` 429 (decisions H2: this endpoint only).
+Errors: `not_signed_in`, `invalid_input` (shape or size), `rate_limited` 429 (decisions H2).
 
-Side effects: one Claude call per turn; nothing is stored.
+Side effects: one to four Claude calls per turn; nothing is stored.
 
 ## 16. Events written by this API
 

@@ -206,13 +206,13 @@ The Playwright happy path in [06-test-plan.md](06-test-plan.md) "End to end" loc
 | `preset-sentence` | Every preset sentence chip on `/new` (6.1); the first chip in DOM order is preset 1 |
 | `extract-terms` | "Extract terms" (6.1) |
 | `save-terms` | "Save terms" (6.2) |
-| `use-sample-reference` | "Use sample listing photos" (6.3) |
+| `use-sample-reference` | "Use sample listing photos" (6.3); rendered only once `presets.json` has loaded in demo mode |
 | `accept-and-share` | "Accept terms and get link" (6.3) |
 | `deal-code` | The element whose text is exactly the code, on `/new` step 2 and in the deal header (7.2) |
 | `deal-status` | A `<span hidden>` inside `StatusPill` whose text is the raw `deals.status`; the pill itself carries `data-status="{deals.status}"` |
 | `join` | "Join as seller" (7.5) |
 | `accept-terms` | "Accept terms" on the deal page (7.5) |
-| `use-sample-evidence-good`, `use-sample-evidence-wrong-item`, `use-sample-evidence-blurry`, `use-sample-evidence-reuse-listing` | The "Use sample evidence" buttons (7.7) |
+| `use-sample-evidence-{setId}` (today `good`, `wrong-item`, `blurry`, `reuse-listing`) | The "Use sample evidence" buttons (7.7): one per set in the deal's preset, generated from `presets.json`, not a fixed four |
 | `tracking-input` | The tracking number input (7.7) |
 | `submit-evidence` | "Submit proof for checking" (7.7) |
 | `verdict-row` | Each row (desktop) or card (mobile) of the verdict table (7.9) |
@@ -641,9 +641,9 @@ The form sits in the Proof card position (7.2 item 6). Top to bottom:
    - Every file is downscaled before staging with the `downscale(file, 1600, 0.85)` function in research/stack.md §9 "Browser image downscale" (long edge 1600 px, JPEG quality 0.85; B6). `createImageBitmap(file, { imageOrientation: 'from-image' })` applies EXIF rotation and the re-encode strips EXIF. If `downscale` throws (undecodable input such as HEIC in Chrome; HEIC handling on iOS Safari is UNVERIFIED in the research) the file is not staged and the row reads "Please choose a JPEG or PNG photo." The original file is never uploaded.
    - Listing-photo check: after downscaling, the staged blob is hashed in the browser (`crypto.subtle.digest('SHA-256', await blob.arrayBuffer())`, hex-encoded) and compared with every `reference_files[].sha256` (7.1). The server stores exactly the uploaded bytes, so the hashes are comparable. A match marks the thumbnail with the Fail icon and "This is one of the listing photos; remove it", and "Submit proof for checking" stays disabled until it is removed. This is a warning layer only; D8 on the server remains the guardrail, and the "Reuse listing photo" sample button stages its file with the check skipped so judges can see D8 fire.
    - A seventh file shows "Up to 6 photos." and is ignored. A resized blob over 2 MB (unlikely at 1600 px) shows "That photo is over 2 MB after resizing. Try a smaller one."
-4. Tracking number: text input, label "Tracking number", `autocapitalize="characters"`. Required when a `tracking` condition exists; helper "Required for: {tracking condition text}". Demo mode adds: "Sandbox carrier: a number ending in an even digit shows as delivered, an odd digit as in transit." The live carrier status ("delivered", "in transit", "unknown") is shown under the field as the user types, using the pure function from 7.1.
+4. Tracking number: text input, label "Tracking number" (in demo mode the label carries a "Demo carrier (mock)" badge), `autocapitalize="characters"`. Required when a `tracking` condition exists; helper "Required for: {tracking condition text}". Demo mode adds: "Sandbox carrier: a number ending in an even digit shows as delivered, an odd digit as in transit." The live carrier status ("delivered", "in transit", "unknown") is shown under the field as the user types, using the pure function from 7.1.
 5. Note: textarea, label "Note to the buyer (optional)", `maxLength` 1000 with counter. Helper: "Anything the buyer should know. Claude reads it as information, never as instructions."
-6. Demo mode "Use sample evidence" row (section 12): one button per entry in the deal's preset `sets` (12.4): "Good", "Wrong item", "Blurry", "Reuse listing photo", each with its `data-testid` from 4.7. Each clears the staged photos, stages the set's photos plus the canvas-composed code photo (12.3) from the same preset, and fills the tracking number with `TRK-DEMO-0000`. A line under the row says what each set is for. In fix mode the tracking number is prefilled from attempt 1 (04 section 9.1).
+6. Demo mode "Use sample evidence" row (section 12): one button per entry in the deal's preset `sets` (12.4), labelled from the set's `label` (today "Good", "Wrong item", "Blurry", "Reuse listing photo") with `data-testid` `use-sample-evidence-{setId}` (4.7); the buttons follow `presets.json`, not a fixed list, and the row is rendered only once the kit has loaded. Each replaces the staged list (the staged photos are cleared), stages the set's photos plus the canvas-composed code photo (12.3) from the same preset, and fills the tracking number with `TRK-DEMO-0000`. A line under the row says what each set is for. In fix mode the tracking number is prefilled from attempt 1 (04 section 9.1).
 7. Button "Submit proof for checking" (primary, full width on mobile). Helper under it: "Submitting is final for this attempt. If a condition fails, you get one fix." In fix mode: "This is your last attempt."
    Disabled until: at least one photo when any `photo` condition exists; a tracking number when a `tracking` condition exists; no staged photo flagged by the listing-photo check.
 8. On click: upload each staged file with `POST /api/deals/{code}/files` (multipart, `purpose=evidence`), each answering `201 FileRef`, with the live line "Uploading 2 of 4" (progress rings after SB-1, 4.6); then `POST /api/deals/{code}/evidence { file_ids, tracking_number, note }`. The verdict runs inside that request, which returns `200` with the final `DealView` (B5). An upload error stops before `evidence` is posted, keeps the staged files, and shows the error on the failed thumbnail.
@@ -866,6 +866,8 @@ Two extras reuse the mug's photos: `mug-over-limit` ($250; `buyer_review` with r
 Obtaining the font without adding a dependency: `cd /tmp && npm pack @fontsource/caveat`, unpack, copy `files/caveat-latin-400-normal.woff2` to `public/demo/fonts/handwriting.woff2` and the package's `LICENSE` (the OFL text) to `public/demo/fonts/OFL.txt`; commit both. The README "Disclosures" names the font and its licence.
 
 ### 12.2 `presets.json`
+
+The paths below are the target JPEGs; as built every photo path in `presets.json` ends in `.png`, because `public/demo/` still holds generated placeholder gradients (`npm run demo:placeholders`; `public/demo/README.md`) until the user's photographs replace them, at which point the paths switch to `.jpg`.
 
 ```json
 {

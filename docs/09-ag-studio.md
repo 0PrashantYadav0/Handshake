@@ -55,18 +55,17 @@ Optional for whoever writes the Studio code: `npx skills add ag-grid/skills` ins
 | --- | --- | --- |
 | `lib/status-labels.ts` | `DealStatus`, `STATUS_LABEL`, `STATUS_ORDER`; shared by the ledger, the deal page and the dashboard | both |
 | `app/ledger/page.tsx` | Reads the session, calls `listDeals(actor, deps)`, renders the grid | server |
-| `app/ledger/ledger-grid.tsx` | AG Grid Community grid | client |
+| `components/Ledger.tsx` | AG Grid Community grid | client |
 | `app/api/dashboard/data/route.ts` | `GET /api/dashboard/data` | server |
 | `lib/dashboard-rows.ts` | Pure functions that turn deals, verdicts and events into dashboard rows; unit-tested | server |
-| `app/dashboard/page.tsx` | Reads the session and `AG_GRID_LICENSE_KEY`, renders `DashboardClient` | server |
-| `app/dashboard/dashboard-client.tsx` | Fetches the data, loads Studio with `next/dynamic` (`ssr: false`) behind a skeleton | client |
-| `app/dashboard/handshake-studio.tsx` | `AgStudioProvider`, data sources, theme, `initialState`, widgets, `ai` | client |
-| `app/dashboard/deal-pipeline.tsx` | The custom widget | client |
-| `app/dashboard/theme.ts` | `studioTheme.withParams(...)` bound to CSS tokens | client |
-| `app/dashboard/claude-adapter.ts` | `AgLlmAdapter` that calls our route | client |
-| `app/api/studio/agent/route.ts` | `POST /api/studio/agent`: the only place the Anthropic key is used for Studio | server |
+| `app/dashboard/page.tsx` | Reads the session and `AG_GRID_LICENSE_KEY`, renders `StudioDashboard` | server |
+| `components/StudioDashboard.tsx` | Fetches the data, loads `StudioCanvas` with `next/dynamic` (`ssr: false`) behind a skeleton | client |
+| `components/StudioCanvas.tsx` | `AgStudioProvider`, data sources, theme (`studioTheme.withParams` on CSS tokens), `initialState`, widgets, the `AgLlmAdapter` that calls our route, and the `ai` harness (lead, built-ins, `auditor`) | client |
+| `components/DealPipelineWidget.tsx` | The custom widget | client |
+| `app/api/studio/agent/route.ts` | `POST /api/studio/agent`: session, rate limit, Zod, then `runTurn` | server |
+| `lib/studio-agent.ts`, `lib/studio-tools.ts` | The turn (Claude call, server tool rounds, response mapping) and the server-run `explain_verdict` | server |
 
-`ag-studio` and `ag-studio-react` are imported only from files under `app/dashboard/`. Nothing under `app/layout.tsx`, `app/ledger/` or `lib/` imports them, so the 1.5 to 2 MB gzipped Studio bundle ([research/ag-grid.md](research/ag-grid.md), section 8) loads only on `/dashboard`.
+As built (the plan said `app/dashboard/*`), `ag-studio` and `ag-studio-react` are imported only from `components/StudioCanvas.tsx` and `components/DealPipelineWidget.tsx`, which `StudioDashboard` loads with `next/dynamic`. Nothing under `app/layout.tsx`, `app/ledger/` or `lib/` imports them, so the 1.5 to 2 MB gzipped Studio bundle ([research/ag-grid.md](research/ag-grid.md), section 8) loads only on `/dashboard`.
 
 ## 4. The ledger on AG Grid Community (`/ledger`, must)
 
@@ -460,8 +459,8 @@ function toSources(d: DashboardData): AgDataSourcesDefinition {
       },
     ],
     relationships: [
-      { from: { source: 'verdicts', field: 'deal_code' }, to: { source: 'deals', field: 'code' }, type: 'many-to-one' },
-      { from: { source: 'decisions', field: 'deal_code' }, to: { source: 'deals', field: 'code' }, type: 'many-to-one' },
+      { id: 'verdicts-deal', source: { tableId: 'verdicts', fieldId: 'deal_code' }, target: { tableId: 'deals', fieldId: 'code' }, type: 'many-to-one' },
+      { id: 'decisions-deal', source: { tableId: 'decisions', fieldId: 'deal_code' }, target: { tableId: 'deals', fieldId: 'code' }, type: 'many-to-one' },
     ],
     formats: createFormats({ overrides: { currencyFormat: { formatOptions: { format: '$#,##0.00' } } } }),
   };
@@ -486,11 +485,11 @@ export function HandshakeStudio({ data, licenseKey }: { data: DashboardData; lic
 
 Dates: the route sends ISO strings and the client converts `dateTimeFormat` fields to `Date` before Studio sees them, because the boilerplate passes `Date` objects and that is the path known to work; **UNVERIFIED** whether Studio also accepts ISO strings ([research/ag-grid.md](research/ag-grid.md), "Note: Studio dates"). The `decided_on` text column exists so "decisions over time" works even if date bucketing in charts disappoints.
 
-**UNVERIFIED** from the research: the exact `relationships[]` entry shape (the boilerplate uses a `manyToOne` helper) and the `menu` option shape of `createWidgets`. Check both against `node_modules/ag-studio/dist/types` when coding; the `ag-dev` skill knows them.
+As built, checked against the ag-studio 3.0.0 types (`components/StudioCanvas.tsx`): a `relationships[]` entry is `{ id, source: { tableId, fieldId }, target: { tableId, fieldId }, type }`, and `createWidgets` takes `menu` as an array, `menu: [{ label: 'Handshake', widgetIds: ['deal-pipeline'] }]`, not a function.
 
 ### 5.4 Widgets and layout
 
-Widget `type` values are from the widget catalogue list in [research/ag-grid.md](research/ag-grid.md), section 3. The canvas is 24 columns wide with 16 px rows; a widget's place is `xTrack / yTrack / xSpan / ySpan` (boilerplate `initial-state.ts`, cited there). **UNVERIFIED**: whether the per-page layout key is `widgetLayout` as the research's sketch guesses.
+Widget `type` values are from the widget catalogue list in [research/ag-grid.md](research/ag-grid.md), section 3. The canvas is 24 columns wide with 16 px rows; a widget's place is `xTrack / yTrack / xSpan / ySpan` under the per-page `widgetLayout` key (verified in 3.0.0; `components/StudioCanvas.tsx`).
 
 | Id | Type | Title | Data mapping | x | y | w | h |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -505,7 +504,7 @@ Widget `type` values are from the widget catalogue list in [research/ag-grid.md]
 | `dealsGrid` | `grid` | Deals | columns `code, item_title, status, amount_usd, decision, lowest_confidence, deadline_at` | 0 | 40 | 24 | 22 |
 
 ```ts
-// app/dashboard/initial-state.ts (shape from the research sketch; one widget shown, the rest follow the table)
+// components/StudioCanvas.tsx, initialState (one widget per kind shown; the rest follow the table)
 export const initialState: AgReportState = {
   version: '3.0.0',
   selectedPageId: 'overview',
@@ -535,11 +534,11 @@ export const initialState: AgReportState = {
             { id: 'decisions.is_void', aggregation: 'sum' },
           ],
         },
-        sort: { field: 'decisions.decided_on', direction: 'asc' },
+        sort: [{ field: { id: 'decisions.decided_on' }, direction: 'asc' }],   // AgSortConfig[]
       },
       // released, voided, statusFilter, pipeline, confidence, dealsGrid: as in the table
     },
-    widgetLayout: {  // UNVERIFIED key name
+    widgetLayout: {  // verified: the per-page layout key in 3.0.0
       held: { xTrack: 0, yTrack: 0, xSpan: 6, ySpan: 8 },
       // ...
     },
@@ -547,7 +546,7 @@ export const initialState: AgReportState = {
 };
 ```
 
-**UNVERIFIED**: the `dataMapping` key names for the `grid` widget and the `sort` shape; take them from the catalogue page (`https://www.ag-grid.com/studio/react/widget-catalogue.md`) when coding. The `button-filter` and cross-filtering (click a donut slice, every other widget filters) are built in and need no code.
+As built: the `grid` widget maps `cols: [{ id }]`, charts map `categoryKey` / `valueKey`, and `sort` is `[{ field: { id }, direction }]` (`components/StudioCanvas.tsx`, against the 3.0.0 types). The `button-filter` and cross-filtering (click a donut slice, every other widget filters) are built in and need no code.
 
 The page is in `mode="edit"`: judges can drag, resize, add widgets from the menu (including "Handshake > Deal pipeline") and the agent can add widgets. Nothing is persisted; a reload restores `initialState`. That is the intended "reset".
 
@@ -570,7 +569,7 @@ export const theme = studioTheme.withParams({
   studioCanvasBackgroundColor: 'var(--hs-bg)',
   studioWidgetBackgroundColor: 'var(--hs-surface)',
   studioWidgetBorderRadius: 10,
-  studioPanelBackgroundColor: 'var(--hs-surface)',
+  studioPanelContainerBackgroundColor: 'var(--hs-surface)',   // 3.0.0 has no studioPanelBackgroundColor
   // Chart palette in state-machine order so "Deals by status" uses the same colours as the pills.
   chartPaletteFills1Color: 'var(--hs-status-draft)',
   chartPaletteFills2Color: 'var(--hs-status-terms_agreed)',
@@ -709,7 +708,7 @@ Our adapter makes one non-streaming request and replays the finished output as s
 The route answers `200` with an `AgLlmResponse` when the model was called, and the H2 error shape `{ error: { code, message } }` with `401`, `400` or `429` before it. The adapter turns any non-2xx response, and any body without `output`, into a failed `AgLlmResponse` whose `error.message` is the server's message, so the chat panel shows "Too many questions in a row. Wait a few minutes and ask again." instead of throwing inside the stream.
 
 ```ts
-// app/dashboard/claude-adapter.ts
+// components/StudioCanvas.tsx (claudeAdapter); sketch, see the as-built note below
 import type { AgAiEvent, AgLlmAdapter, AgLlmResponse } from 'ag-studio';
 
 async function toResponse(r: Response): Promise<AgLlmResponse> {
@@ -750,14 +749,16 @@ export function claudeAdapter(endpoint = '/api/studio/agent'): AgLlmAdapter {
 }
 ```
 
-**UNVERIFIED**: the exact field names on `*_CHUNK` events and on `AgAiOutputItem` message items (`id`, content array). Take them from `agAiProtocol.d.ts` / `agAiMessage.d.ts`. Also **UNVERIFIED** that `directLlmRunner` is content with events that arrive only after `complete` resolves; the week-4 spike (section 8) tests exactly this, and the fallback is the research's streaming design.
+As built (`components/StudioCanvas.tsx`): the adapter replays the finished `output` as `TEXT_MESSAGE_START` / `TEXT_MESSAGE_CONTENT` / `TEXT_MESSAGE_END` and `TOOL_CALL_START` / `TOOL_CALL_ARGS` / `TOOL_CALL_END`, not the `*_CHUNK` shortcuts; message items carry `content: [{ type: 'text', text, annotations: [] }]`; `directLlmRunner` accepts events that arrive only after `complete` resolves; and `AgLlmResponse.status` is `"completed" | "incomplete" | "failed"` (`agLlmAdapter.d.ts`, 3.0.0). The streaming design stays the upgrade path.
 
 ### 6.3 Server route `POST /api/studio/agent`
 
 The route is the only code that touches the Anthropic key on behalf of Studio. It reads the session, rate-limits, validates, maps Studio's request to `messages.create`, calls `claude-sonnet-5-5` with thinking off, and maps the reply back. Session and error helpers are the shared ones from [02-system-design.md](02-system-design.md) section 4 (`requireSession(req)` and `toResponse(error)` in `lib/http.ts`, `DealError` in `lib/deal/errors.ts`); the route reads the cookie from the request, never through `next/headers`, so it runs under Vitest ([06-test-plan.md](06-test-plan.md)). `HTTP_STATUS` in `lib/deal/errors.ts` carries `rate_limited: 429` (H2) so `toResponse` maps it like every other code.
 
+As built the route is thin (`app/api/studio/agent/route.ts`): session, `allowTurn` from `lib/rate-limit.ts`, Zod, then `runTurn` in `lib/studio-agent.ts`. The turn differs from the sketch below in two ways. `explain_verdict`, the one `kind: "server"` tool, is executed on the server (`lib/studio-tools.ts`, as the signed-in user) in a loop of at most `MAX_TOOL_ROUNDS = 3` rounds (tool_use → run → tool_result → model); other tool calls are returned to Studio as `function_call` items. And `stop_reason: "max_tokens"` maps to `status: "incomplete"` with `incompleteDetails: { reason: "max_output_tokens" }`, `refusal` to `status: "failed"`.
+
 ```ts
-// app/api/studio/agent/route.ts
+// app/api/studio/agent/route.ts (plan sketch; see the as-built note above)
 export const runtime = 'nodejs';
 import { z } from 'zod';
 import { claude } from '@/lib/ai/client';            // lazily built client from research/claude-api.md, "Client construction"
@@ -847,7 +848,7 @@ Mapping, as proposed in [research/ag-grid.md](research/ag-grid.md), section 4 ("
 | `tool_use { id, name, input }` | `{ type: 'function_call', callId: id, name, arguments: JSON.stringify(input) }` |
 | `thinking` (should not occur) | dropped |
 
-`stop_reason` `end_turn` or `tool_use` gives `status: 'completed'`; `max_tokens` and `refusal` (HTTP 200 with `stop_reason: "refusal"`, [research/claude-api.md](research/claude-api.md), summary item 13) give `status: 'failed'` with an `error.message`. **UNVERIFIED**: the exact `status` enum of `AgLlmResponse`.
+`stop_reason` `end_turn` or `tool_use` gives `status: 'completed'`; `refusal` (HTTP 200 with `stop_reason: "refusal"`, [research/claude-api.md](research/claude-api.md), summary item 13) gives `status: 'failed'` with an `error.message`; `max_tokens` gives `status: 'incomplete'`. The `status` enum of `AgLlmResponse` is verified: `"completed" | "incomplete" | "failed"` (3.0.0).
 
 Why these parameters, from [research/claude-api.md](research/claude-api.md):
 
@@ -859,12 +860,12 @@ Why these parameters, from [research/claude-api.md](research/claude-api.md):
 
 ### 6.4 How Studio's built-in tool schemas reach Claude
 
-Studio sends `tools: [{ name, description, parameters, kind }]`; the route forwards `name`, `description` and `parameters` as `input_schema` unchanged and drops `kind`. The research notes the built-in schemas were written with OpenAI strict mode in mind and that the OpenAI adapter transforms them, while "Anthropic should accept plain JSON Schema. **UNVERIFIED**." If the API returns a 400 naming a schema keyword, `sanitizeSchema()` in the route deletes that keyword recursively; nothing else changes. The roughly 20 built-in tools (`view_schema`, `view_report`, `view_page`, `view_widget`, `execute_query`, `add_widget`, `position_widget`, `remove_widget`, `configure_widget`, `create|update|delete_expression`, `add|remove_page_filter`, `add|remove_widget_filter`, `create_plan`, `delegate_to`, `rename_thread`) are listed in [research/ag-grid.md](research/ag-grid.md), section 4. Tool schemas include field ids, and row values leave the browser only through tool results such as `execute_query` (same section). Because the data source is the user's own deals (section 5.2), that is acceptable.
+Studio sends `tools: [{ name, description, parameters, kind }]`; the route forwards `name`, `description` and `parameters` as `input_schema` unchanged and drops `kind`; the one tool declared `kind: "server"`, `explain_verdict`, is recognised by name and executed by the route itself (6.5). The research notes the built-in schemas were written with OpenAI strict mode in mind and that the OpenAI adapter transforms them, while "Anthropic should accept plain JSON Schema. **UNVERIFIED**." If the API returns a 400 naming a schema keyword, `sanitizeSchema()` in the route deletes that keyword recursively; nothing else changes. The roughly 20 built-in tools (`view_schema`, `view_report`, `view_page`, `view_widget`, `execute_query`, `add_widget`, `position_widget`, `remove_widget`, `configure_widget`, `create|update|delete_expression`, `add|remove_page_filter`, `add|remove_widget_filter`, `create_plan`, `delegate_to`, `rename_thread`) are listed in [research/ag-grid.md](research/ag-grid.md), section 4. Tool schemas include field ids, and row values leave the browser only through tool results such as `execute_query` (same section). Because the data source is the user's own deals (section 5.2), that is acceptable.
 
 ### 6.5 Harness wiring, the `auditor` agent and its tool
 
 ```tsx
-// app/dashboard/handshake-studio.tsx (ai part)
+// components/StudioCanvas.tsx (ai part); plan sketch, see the as-built note below
 import { AgStudioAiModule, createAiHarness, directLlmRunner, type AgAiHarnessSetup } from 'ag-studio';
 import { claudeAdapter } from './claude-adapter';
 
@@ -921,9 +922,12 @@ const explainVerdict = (api) => api.defineAiTool({
 //   <AgStudio data={sources} theme={theme} initialState={initialState} widgets={widgets} ai={ai} mode="edit" ... />
 ```
 
-The tool fetches our own API with the session cookie, so the access check (F4) applies: a code the user is not party to returns `not_a_party` and the agent reports that. Photos are never fetched; only text reaches the model. The Lead agent delegates to `auditor` through `delegate_to` exactly as it delegates to the built-in four, which is the "custom agent talking to Studio's built-in agents" the judges ask for.
+As built (`components/StudioCanvas.tsx`, `lib/studio-tools.ts`), four things differ from the sketch:
 
-**UNVERIFIED** (all from the research): `ctx.success('ok', data)` / `ctx.error` signatures, and how to pass `promptStarters` when `createAiHarness` is called with the function form rather than the options object. The boilerplate passes `promptStarters` in the options object; see `https://www.ag-grid.com/studio/react/ai-builtin-harness.md`.
+- `explain_verdict` is declared with `kind: "server"` and only a schema (`params`), no browser `execute`. The route runs it (`lib/studio-tools.ts`) through `getDeal` / `getEvents` from `lib/deal` as the signed-in user, so the access check (F4) applies without an HTTP round trip: a code the user is not party to is `not_a_party` and the agent reports that. Photos are never read; only text reaches the model. It also returns the money trail (payment and payout ids).
+- The `auditor` is a real custom agent (`directLlmRunner({ id: 'auditor', ... })`) registered through the builder form of `createAiHarness`, with `view_schema`, `execute_query` and `explain_verdict`.
+- The built-in lead's `delegate_to` is hard-coded to the four AG agents in 3.0.0, so the lead is rebuilt from `builtIn.lead` with `tools.delegateTo(['data', 'widget', 'page', 'planning', 'auditor'])` and an "Auditor" routing line appended to its instructions. That is the "custom agent talking to Studio's built-in agents" the judges ask for.
+- `promptStarters` is returned from the builder alongside `agents` and `primary` (6.6 lists them).
 
 ### 6.6 Prompts a judge can type
 
@@ -1003,7 +1007,7 @@ The ledger is never cut: FR-13 is a must and the demo video needs it.
 | Trial tier: `AgStudioAiModule` needs `PRO-AI`; whether the trial key is that tier is **UNVERIFIED** | "Incompatible License Key" banner and watermark with the agent on | Check the console on the Render host the day the key arrives (section 7); if the tier is wrong, ask on Discord, and if that fails ship the agent anyway (features are not gated) |
 | Trial timing: a key requested before 2026-11-01 expires before judging ends | "Trial Period Expired" watermark during judging | Form on 2026-11-02; Discord request now for a longer key |
 | Claude adapter unbuilt: synthesized stream events, Anthropic accepting Studio's tool schemas, our `tool_use` ids in history, `between_tools` leaving no thinking blocks, all **UNVERIFIED** | Agent does not work | 3-hour spike before any further agent work; cut rule in section 8 |
-| Studio API names from the research sketch (`results.rows`, `field.key`, `widgetLayout`, `relationships[]`, `formatShape`, `toggleCrossFilter` arguments, `AgLlmResponse.status`) are **UNVERIFIED** | Type errors while coding | Read `node_modules/ag-studio/dist/types` and the `.md` docs pages; install the `ag-dev` skill |
+| Studio API names from the research sketch (`results.rows`, `field.key`, `widgetLayout`, `relationships[]`, `formatShape`, `toggleCrossFilter` arguments, `AgLlmResponse.status`) were **UNVERIFIED**; resolved against the 3.0.0 types in T-37 and T-39 (5.3, 5.4, 5.5, 6.2, 6.3) | Type errors while coding | Read `node_modules/ag-studio/dist/types` and the `.md` docs pages; install the `ag-dev` skill |
 | Dates: ISO strings vs `Date` for `dateTimeFormat` fields is **UNVERIFIED** | Empty time charts | The client converts to `Date` (the boilerplate's path); `decided_on` text is the fallback axis |
 | Data exposure: Studio's sync engine ships every row to the browser, and `execute_query` results reach Claude | Leaking other users' deals | The route returns only the signed-in user's deals, with no emails or names (F4); the demo personas own the seeded deals, so a judge still sees a full dashboard |
 | Public AI route behind demo login (`DEMO_LOGIN=true` lets anyone sign in) | Runaway Anthropic spend | Session required, 30 turns per user per 10 minutes (04 section 15), `max_tokens` 2000, input capped at 80 items, one fixed model; about $0.025 per turn |
