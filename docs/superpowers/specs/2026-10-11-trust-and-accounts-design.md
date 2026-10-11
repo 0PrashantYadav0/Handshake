@@ -157,3 +157,13 @@ The figures come from one query module, `lib/deal/summary.ts`, unit-tested on fi
 - WebAuthn passkeys as a login factor. TOTP covers 2FA today; passkeys can replace it later without schema churn beyond a new table.
 - "Log in with PayPal" to prove payout account ownership. It needs app configuration on the user's PayPal developer account; the email code covers ownership of the address for now.
 - KMS-held keys. `DATA_KEYS` comes from the Render environment.
+
+## 15. Amendments after the independent review (issue #67)
+
+- **Contract format 2.** The signed document also covers the listing photos' SHA-256 and the decision rule (`pass_threshold`, `auto_capture_max_minor`). The rule is snapshotted on the deal at creation and `decide()` uses the snapshot, so a later change to the environment cannot change a signed deal. Listing photos can be added only before anyone signs. The signed message is `Handshake contract v2\n<hash>`.
+- **Failure counting.** Wrong second-factor codes are counted in Postgres with one atomic update before each check (§4 "Limits"), not in memory.
+- **Sessions.** Tokens carry `sv`; every request compares it with `users.session_version`. `/security` has "Sign out everywhere".
+- **Demo personas.** Exempt from lockout; payout address, key revocation and recovery codes are locked; `DEMO_LOGIN=true` refuses to boot unless `PAYPAL_API_BASE` is the sandbox.
+- **Gate coverage.** The order-approved webhook and reconciliation verify the contract before recording a hold; reconciliation voids a hold on a contract that no longer verifies. A refused void re-sends a capture only on `AUTHORIZATION_ALREADY_CAPTURED`.
+- **Legacy plaintext.** `npm run reseal` seals plaintext columns; `--seal-plaintext-events` seals event payloads in one transaction that lifts and restores the append-only trigger.
+- **Tick** runs every 10 minutes.

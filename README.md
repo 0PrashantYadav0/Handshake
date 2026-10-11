@@ -14,10 +14,10 @@ Built for the PayPal AI Hackathon 2026. Sandbox only, no real money moves.
 
 One browser, no account, no install. The header has a **Demo** badge with **Buyer** and **Seller** chips that swap between the two seeded personas (`demo-buyer@handshake.demo`, `demo-seller@handshake.demo`), so you play both sides.
 
-1. Open the hosted URL. Click **Continue as buyer**.
-2. On `/new` click the first **Try one:** chip, **$18 mug, 5 days**. It fills the sentence "I'll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered". Click **Extract terms**. You get 2 to 5 conditions; the last one, "Photo shows the deal code HS-XXXX written by hand", is added by the server. Click **Save terms**, **Use sample listing photos**, **Accept terms and get link**, then **Open deal page**.
-3. Switch to **Seller**. Click **Join as seller**, then **Accept terms**.
-4. Switch to **Buyer**. Click the PayPal button and log into the popup with the sandbox buyer:
+1. Open the hosted URL and click **Start a deal**, then **Continue as buyer**. Every account signs in with two steps; the demo accounts' authenticator secret is published, so on the code screen click **Use demo code**, then **Continue**.
+2. On `/new` click the first **Try one:** chip, **$18 mug, 5 days**. It fills the sentence "I'll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered". Click **Extract terms**. You get 2 to 5 conditions; the last one, "Photo shows the deal code HS-XXXX written by hand", is added by the server. Click **Save terms**, **Use sample listing photos**, **Save and get link**, then **Open deal page**.
+3. Switch to **Seller** (the same two-step screen; **Use demo code**). Click **Join as seller**. Read the contract, tick **I agree**, click **Use demo code**, then **Sign contract**. The signature is made by a key that stays in your browser.
+4. Switch to **Buyer** and sign the same way. The deal reads **Approve the hold with PayPal**. **Contract and signatures** under Records shows both signatures verified in your browser. Click the PayPal button and log into the popup with the sandbox buyer:
 
    ```
    email:    <!-- TODO(T-45): sandbox personal account 1 email -->
@@ -26,7 +26,7 @@ One browser, no account, no install. The header has a **Demo** badge with **Buye
 
    Approve. The deal shows **Money held. Waiting for proof.** ($18.00 held, not charged).
 5. Switch to **Seller**. Under **Use sample evidence** click **Good** (it stages two photos, the composed deal-code photo and the tracking number `TRK-DEMO-0000`), then **Submit proof for checking**. Checking usually takes under 15 seconds, at most about 40.
-6. Every condition reads `pass` with a reason. Status goes to **Payment released**, then **Paid** within about a minute. Open `/ledger` (AG Grid), `/dashboard` (AG Studio) and **Download evidence pack (JSON)** under Records on the deal page.
+6. Every condition reads `pass` with a reason. Status goes to **Payment released**, then **Paid** within about a minute. Open `/dashboard` (money held, released and paid out, what needs you), `/wallet` (holds, captures and payouts with their PayPal ids), `/ledger` (AG Grid), **Open analytics studio** (AG Studio) and **Download evidence pack (JSON)** under Records on the deal page.
 
 More runs, each a different exit from the same state machine:
 
@@ -45,7 +45,7 @@ email:    <!-- TODO(T-45): sandbox personal account 2 email -->
 password: <!-- TODO(T-45): sandbox personal account 2 password -->
 ```
 
-Prompts to type into the `/dashboard` agent panel (for example "Why was HS-7K2Q voided?") are listed in [docs/studio-prompts.md](docs/studio-prompts.md).
+Prompts to type into the `/dashboard/studio` agent panel (for example "Why was HS-7K2Q voided?") are listed in [docs/studio-prompts.md](docs/studio-prompts.md).
 
 ## How it works
 
@@ -95,6 +95,19 @@ decide(verdicts, deal):
 Void is the one irreversible automated action against the seller, so on the second submission a `fail` voids only when the model is confident; a low-confidence `fail` goes to the buyer. Before any model call, an evidence photo whose SHA-256 matches a listing photo fails every photo condition at confidence 1 (D8). Untrusted text (notes, text inside photos) is delimited in the prompt and treated as evidence, never as instructions.
 
 Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions.md](docs/decisions.md), [docs/02-system-design.md](docs/02-system-design.md).
+
+## Security
+
+Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md).
+
+- **Two-step sign-in for everyone.** An email link, then a 6-digit code from an authenticator app (TOTP, RFC 6238). Enrollment is required before anything else; ten single-use recovery codes back it up. Five wrong codes lock the account for 10 minutes, counted in Postgres. "Sign out everywhere" on `/security` ends every session.
+- **Step-up.** Signing a contract, changing the payout email, revoking a signing key and making new recovery codes each need a fresh code.
+- **Both parties sign every contract.** Each browser makes an ECDSA P-256 key that never leaves it. The signed document covers the parties, item, amount, deadline, conditions, the listing photos' SHA-256 and the decision rule. Editing anything means signing again. `/deal/{code}/contract` re-verifies both signatures in your browser and downloads the signed contract.
+- **The contract is checked before money moves.** Before an order, an authorization, a capture or a payout, the server rebuilds the contract from the database and verifies both signatures. A change made straight in the database stops the step, records why, and moves no money. Releasing the buyer's hold is never blocked.
+- **Payouts go only to a verified address.** A new PayPal email gets a 6-digit code by email; until it is confirmed, no payout is sent there.
+- **Encrypted at rest and in transit.** Deal text, conditions, evidence notes, photos and verdict reasons are sealed with AES-256-GCM, bound to their deal and column (`DATA_KEYS`, rotatable with `npm run reseal`). HTTPS with HSTS in transit. This is not zero-knowledge encryption: the server must read the terms so Claude can check the proof, so the two parties and the in-app verifier can read a contract, and a database dump cannot.
+- **Reconciliation.** Every 10 minutes the tick job asks PayPal about captures, holds and payouts still waiting on a webhook, and applies what PayPal reports, once.
+- **Demo accounts.** With `DEMO_LOGIN=true` the two personas share a published authenticator secret, so their payout address, keys and recovery codes are locked, and the app refuses to start in demo mode unless PayPal is the sandbox.
 
 ## Disclosures
 
@@ -160,6 +173,7 @@ Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point t
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/handshake` |
 | `APP_URL` | `http://localhost:3000` |
 | `SESSION_SECRET`, `FILE_URL_SECRET`, `CRON_SECRET` | Random strings, at least 32 characters each |
+| `DATA_KEYS` | Field encryption keyring: one secret of at least 32 characters, or `k2:<secret>,k1:<secret>` (the first encrypts; any listed key decrypts). Never change a key in place: prepend a new one, deploy, run `npm run reseal` |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | A sandbox REST app (type Merchant) from developer.paypal.com; the public id is the same client id |
 | `PAYPAL_API_BASE` | `https://api-m.sandbox.paypal.com` |
 | `PAYPAL_WEBHOOK_ID` | The webhook on that app, subscribed to the order, authorization, capture and payout events. May be empty in development, required in production |
@@ -182,9 +196,13 @@ npx playwright install chromium        # once
 E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
                                        # builds and starts the app, runs the judge happy path end to end (sandbox personal account 1);
                                        # without the two variables it runs up to the PayPal popup and skips the rest
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party
+                                       # both demo personas: 2FA, join, sign on both sides, contract verified in the browser;
+                                       # needs no Anthropic or PayPal key (tests/e2e/make-draft.ts)
 npm run eval                           # the judge eval, calls the real API; prints the estimated cost at the end
 npm run sandbox -- SB-1 --base <url>   # sandbox scenarios SB-1, SB-6, SB-7, SB-8, SB-11 against a running app
 npm run reseal                         # after prepending a new kid:secret to DATA_KEYS: re-seals contract data with it (trust spec §5)
+npm run reseal -- --seal-plaintext-events  # once, on a database with rows from before encryption
 npm run lint && npm run typecheck
 ```
 
@@ -198,6 +216,8 @@ Details: [tests/e2e/README.md](tests/e2e/README.md) (`PLAYWRIGHT_BASE_URL` to ru
 - Split payouts and a platform fee.
 - PayPal multiparty onboarding so the seller is the payee instead of the platform.
 - A real carrier lookup, a verified email sending domain, and reauthorization for deals longer than 21 days.
+- Encryption keys held in a KMS instead of the environment, passkeys (WebAuthn) as the second factor, and "Log in with PayPal" to prove the payout account.
+- A content security policy with nonces (the PayPal and AG Studio scripts need them) and rate limits shared across instances.
 
 ## Licence
 
