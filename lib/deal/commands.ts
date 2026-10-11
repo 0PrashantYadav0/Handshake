@@ -14,7 +14,7 @@ import { afterCommit, applyFactTx, captureHold, rethrowPaypal, sendPayout, voidH
 import { authKey, orderKey, payoutBatchId, strayVoidKey, voidKey } from "./keys";
 import { sealFile, sealText } from "./sealed";
 import { acceptanceOutcome, appendCodeCondition, validateTerms } from "./terms";
-import { checkSignature, contractDocOf, hashOf, useSigningKey } from "./contract";
+import { checkSignature, contractDocOf, contractInvalid, hashOf, requireContract, useSigningKey, verifyContract } from "./contract";
 import { insertEvent, lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import { commandError, nextStatus } from "./transitions";
 import type { Actor, AddFileInput, Command, CreateDealInput, DealView, Deps, FileRef } from "./types";
@@ -184,13 +184,25 @@ async function accept(code: string, actor: Actor, cmd: Extract<Command, { type: 
   });
 }
 
+/** trust spec §7: checked once with an audit event outside the lock, and again under it (no event: a nested write would deadlock). */
+async function gate(code: string, actor: Actor, deps: Deps, step: "start_payment" | "confirm_approval"): Promise<void> {
+  const pre = await loadDeal(deps.db, code, actor);
+  if (pre.deal.status === "terms_agreed") await requireContract(pre.deal, deps, step);
+}
+async function recheck(deal: Loaded["deal"]): Promise<void> {
+  const problem = await verifyContract(deal);
+  if (problem) throw contractInvalid(problem);
+}
+
 async function startPayment(code: string, actor: Actor, deps: Deps): Promise<void> {
   const now = deps.clock.now();
+  await gate(code, actor, deps, "start_payment");
   const intent = await inTx(deps, async (tx) => {
     const loaded = await loadLocked(tx, code, actor);
     requireRole(loaded, "buyer");
     const { deal } = loaded;
     if (deal.status !== "terms_agreed") throw new DealError(commandError(deal.status, "start_payment"), "Both parties must accept the terms before paying.");
+    await recheck(deal);
     const p = deal.payment;
     if (p?.authorization_id) throw new DealError("invalid_state", "A PayPal hold is already pending on this deal; cancel it to start over.");
     if (p && p.status === "created" && now.getTime() - p.updated_at.getTime() < SIX_HOURS) {
@@ -213,6 +225,7 @@ async function startPayment(code: string, actor: Actor, deps: Deps): Promise<voi
 }
 
 async function confirmApproval(code: string, actor: Actor, order_id: string, deps: Deps): Promise<void> {
+  await gate(code, actor, deps, "confirm_approval");
   const proceed = await inTx(deps, async (tx) => {
     const loaded = await loadLocked(tx, code, actor);
     requireRole(loaded, "buyer");
@@ -221,6 +234,7 @@ async function confirmApproval(code: string, actor: Actor, order_id: string, dep
     if (deal.status === "held" && p?.paypal_order_id === order_id) return false; // the webhook got there first (C3): nothing to do
     if (deal.status !== "terms_agreed") throw new DealError(commandError(deal.status, "confirm_approval"), "The payment cannot be confirmed in this state.");
     if (!p || p.paypal_order_id !== order_id) throw new DealError("invalid_input", "order_id does not match this deal's PayPal order.");
+    await recheck(deal);
     await tx.payment.update({ where: { id: p.id }, data: { status: "approved" } });
     return true;
   });

@@ -6,7 +6,7 @@ import type { DealRow } from "./access";
 import { toIso } from "./dates";
 import { isCodeCondition } from "./terms";
 import { contractDocOf, hashOf } from "./contract";
-import type { Condition, ContractView, DealEvent, DealPreview, DealView, FileRef, LedgerRow, Mime, Payment, Payout, Role, Submission, VerdictView } from "./types";
+import type { Condition, ContractSignatureView, ContractView, DealEvent, DealPreview, DealView, FileRef, LedgerRow, Mime, Payment, Payout, Role, Submission, VerdictView } from "./types";
 
 const iso = (d: Date | null) => (d ? toIso(d) : null);
 const payloadOf = (e: { payload: Prisma.JsonValue }) => e.payload as Record<string, unknown>;
@@ -97,12 +97,14 @@ export function buildContractView(deal: DealRow): ContractView | null {
   if (!document) return null;
   return {
     document, hash: hashOf(document),
-    signatures: deal.signatures.filter((s) => s.terms_version === deal.terms_version).map((s) => ({
-      role: s.role, terms_version: s.terms_version, contract_hash: s.contract_hash, signature: s.signature, signed_at: toIso(s.signed_at),
-      key_fingerprint: s.key.fingerprint, public_key: { x: s.key.x, y: s.key.y },
-    })),
+    signatures: deal.signatures.filter((s) => s.terms_version === deal.terms_version).map(toSignature),
   };
 }
+
+export const toSignature = (s: DealRow["signatures"][number]): ContractSignatureView => ({
+  role: s.role, terms_version: s.terms_version, contract_hash: s.contract_hash, signature: s.signature, signed_at: toIso(s.signed_at),
+  key_fingerprint: s.key.fingerprint, public_key: { x: s.key.x, y: s.key.y },
+});
 
 /** Exactly the F4 keys. */
 export function buildDealPreview(deal: DealRow): DealPreview {
