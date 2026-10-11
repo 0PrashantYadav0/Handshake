@@ -1,9 +1,9 @@
 // Magic-link token (purpose "login", 15 min) and the link the email carries (F2; 02 section 9.1; 04 section 4.1).
 import { LOGIN_TTL_SEC, readClaims, signToken } from "./session";
 
-/** 04 section 4.1: relative paths only; `//evil` and `/\evil` fall back to /ledger. */
+/** 04 section 4.1: relative paths only; `//evil` and `/\evil` fall back to /dashboard (trust spec §10: home after sign-in). */
 export function safeNext(next: string | null | undefined): string {
-  return next && next.length <= 200 && /^\/(?![/\\])[^\s\\]*$/.test(next) ? next : "/ledger";
+  return next && next.length <= 200 && /^\/(?![/\\])[^\s\\]*$/.test(next) ? next : "/dashboard";
 }
 
 export const createMagicToken = (email: string): Promise<string> =>

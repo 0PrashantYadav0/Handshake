@@ -20,7 +20,7 @@ export default async function LedgerPage() {
         <span className="text-[var(--hs-muted)]">{rows.length} {rows.length === 1 ? "deal" : "deals"}</span>
         <div className="ml-auto flex gap-2">
           <Link href="/new" className="hs-btn">New deal</Link>
-          <Link href="/dashboard" className="hs-btn-secondary">Open dashboard</Link>
+          <Link href="/dashboard/studio" className="hs-btn-secondary">Open analytics studio</Link>
         </div>
       </div>
       <Ledger rows={rows} />

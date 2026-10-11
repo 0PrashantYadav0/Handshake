@@ -28,7 +28,7 @@ export function SignInPanel({ demo, dev, name, next, invalidLink }: Props) {
   const persona = (p: "buyer" | "seller") =>
     run(async () => {
       await api("/api/auth/demo", { json: { persona: p } });
-      router.push(`/signin/2fa?next=${encodeURIComponent(next ?? (p === "buyer" ? "/new" : "/ledger"))}`);
+      router.push(`/signin/2fa?next=${encodeURIComponent(next ?? (p === "buyer" ? "/new" : "/dashboard"))}`);
     });
   const magic = (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -44,7 +44,7 @@ export function SignInPanel({ demo, dev, name, next, invalidLink }: Props) {
         <h2 className="text-lg font-semibold">You&apos;re signed in as {name}.</h2>
         <div className="mt-4 flex gap-2">
           <Link href="/new" className="hs-btn">New deal</Link>
-          <Link href="/ledger" className="hs-btn-secondary">Your ledger</Link>
+          <Link href="/dashboard" className="hs-btn-secondary">Your dashboard</Link>
         </div>
       </section>
     );

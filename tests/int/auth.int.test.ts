@@ -110,14 +110,14 @@ describe("magic link", () => {
     expect(again.headers.get("location")).toBe("/signin/2fa?next=%2Fledger");
   });
 
-  test("default next is /ledger; absolute-looking next falls back", async () => {
+  test("default next is /dashboard; absolute-looking next falls back", async () => {
     const token = await createMagicToken("a@test");
     const plain = await callRoute(callback, "GET", `/api/auth/callback?token=${token}`);
-    expect(plain.headers.get("location")).toBe("/security/setup?next=%2Fledger");
+    expect(plain.headers.get("location")).toBe("/security/setup?next=%2Fdashboard");
     const reused = await callRoute(callback, "GET", `/api/auth/callback?token=${token}`);
     expect(reused.headers.get("location")).toBe("/signin?error=invalid_link"); // single use
     const evil = await callRoute(callback, "GET", `/api/auth/callback?token=${await createMagicToken("a@test")}&next=//evil.example`);
-    expect(evil.headers.get("location")).toBe("/security/setup?next=%2Fledger");
+    expect(evil.headers.get("location")).toBe("/security/setup?next=%2Fdashboard");
     expect(await deps.db.user.count()).toBe(1); // upsert, not a second row
   });
 
