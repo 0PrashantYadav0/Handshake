@@ -13,7 +13,7 @@ import { lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transit
 import type { Deps } from "./types";
 
 export type { PaypalFact } from "./facts";
-export type FactSource = { source: "api"; paypal_request_id: string } | { source: "webhook"; paypal_event_id: string };
+export type FactSource = { source: "api"; paypal_request_id: string } | { source: "webhook"; paypal_event_id: string } | { source: "reconcile" };
 
 /** What the caller must do once the transaction has committed (8.2): the payout call, the capture_declined notice. */
 export type AfterCommit = { payout: Payout | null; declined: boolean };
@@ -24,6 +24,20 @@ export function captureFact(r: { capture_id: string; status: string; reason: str
   if (r.status === "COMPLETED") return { type: "capture_completed", capture_id: r.capture_id };
   if (r.status === "PENDING") return { type: "capture_pending", capture_id: r.capture_id, reason: r.reason };
   if (r.status === "DECLINED" || r.status === "FAILED") return { type: "capture_declined", capture_id: r.capture_id, reason: r.reason };
+  return null;
+}
+
+/** The fact a payout item status carries (02 section 5.5, E5): `word` is the PAYMENT.PAYOUTS-ITEM.* suffix, or a GET item's
+ *  transaction_status with SUCCESS read as SUCCEEDED. null for every other status (pending, on hold, refunded, ...). */
+export function payoutItemFact(
+  word: string,
+  i: { sender_item_id: string; payout_batch_id: string | null; payout_item_id: string | null; error_name: string | null },
+): PaypalFact | null {
+  const { sender_item_id, payout_batch_id, payout_item_id } = i;
+  if (word === "SUCCEEDED") return payout_batch_id && payout_item_id ? { type: "payout_succeeded", sender_item_id, payout_batch_id, payout_item_id } : null;
+  if (word === "FAILED" || word === "BLOCKED" || word === "RETURNED" || word === "UNCLAIMED") {
+    return { type: "payout_failed", sender_item_id, payout_batch_id, payout_item_id, failure_reason: word === "UNCLAIMED" ? word : (i.error_name ?? word) };
+  }
   return null;
 }
 
