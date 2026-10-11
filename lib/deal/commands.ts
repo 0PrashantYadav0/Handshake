@@ -14,6 +14,7 @@ import { afterCommit, applyFactTx, captureHold, rethrowPaypal, sendPayout, voidH
 import { authKey, orderKey, payoutBatchId, strayVoidKey, voidKey } from "./keys";
 import { sealFile, sealText } from "./sealed";
 import { acceptanceOutcome, appendCodeCondition, validateTerms } from "./terms";
+import { checkSignature, contractDocOf, hashOf, useSigningKey } from "./contract";
 import { insertEvent, lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import { commandError, nextStatus } from "./transitions";
 import type { Actor, AddFileInput, Command, CreateDealInput, DealView, Deps, FileRef } from "./types";
@@ -104,7 +105,7 @@ export async function handle(code: string, actor: Actor, command: Command, deps:
   switch (command.type) {
     case "edit_terms": await editTerms(code, actor, command, deps); break;
     case "join": await join(code, actor, deps); break;
-    case "accept": await accept(code, actor, command.terms_version, deps); break;
+    case "accept": await accept(code, actor, command, deps); break;
     case "start_payment": await startPayment(code, actor, deps); break;
     case "confirm_approval": await confirmApproval(code, actor, command.order_id, deps); break;
     case "cancel": await cancel(code, actor, deps); break;
@@ -156,7 +157,9 @@ async function join(code: string, actor: Actor, deps: Deps): Promise<void> {
   });
 }
 
-async function accept(code: string, actor: Actor, terms_version: number, deps: Deps): Promise<void> {
+/** Accepting is signing (trust spec §6): the party's device key signs the canonical contract of this terms version. */
+async function accept(code: string, actor: Actor, cmd: Extract<Command, { type: "accept" }>, deps: Deps): Promise<void> {
+  const { terms_version } = cmd;
   await inTx(deps, async (tx) => {
     const loaded = await loadLocked(tx, code, actor);
     const role = requireRole(loaded, "buyer", "seller");
@@ -164,12 +167,20 @@ async function accept(code: string, actor: Actor, terms_version: number, deps: D
     if (deal.status !== "draft") throw new DealError("invalid_state", "The terms can be accepted only while the deal is a draft.");
     if (terms_version !== deal.terms_version) throw new DealError("terms_version_mismatch", `The terms changed; reload to see version ${deal.terms_version}.`);
     if (deal.amount_minor === null || deal.deadline_days === null) throw new DealError("invalid_input", "Set the amount and the deadline before accepting.");
+    if (!deal.seller) throw new DealError("invalid_state", "Both parties sign once the seller has joined. Share the link first.");
     const field = role === "buyer" ? "buyer_accepted_version" : "seller_accepted_version";
     if (deal[field] === terms_version) return; // the same version twice: a no-op that still answers 200
     const to = acceptanceOutcome({ ...deal, [field]: terms_version });
     if (role === "seller" || to === "terms_agreed") requireVerifiedPayout(deal.seller); // trust spec §8
+    const hash = hashOf(contractDocOf(deal)!);
+    if (cmd.contract_hash !== hash) throw new DealError("signature_invalid", "The contract changed while you were signing. Reload and sign the current version.");
+    const key = await useSigningKey(tx, actor.user_id, cmd.public_key, deps.clock.now(), cmd.key_label ?? null);
+    await checkSignature(cmd.public_key, hash, cmd.signature);
+    await tx.contractSignature.create({
+      data: { deal_id: deal.id, user_id: actor.user_id, role, terms_version, contract_hash: hash, key_id: key.id, signature: cmd.signature, signed_at: deps.clock.now() },
+    });
     await tx.deal.update({ where: { id: deal.id }, data: { [field]: terms_version } });
-    await transition(tx, deal, to, role, "accept", { terms_version });
+    await transition(tx, deal, to, role, "accept", { terms_version, contract_hash: hash, key_fingerprint: key.fingerprint });
   });
 }
 

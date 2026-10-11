@@ -36,7 +36,7 @@ export function NewDealFlow({ kit = null }: { kit?: Presets | null }) {
     }
   }
 
-  // Back to 1 starts a new deal (the draft stays in the ledger); back to 2 re-opens the terms. Nothing goes back once accepted (step 4) except a new deal.
+  // Back to 1 starts a new deal (the draft stays in the ledger); back to 2 re-opens the terms. Nothing goes back once shared (step 4) except a new deal.
   function back(n: number) {
     if (n === 1) {
       setDeal(null);

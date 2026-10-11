@@ -7,7 +7,7 @@ const base: DealView = {
   code: "HS-TEST", role: "buyer", status: "draft", item_title: "mug", source_text: "", amount_minor: 1800, currency: "USD",
   deadline_days: 5, deadline_at: null, terms_version: 1, buyer_accepted_version: null, seller_accepted_version: null, fix_attempts_used: 0,
   buyer: { display_name: "Demo Buyer", email: "b@x" }, seller: null, conditions: [], reference_files: [], submissions: [], payment: null,
-  payouts: [], seeded: false, created_at: "2026-10-10T00:00:00Z", updated_at: "2026-10-10T00:00:00Z",
+  payouts: [], contract: null, seeded: false, created_at: "2026-10-10T00:00:00Z", updated_at: "2026-10-10T00:00:00Z",
 };
 const seller = { display_name: "Demo Seller", email: "s@x", has_paypal_email: true, payout_email_verified: true, paypal_email: null };
 const payment = { status: "authorized" as const, paypal_order_id: "o", authorization_id: "a", authorized_at: "2026-10-10T00:00:00Z", auth_expires_at: null, capture_id: null };
@@ -20,10 +20,11 @@ const ev = (cause: string, actor: DealEvent["actor"], payload: Record<string, un
 describe("whatNext", () => {
   it("draft: buyer without a seller shares; seller reviews; preview invites", () => {
     expect(whatNext(base).heading).toBe("Share the link with your seller");
-    expect(whatNext({ ...base, seller }).heading).toBe("Waiting for Demo Seller to accept");
-    expect(whatNext({ ...base, seller, seller_accepted_version: 1 }).heading).toBe("Demo Seller accepted. Accept to continue.");
-    expect(whatNext({ ...base, role: "seller", seller }).heading).toBe("Review the terms");
-    expect(whatNext({ ...base, role: "seller", seller, seller_accepted_version: 1 }).heading).toBe("You accepted version 1");
+    expect(whatNext({ ...base, seller }).heading).toBe("Sign the contract");
+    expect(whatNext({ ...base, seller, buyer_accepted_version: 1 }).heading).toBe("Waiting for Demo Seller to sign");
+    expect(whatNext({ ...base, seller, seller_accepted_version: 1 }).heading).toBe("Demo Seller signed. Sign to continue.");
+    expect(whatNext({ ...base, role: "seller", seller }).heading).toBe("Review and sign the terms");
+    expect(whatNext({ ...base, role: "seller", seller, seller_accepted_version: 1 }).heading).toBe("You signed version 1");
     expect(whatNext({ role: "preview", code: "HS-TEST", item_title: "mug", amount_minor: 1800, currency: "USD", deadline_days: 5, conditions: [], buyer: { display_name: null } }).heading)
       .toBe("The buyer invited you to a deal");
   });
@@ -126,7 +127,7 @@ describe("cancellable / evidenceChip / decisionLine / timelineSentence", () => {
   });
   it("timeline sentences fill the payload and actor; unknown causes show raw", () => {
     expect(timelineSentence(ev("create", "buyer"))).toBe("Buyer created the deal from one sentence.");
-    expect(timelineSentence(ev("accept", "seller", { terms_version: 2 }))).toBe("Seller accepted version 2.");
+    expect(timelineSentence(ev("accept", "seller", { terms_version: 2 }))).toBe("Seller signed version 2.");
     expect(timelineSentence(ev("edit_terms", "buyer", { terms_version: 3 }))).toBe("Buyer edited the terms (now version 3).");
     expect(timelineSentence(ev("start_payment", "buyer", { order_attempt: 1 }))).toBe("Buyer started PayPal checkout (order attempt 1).");
     expect(timelineSentence(ev("submit_evidence", "seller", { submission_no: 2 }))).toBe("Seller submitted proof (attempt 2).");
@@ -152,9 +153,10 @@ describe("paymentLine / deadlineLine", () => {
 describe("primaryAction (sticky bar, 7.2)", () => {
   it("one label per role and state, none once the viewer has nothing to do", () => {
     expect(primaryAction({ role: "preview", code: "HS-TEST", item_title: "mug", amount_minor: 1800, currency: "USD", deadline_days: 5, conditions: [], buyer: { display_name: "B" } })).toBe("Join as seller");
-    expect(primaryAction(base)).toBe("Accept terms");
-    expect(primaryAction({ ...base, buyer_accepted_version: 1 })).toBeNull();
-    expect(primaryAction({ ...base, role: "seller", seller, seller_accepted_version: null })).toBe("Accept terms");
+    expect(primaryAction(base)).toBeNull(); // no seller yet: nothing to sign
+    expect(primaryAction({ ...base, seller })).toBe("Sign contract");
+    expect(primaryAction({ ...base, seller, buyer_accepted_version: 1 })).toBeNull();
+    expect(primaryAction({ ...base, role: "seller", seller, seller_accepted_version: null })).toBe("Sign contract");
     expect(primaryAction({ ...base, status: "terms_agreed", seller })).toBe("Pay with PayPal");
     expect(primaryAction({ ...base, status: "terms_agreed", seller, payment: { ...payment, status: "approved", authorization_id: null } })).toBeNull();
     expect(primaryAction({ ...base, status: "terms_agreed", role: "seller", seller })).toBeNull();

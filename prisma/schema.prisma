@@ -107,6 +107,8 @@ model User {
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @updatedAt @db.Timestamptz(6)
 
+  signing_keys    SigningKey[]
+  signatures      ContractSignature[]
   deals_as_buyer  Deal[]     @relation("DealBuyer")
   deals_as_seller Deal[]     @relation("DealSeller")
   files           File[]
@@ -144,6 +146,7 @@ model Deal {
   payment    Payment?
   payouts    Payout[]
   events     DealEvent[]
+  signatures ContractSignature[]
 
   @@index([buyer_id, status])
   @@index([seller_id, status])
@@ -294,4 +297,52 @@ model WebhookEvent {
   created_at      DateTime  @default(now()) @db.Timestamptz(6)
 
   @@map("webhook_events")
+}
+
+// ---------- trust spec §6: digital signatures ----------
+
+enum PartyRole {
+  buyer
+  seller
+
+  @@map("party_role")
+}
+
+/// One per browser: ECDSA P-256 public key; the private key never leaves the device.
+model SigningKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  user_id     String    @db.Uuid
+  fingerprint String    @unique // sha256 hex of "P-256.<x>.<y>"
+  x           String
+  y           String
+  label       String?
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  revoked_at  DateTime? @db.Timestamptz(6)
+
+  user       User                @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  signatures ContractSignature[]
+
+  @@index([user_id])
+  @@map("signing_keys")
+}
+
+/// Append-only (trigger): one signature per party per terms version.
+model ContractSignature {
+  id            String    @id @default(uuid()) @db.Uuid
+  deal_id       String    @db.Uuid
+  user_id       String    @db.Uuid
+  role          PartyRole
+  terms_version Int
+  contract_hash String
+  key_id        String    @db.Uuid
+  signature     String
+  signed_at     DateTime  @default(now()) @db.Timestamptz(6)
+
+  deal Deal       @relation(fields: [deal_id], references: [id], onDelete: Restrict)
+  user User       @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  key  SigningKey @relation(fields: [key_id], references: [id], onDelete: Restrict)
+
+  @@unique([deal_id, role, terms_version])
+  @@index([key_id])
+  @@map("contract_signatures")
 }

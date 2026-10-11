@@ -7,7 +7,7 @@ import { openFile } from "@/lib/deal/sealed";
 import type { DealView } from "@/lib/deal/types";
 import { MAX_FILE_BYTES } from "@/lib/files/validate";
 import { verifyFileUrl } from "@/lib/files/urls";
-import { assertEventsInC6, dealBuilder, events, expectError, parties, resetDb, testDeps, type Parties, type TestDeps } from "./helpers";
+import { assertEventsInC6, dealBuilder, events, expectError, parties, resetDb, testDeps, type Parties, type TestDeps, signedAccept } from "./helpers";
 
 let deps: TestDeps;
 let p: Parties;
@@ -39,8 +39,8 @@ describe("read", () => {
     const draft = await build.draft();
     await addFile(draft, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg() }, deps);
     await handle(draft, p.asSeller, { type: "join" }, deps);
-    await handle(draft, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-    await handle(draft, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(draft, p.asSeller, await signedAccept(draft, p.asSeller, 1), deps);
+    await handle(draft, p.asBuyer, await signedAccept(draft, p.asBuyer, 1), deps);
     const v0 = await handle(draft, p.asBuyer, { type: "start_payment" }, deps);
     await handle(draft, p.asBuyer, { type: "confirm_approval", order_id: v0.payment!.paypal_order_id }, deps);
 
@@ -104,8 +104,8 @@ describe("evidence pack", () => {
     const code = await build.draft();
     await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/png", bytes: png() }, deps);
     await handle(code, p.asSeller, { type: "join" }, deps);
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     const v = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
     await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v.payment!.paypal_order_id }, deps);
 
@@ -150,7 +150,7 @@ describe("access rules (F4, H2)", () => {
   });
   test("a preview reader may only join; every other command is 403", async () => {
     const code = await build.draft();
-    await expectError(handle(code, p.asThird, { type: "accept", terms_version: 1 }, deps), "not_a_party");
+    await expectError(handle(code, p.asThird, await signedAccept(code, p.asThird, 1), deps), "not_a_party");
     await expectError(handle(code, p.asThird, { type: "cancel" }, deps), "not_a_party");
     await expectError(getEvents(code, p.asThird, deps), "not_a_party");
     await expectError(getEvidencePack(code, p.asThird, deps), "not_a_party");
@@ -201,10 +201,10 @@ describe("addFile", () => {
   });
   test("reference only in draft before the seller accepted; evidence only in held before the deadline; 7th evidence -> too_many_files", async () => {
     const code = await build.joined();
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
     const e = await expectError(addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg() }, deps), "invalid_state");
     expect(e.message).toBe("Edit the terms before adding photos.");
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     await expectError(addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg() }, deps), "invalid_state");
     await expectError(addFile(code, p.asSeller, { purpose: "evidence", mime: "image/jpeg", bytes: jpeg() }, deps), "invalid_state");
 
