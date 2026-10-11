@@ -9,7 +9,7 @@ const base: DealView = {
   buyer: { display_name: "Demo Buyer", email: "b@x" }, seller: null, conditions: [], reference_files: [], submissions: [], payment: null,
   payouts: [], seeded: false, created_at: "2026-10-10T00:00:00Z", updated_at: "2026-10-10T00:00:00Z",
 };
-const seller = { display_name: "Demo Seller", email: "s@x", has_paypal_email: true, paypal_email: null };
+const seller = { display_name: "Demo Seller", email: "s@x", has_paypal_email: true, payout_email_verified: true, paypal_email: null };
 const payment = { status: "authorized" as const, paypal_order_id: "o", authorization_id: "a", authorized_at: "2026-10-10T00:00:00Z", auth_expires_at: null, capture_id: null };
 const payout = (over: Partial<Payout>): Payout => ({ attempt: 1, status: "pending", amount_minor: 1800, sender_batch_id: "payout-HS-TEST-1", paypal_batch_id: "B1", paypal_item_id: null, failure_reason: null, created_at: base.created_at, ...over });
 const verdict = (result: "pass" | "fail" | "unclear", confidence = 0.95) => ({ condition_id: "c", result, confidence, reason: "r", evidence_used: [], model: "claude-x", prompt_version: "judge-v1" });

@@ -128,6 +128,9 @@ export function payoutCopy(d: Pick<DealView, "role" | "amount_minor" | "seller" 
       : { heading: "Payment released", helper: `${amount} is being charged to your PayPal and paid to ${partyName(d.seller, "the seller")}. The deal is complete once the payout lands.` };
   }
   const email = d.seller?.paypal_email ?? "your PayPal email";
+  if (p?.status === "failed" && p.failure_reason === "PAYOUT_EMAIL_UNVERIFIED") {
+    return { heading: "Verify your PayPal email", helper: `The money is captured and waiting for you. Confirm ${email} on your profile with the code we emailed, then retry the payout.` };
+  }
   if (p?.status === "failed") {
     const extra = p.failure_reason === "UNCLAIMED" ? " That address has no PayPal account yet. Retrying cancels the unclaimed payment first." : "";
     return { heading: "Payout failed", helper: `PayPal couldn't pay ${email}: ${p.failure_reason ?? "unknown reason"}. Check your PayPal email on your profile, then retry.${extra}` };

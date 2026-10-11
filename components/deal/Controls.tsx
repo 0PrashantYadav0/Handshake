@@ -1,5 +1,5 @@
 "use client";
-// Small deal-page controls (08 sections 7.5, 7.13, 6.4): Join, Accept terms (+ PayPal email form), Cancel deal, the share row.
+// Small deal-page controls (08 sections 7.5, 7.13, 6.4): Join, Accept terms (+ the payout email card), Cancel deal, the share row.
 // data-primary-action marks the button the mobile sticky bar (Deal.tsx) forwards to.
 import { useState, useSyncExternalStore } from "react";
 import type { DealView } from "@/lib/deal/types";
@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/client-api";
 import { money } from "@/lib/ledger-columns";
 import { confirm } from "@/components/ConfirmDialog";
 import { CopyButton, ShareButton } from "@/components/ShareLink";
+import { PayoutEmailForm } from "@/components/PayoutEmailForm";
 
 export { CopyButton };
 
@@ -39,12 +40,11 @@ export function Join({ code, onDone, fail }: { code: string; onDone: Done; fail:
 
 export function AcceptTerms({ deal, onDone, fail }: { deal: DealView; onDone: Done; fail: Fail }) {
   const [busy, run] = useBusy(fail);
-  const [needEmail, setNeedEmail] = useState(deal.role === "seller" && !deal.seller?.has_paypal_email);
-  const [email, setEmail] = useState("");
+  const [needEmail, setNeedEmail] = useState(deal.role === "seller" && !deal.seller?.payout_email_verified);
   const accept = () =>
     run(
       async () => onDone(await api(`/api/deals/${deal.code}/accept`, { json: { terms_version: deal.terms_version } })),
-      (e) => (e instanceof ApiError && e.code === "paypal_email_required" ? setNeedEmail(true) : fail(e)),
+      (e) => (e instanceof ApiError && (e.code === "paypal_email_required" || e.code === "payout_email_unverified") && deal.role === "seller" ? setNeedEmail(true) : fail(e)),
     );
   if (!needEmail) {
     return (
@@ -53,23 +53,8 @@ export function AcceptTerms({ deal, onDone, fail }: { deal: DealView; onDone: Do
       </button>
     );
   }
-  return (
-    <form
-      className="flex flex-col gap-2"
-      onSubmit={(ev) => {
-        ev.preventDefault();
-        void run(async () => {
-          await api("/api/me", { method: "PATCH", json: { paypal_email: email } });
-          await accept();
-        });
-      }}
-    >
-      <label htmlFor="paypal_email" className="hs-label">PayPal email</label>
-      <input id="paypal_email" type="email" required className="hs-input" value={email} onChange={(e) => setEmail(e.target.value)} aria-describedby="paypal_email-help" />
-      <p id="paypal_email-help" className="hs-help">Where you&apos;re paid when the proof passes. In the sandbox use the seller test account&apos;s email from the README. You can change it later on your profile.</p>
-      <button type="submit" data-testid="accept-terms" data-primary-action className="hs-btn self-start" disabled={busy}>{busy ? "Accepting…" : "Save and accept"}</button>
-    </form>
-  );
+  // trust spec §8: the seller confirms where they're paid, then the accept goes through.
+  return <PayoutEmailForm current={deal.seller?.paypal_email ?? null} verified={false} onVerified={async () => { setNeedEmail(false); await accept(); }} />;
 }
 
 export function CancelDeal({ deal, onDone, fail }: { deal: DealView; onDone: Done; fail: Fail }) {

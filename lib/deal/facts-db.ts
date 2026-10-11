@@ -141,13 +141,17 @@ export async function applyFactTx(tx: Tx, deps: Deps, deal: DealRow, fact: Paypa
   }
   let payout: Payout | null = null;
   if (r.triggerPayout) {
-    payout = await tx.payout.create({
+    // trust spec §8: money goes only to a verified address. Otherwise the row is failed at once and PayPal is not called;
+    // the seller verifies the address and uses retry_payout.
+    const verified = !!deal.seller?.paypal_email && !!deal.seller.paypal_email_verified_at;
+    const row = await tx.payout.create({
       data: {
         deal_id: deal.id, attempt: 1, sender_batch_id: payoutBatchId(code, 1), recipient_email: deal.seller?.paypal_email ?? "",
-        amount_minor: deal.amount_minor!, status: "pending",
+        amount_minor: deal.amount_minor!, status: verified ? "pending" : "failed", failure_reason: verified ? null : PAYOUT_EMAIL_UNVERIFIED,
       },
     });
-    payload.payout = { attempt: 1, sender_batch_id: payout.sender_batch_id, paypal_batch_id: null, status: "pending" };
+    payload.payout = { attempt: 1, sender_batch_id: row.sender_batch_id, paypal_batch_id: null, status: row.status, failure_reason: row.failure_reason };
+    if (verified) payout = row;
   }
 
   const cause = `fact:${type}`;
@@ -155,6 +159,9 @@ export async function applyFactTx(tx: Tx, deps: Deps, deal: DealRow, fact: Paypa
   else await transition(tx, deal, r.next, "paypal", cause, payload);
   return { outcome: "applied", after: { payout, declined: type === "capture_declined" && !r.detailOnly } };
 }
+
+/** failure_reason of a payout held back because the seller's PayPal email is not verified (trust spec §8). */
+export const PAYOUT_EMAIL_UNVERIFIED = "PAYOUT_EMAIL_UNVERIFIED";
 
 /** Runs the after-commit effects of applyFactTx. Never throws. */
 export async function afterCommit(deps: Deps, deal: DealRow, result: FactResult): Promise<void> {

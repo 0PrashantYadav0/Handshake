@@ -77,6 +77,7 @@ export function buildDealView(deal: DealRow, role: Role, now: Date): DealView {
     buyer: { display_name: deal.buyer.display_name, email: deal.buyer.email },
     seller: deal.seller && {
       display_name: deal.seller.display_name, email: deal.seller.email, has_paypal_email: !!deal.seller.paypal_email,
+      payout_email_verified: !!deal.seller.paypal_email && !!deal.seller.paypal_email_verified_at,
       paypal_email: role === "seller" ? deal.seller.paypal_email : null,
     },
     conditions: deal.conditions.map(toCondition),

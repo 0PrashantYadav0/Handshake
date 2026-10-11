@@ -53,11 +53,12 @@ describe("demo sign-in", () => {
     const cookie = await passDemo2fa(partial);
     expect((await seller.json()).user).toMatchObject({ email: "demo-seller@handshake.demo", display_name: "Demo Seller", paypal_email: "demo-seller-pp@test" });
 
-    const patched = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { paypal_email: "other@test", display_name: "Mallory" } });
-    expect((await patched.json()).user).toMatchObject({ paypal_email: "other@test", display_name: "Mallory" });
+    const { code: totp } = await (await callRoute(demoCode, "GET", "/api/auth/2fa/demo-code", { cookie })).json();
+    const patched = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { paypal_email: "other@test", display_name: "Mallory", totp } });
+    expect((await patched.json()).user).toMatchObject({ paypal_email: "other@test", paypal_email_verified: false, display_name: "Mallory" });
 
     const again = await callRoute(demo, "POST", "/api/auth/demo", { body: { persona: "seller" } });
-    expect((await again.json()).user).toMatchObject({ display_name: "Demo Seller", paypal_email: "demo-seller-pp@test" });
+    expect((await again.json()).user).toMatchObject({ display_name: "Demo Seller", paypal_email: "demo-seller-pp@test", paypal_email_verified: true });
     expect(await deps.db.user.count()).toBe(2);
   });
 
@@ -149,19 +150,23 @@ test("sign out clears the cookie (Max-Age=0)", async () => {
 });
 
 describe("profile", () => {
-  test("GET returns id, email, display_name, paypal_email; PATCH updates both fields and trims", async () => {
+  test("GET returns the profile; PATCH display_name trims and needs no step-up; paypal_email needs a code (payout-email.int.test.ts)", async () => {
     const u = await makeUser("buyer@test", { display_name: "Buyer" });
     const cookie = await signIn(u.id);
     const got = await callRoute(getMe, "GET", "/api/me", { cookie });
     expect(got.status).toBe(200);
-    expect((await got.json()).user).toEqual({ id: u.id, email: "buyer@test", display_name: "Buyer", paypal_email: null, created_at: u.created_at.toISOString() });
+    expect((await got.json()).user).toEqual({
+      id: u.id, email: "buyer@test", display_name: "Buyer", paypal_email: null, created_at: u.created_at.toISOString(), paypal_email_verified: false, two_factor: false,
+    });
 
-    const patched = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { display_name: "  New Name ", paypal_email: " pp@test " } });
+    const patched = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { display_name: "  New Name " } });
     expect(patched.status).toBe(200);
-    expect((await patched.json()).user).toMatchObject({ display_name: "New Name", paypal_email: "pp@test" });
+    expect((await patched.json()).user).toMatchObject({ display_name: "New Name", paypal_email: null });
 
-    const one = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { paypal_email: "pp2@test" } });
-    expect((await one.json()).user).toMatchObject({ display_name: "New Name", paypal_email: "pp2@test" });
+    const noStepUp = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { paypal_email: "pp2@test" } });
+    expect(noStepUp.status).toBe(400);
+    expect(await errorCode(noStepUp)).toBe("totp_invalid");
+    expect((await deps.db.user.findUniqueOrThrow({ where: { id: u.id } })).paypal_email).toBeNull();
   });
 
   test("signed out -> 401 not_signed_in on GET and PATCH", async () => {
