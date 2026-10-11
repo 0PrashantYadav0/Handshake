@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { addFile, createDeal, getDeal, getEvents, getEvidencePack, handle, listDeals } from "@/lib/deal";
 import { toIso } from "@/lib/deal/dates";
+import { openFile } from "@/lib/deal/sealed";
 import type { DealView } from "@/lib/deal/types";
 import { MAX_FILE_BYTES } from "@/lib/files/validate";
 import { verifyFileUrl } from "@/lib/files/urls";
@@ -182,7 +183,7 @@ describe("addFile", () => {
     expect(urlOk(ref.url)).toBe(true);
     const row = await deps.db.file.findUniqueOrThrow({ where: { id: ref.id }, omit: { bytes: false } });
     expect(row).toMatchObject({ mime: "image/webp", size_bytes: 100, sha256: ref.sha256, uploaded_by: p.buyer.id });
-    expect(Buffer.from(row.bytes).equals(Buffer.from(webp()))).toBe(true);
+    expect(Buffer.from(openFile(row.deal_id, row.bytes)).equals(Buffer.from(webp()))).toBe(true);
     expect(await events(code)).toHaveLength(n);
 
     for (let i = 1; i <= 3; i++) await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg(100, i) }, deps);

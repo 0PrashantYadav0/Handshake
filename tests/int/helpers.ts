@@ -8,6 +8,7 @@ import { fakePaypal, type FakePaypal } from "@/lib/paypal/fake";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
 import { addFile, createDeal, DealError, handle } from "@/lib/deal";
 import type { JudgeMode } from "@/lib/ai/fake";
+import { openDealRow, openPayload } from "@/lib/deal/sealed";
 import type { Actor, DealView, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
 import { expect } from "vitest";
 
@@ -139,10 +140,11 @@ export function dealBuilder(deps: TestDeps, p: Parties) {
   return b;
 }
 
-export const events = (code: string) =>
-  prisma.dealEvent.findMany({ where: { deal: { public_code: code } }, orderBy: { id: "asc" } });
-export const dealRow = (code: string) =>
-  prisma.deal.findUniqueOrThrow({ where: { public_code: code }, include: { payment: true, payouts: true, conditions: { orderBy: { position: "asc" } } } });
+/** Raw rows, opened (trust spec §5) so assertions read plain values. */
+export const events = async (code: string) =>
+  (await prisma.dealEvent.findMany({ where: { deal: { public_code: code } }, orderBy: { id: "asc" } })).map((e) => ({ ...e, payload: openPayload(e.deal_id, e.payload) }));
+export const dealRow = async (code: string) =>
+  openDealRow(await prisma.deal.findUniqueOrThrow({ where: { public_code: code }, include: { payment: true, payouts: true, conditions: { orderBy: { position: "asc" } } } }));
 
 /** Asserts the promise rejects with a DealError of the given code; returns it for message checks. */
 export function expectError(promise: Promise<unknown>, code: string): Promise<DealError> {

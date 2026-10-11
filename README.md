@@ -184,6 +184,7 @@ E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
                                        # without the two variables it runs up to the PayPal popup and skips the rest
 npm run eval                           # the judge eval, calls the real API; prints the estimated cost at the end
 npm run sandbox -- SB-1 --base <url>   # sandbox scenarios SB-1, SB-6, SB-7, SB-8, SB-11 against a running app
+npm run reseal                         # after prepending a new kid:secret to DATA_KEYS: re-seals contract data with it (trust spec §5)
 npm run lint && npm run typecheck
 ```
 

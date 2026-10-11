@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { addFile, handle } from "@/lib/deal";
 import { captureKey, payoutBatchId } from "@/lib/deal/keys";
+import { openRaw, openText, openVerdict } from "@/lib/deal/sealed";
 import type { Command } from "@/lib/deal/types";
 import { assertEventsInC6, dealBuilder, dealRow, events, expectError, makeJpeg, parties, resetDb, testDeps, TRACKING, type Parties, type TestDeps } from "./helpers";
 
@@ -41,10 +42,10 @@ describe("submit_evidence", () => {
 
     const d = await dealRow(code);
     const ev = await deps.db.evidence.findMany({ where: { deal_id: d.id }, orderBy: { position: "asc" } });
-    expect(ev.map((e) => [e.submission_no, e.kind, e.position, e.file_id, e.value]).sort()).toEqual([
+    expect(ev.map((e) => [e.submission_no, e.kind, e.position, e.file_id, e.value && openText("evidence.value", d.id, e.value)]).sort()).toEqual([
       [1, "note", 0, null, "Shipped Monday"], [1, "photo", 1, ids[0], null], [1, "photo", 2, ids[1], null], [1, "tracking", 0, null, TRACKING],
     ]);
-    const rows = await deps.db.verdict.findMany({ where: { deal_id: d.id } });
+    const rows = (await deps.db.verdict.findMany({ where: { deal_id: d.id } })).map((r) => openVerdict(d.id, r));
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({ submission_no: 1, model: "fake", prompt_version: "judge-v1", raw_response: expect.objectContaining({ request_id: "req_fake" }) });
 
@@ -147,7 +148,7 @@ describe("submit_evidence", () => {
     expect(s.verdicts[0]).toMatchObject({ reason: "Evidence photo e1 is the same file as listing photo r1; a listing photo is not proof.", evidence_used: ["e1", "r1"] });
     expect(s.verdicts[1]!.reason).toBe("Not judged: the submission was rejected before the AI was called.");
     const row = await deps.db.verdict.findFirst({ where: { deal: { public_code: code } } });
-    expect(row!.raw_response).toEqual({ skipped: "hash_match", matches: [{ evidence: "e1", reference: "r1", sha256: ref.sha256 }], latency_ms: 0 });
+    expect(openRaw(row!.deal_id, row!.raw_response)).toEqual({ skipped: "hash_match", matches: [{ evidence: "e1", reference: "r1", sha256: ref.sha256 }], latency_ms: 0 });
     expect((await events(code)).find((e) => e.cause === "verdict")!.payload).toMatchObject({ model: "none", prompt_version: "guardrail-v1", labels: { r1: ref.id, e1: copy.id, e2: fresh.id } });
   });
 
