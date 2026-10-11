@@ -3,7 +3,8 @@
 // Thumbnails switch to the signed FileRef.url once uploaded; a failed upload keeps the staged files and the ones already sent.
 import { useState } from "react";
 import type { DealView, FileRef } from "@/lib/deal/types";
-import { downscale, errorCopy, formatBytes, sendJson, UNDECODABLE_COPY, uploadFile } from "@/lib/client-upload";
+import { downscale, errorCopy, formatBytes, UNDECODABLE_COPY, uploadFile } from "@/lib/client-upload";
+import { api } from "@/lib/client-api";
 import { fetchSample, findPreset, type Presets } from "@/lib/demo-kit";
 import { Thumb, useLightbox } from "@/components/Lightbox";
 import { Ring } from "@/components/Ring";
@@ -79,7 +80,8 @@ export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView
           }
         }
       }
-      onAccepted(await sendJson<DealView>(`/api/deals/${deal.code}/accept`, "POST", { terms_version: deal.terms_version }));
+      // trust spec §6: nobody signs before the seller joins, so this step only saves the photos and moves on to sharing.
+      onAccepted(await api<DealView>(`/api/deals/${deal.code}`));
     } catch (e) {
       setError(errorCopy(e));
     } finally {
@@ -134,7 +136,7 @@ export function PhotoUploader({ deal, kit = null, onAccepted }: { deal: DealView
 
       <div className="mt-5 flex items-center gap-4">
         <button type="button" className="hs-btn" data-testid="accept-and-share" disabled={busy} onClick={() => accept(true)}>
-          {busy && !progress ? "Accepting…" : "Accept terms and get link"}
+          {busy && !progress ? "Saving…" : "Save and get link"}
         </button>
         <button type="button" className="hs-link text-sm font-medium" disabled={busy} onClick={() => accept(false)}>
           Skip photos

@@ -6,9 +6,16 @@ import { fakeAi, type FakeAi } from "@/lib/ai/fake";
 import { fakeEmail, type RecordingEmail } from "@/lib/email/console";
 import { fakePaypal, type FakePaypal } from "@/lib/paypal/fake";
 import { SESSION_COOKIE, signSession } from "@/lib/auth/session";
+import { newTotpSecret } from "@/lib/auth/totp";
+import { aad, seal } from "@/lib/crypto/seal";
+import { signingMessage } from "@/lib/contract/canonical";
+import { bytesToB64url, type PublicKey } from "@/lib/contract/signature";
+import { DEAL_INCLUDE } from "@/lib/deal/access";
+import { contractDocOf, hashOf } from "@/lib/deal/contract";
 import { addFile, createDeal, DealError, handle } from "@/lib/deal";
 import type { JudgeMode } from "@/lib/ai/fake";
-import type { Actor, DealView, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
+import { openDealRow, openPayload } from "@/lib/deal/sealed";
+import type { Actor, Command, DealView, EventActor, PaypalWebhookEvent } from "@/lib/deal/types";
 import { expect } from "vitest";
 
 process.env.SESSION_SECRET ??= "test-session-secret-at-least-32-characters-long";
@@ -20,7 +27,7 @@ export type TestDeps = { db: typeof prisma; paypal: FakePaypal; ai: FakeAi; emai
 
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "webhook_events", "deal_events", "payouts", "payments", "verdicts",
+    `TRUNCATE TABLE "webhook_events", "contract_signatures", "signing_keys", "deal_events", "payouts", "payments", "verdicts",
       "evidence", "files", "conditions", "deals", "users" RESTART IDENTITY CASCADE`,
   );
 }
@@ -35,8 +42,37 @@ export function testDeps(overrides: Partial<TestDeps> = {}): TestDeps {
   return deps;
 }
 
-export function makeUser(email: string, opts: { display_name?: string; paypal_email?: string } = {}) {
-  return prisma.user.create({ data: { email, display_name: opts.display_name ?? null, paypal_email: opts.paypal_email ?? null } });
+/** A paypal_email is verified unless verified: false (trust spec §8). */
+export function makeUser(email: string, opts: { display_name?: string; paypal_email?: string; verified?: boolean } = {}) {
+  const verified = opts.paypal_email && opts.verified !== false ? new Date() : null;
+  return prisma.user.create({ data: { email, display_name: opts.display_name ?? null, paypal_email: opts.paypal_email ?? null, paypal_email_verified_at: verified } });
+}
+
+// ---------- trust spec §6: each test user signs with its own P-256 key, like a browser would ----------
+const testKeys = new Map<string, CryptoKeyPair>();
+export async function testKeyFor(userId: string): Promise<CryptoKeyPair> {
+  let k = testKeys.get(userId);
+  if (!k) testKeys.set(userId, (k = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])));
+  return k;
+}
+export async function signHash(pair: CryptoKeyPair, hash: string): Promise<{ signature: string; public_key: PublicKey }> {
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(signingMessage(hash)));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+  return { signature: bytesToB64url(sig), public_key: { x: jwk.x!, y: jwk.y! } };
+}
+/** The accept command a party's browser would send: its key's signature over the deal's current contract hash. */
+export async function signedAccept(code: string, actor: Actor, terms_version = 1): Promise<Extract<Command, { type: "accept" }>> {
+  const row = await prisma.deal.findUnique({ where: { public_code: code }, include: DEAL_INCLUDE });
+  const doc = row ? contractDocOf(openDealRow(row)) : null;
+  const contract_hash = doc ? hashOf(doc) : "0".repeat(64); // nothing to sign yet: the command fails before the signature check
+  return { type: "accept", terms_version, contract_hash, ...(await signHash(await testKeyFor(actor.user_id), contract_hash)) };
+}
+
+/** Turns 2FA on with a fresh secret (trust spec §4); returns the secret for totpAt(). */
+export async function enrollTotp(userId: string): Promise<string> {
+  const secret = newTotpSecret();
+  await prisma.user.update({ where: { id: userId }, data: { totp_secret: seal(secret, aad("users.totp_secret", userId)), totp_enabled_at: new Date(), totp_last_step: null } });
+  return secret;
 }
 
 export async function signIn(userId: string): Promise<string> {
@@ -125,8 +161,8 @@ export function dealBuilder(deps: TestDeps, p: Parties) {
     },
     async agreed(): Promise<string> {
       const code = await b.joined();
-      await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-      await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+      await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+      await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
       return code;
     },
     async held(): Promise<string> {
@@ -139,10 +175,11 @@ export function dealBuilder(deps: TestDeps, p: Parties) {
   return b;
 }
 
-export const events = (code: string) =>
-  prisma.dealEvent.findMany({ where: { deal: { public_code: code } }, orderBy: { id: "asc" } });
-export const dealRow = (code: string) =>
-  prisma.deal.findUniqueOrThrow({ where: { public_code: code }, include: { payment: true, payouts: true, conditions: { orderBy: { position: "asc" } } } });
+/** Raw rows, opened (trust spec §5) so assertions read plain values. */
+export const events = async (code: string) =>
+  (await prisma.dealEvent.findMany({ where: { deal: { public_code: code } }, orderBy: { id: "asc" } })).map((e) => ({ ...e, payload: openPayload(e.deal_id, e.payload) }));
+export const dealRow = async (code: string) =>
+  openDealRow(await prisma.deal.findUniqueOrThrow({ where: { public_code: code }, include: { payment: true, payouts: true, conditions: { orderBy: { position: "asc" } } } }));
 
 /** Asserts the promise rejects with a DealError of the given code; returns it for message checks. */
 export function expectError(promise: Promise<unknown>, code: string): Promise<DealError> {
@@ -166,6 +203,7 @@ export const C6: Record<string, EventActor[]> = {
   "fact:authorization_created": ["paypal"], "fact:late_authorization_voided": ["paypal"], "fact:capture_completed": ["paypal"],
   "fact:capture_pending": ["paypal"], "fact:capture_declined": ["paypal"], "fact:authorization_voided": ["paypal"],
   "fact:payout_succeeded": ["paypal"], "fact:payout_failed": ["paypal"],
+  "contract:verification_failed": ["system"], // trust spec §7
 };
 
 /** afterEach: every cause written by the test is a C6 string with a C6 actor, and the per-deal chain is unbroken (06 "Audit log"). */

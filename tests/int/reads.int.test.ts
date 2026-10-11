@@ -3,10 +3,11 @@ import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { addFile, createDeal, getDeal, getEvents, getEvidencePack, handle, listDeals } from "@/lib/deal";
 import { toIso } from "@/lib/deal/dates";
+import { openFile } from "@/lib/deal/sealed";
 import type { DealView } from "@/lib/deal/types";
 import { MAX_FILE_BYTES } from "@/lib/files/validate";
 import { verifyFileUrl } from "@/lib/files/urls";
-import { assertEventsInC6, dealBuilder, events, expectError, parties, resetDb, testDeps, type Parties, type TestDeps } from "./helpers";
+import { assertEventsInC6, dealBuilder, events, expectError, parties, resetDb, testDeps, type Parties, type TestDeps, signedAccept } from "./helpers";
 
 let deps: TestDeps;
 let p: Parties;
@@ -38,8 +39,8 @@ describe("read", () => {
     const draft = await build.draft();
     await addFile(draft, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg() }, deps);
     await handle(draft, p.asSeller, { type: "join" }, deps);
-    await handle(draft, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-    await handle(draft, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(draft, p.asSeller, await signedAccept(draft, p.asSeller, 1), deps);
+    await handle(draft, p.asBuyer, await signedAccept(draft, p.asBuyer, 1), deps);
     const v0 = await handle(draft, p.asBuyer, { type: "start_payment" }, deps);
     await handle(draft, p.asBuyer, { type: "confirm_approval", order_id: v0.payment!.paypal_order_id }, deps);
 
@@ -103,13 +104,15 @@ describe("evidence pack", () => {
     const code = await build.draft();
     await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/png", bytes: png() }, deps);
     await handle(code, p.asSeller, { type: "join" }, deps);
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     const v = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
     await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v.payment!.paypal_order_id }, deps);
 
     const pack = await getEvidencePack(code, p.asSeller, deps);
-    expect(Object.keys(pack).sort()).toEqual(["conditions", "deal", "events", "extraction", "format", "generated_at", "generated_for", "parties", "payment", "payouts", "reference_files", "submissions", "webhook_events"].sort());
+    expect(Object.keys(pack).sort()).toEqual(["conditions", "contract", "deal", "events", "extraction", "format", "generated_at", "generated_for", "parties", "payment", "payouts", "reference_files", "signature_history", "submissions", "webhook_events"].sort());
+    expect(pack.contract?.signatures.map((x) => x.role).sort()).toEqual(["buyer", "seller"]); // trust spec §6
+    expect(pack.signature_history).toHaveLength(2);
     expect(pack).toMatchObject({
       format: "handshake-evidence-pack/1", generated_at: toIso(deps.clock.now()), generated_for: "seller",
       deal: { code, status: "held", terms_version: 1, seeded: false },
@@ -149,7 +152,7 @@ describe("access rules (F4, H2)", () => {
   });
   test("a preview reader may only join; every other command is 403", async () => {
     const code = await build.draft();
-    await expectError(handle(code, p.asThird, { type: "accept", terms_version: 1 }, deps), "not_a_party");
+    await expectError(handle(code, p.asThird, await signedAccept(code, p.asThird, 1), deps), "not_a_party");
     await expectError(handle(code, p.asThird, { type: "cancel" }, deps), "not_a_party");
     await expectError(getEvents(code, p.asThird, deps), "not_a_party");
     await expectError(getEvidencePack(code, p.asThird, deps), "not_a_party");
@@ -182,7 +185,7 @@ describe("addFile", () => {
     expect(urlOk(ref.url)).toBe(true);
     const row = await deps.db.file.findUniqueOrThrow({ where: { id: ref.id }, omit: { bytes: false } });
     expect(row).toMatchObject({ mime: "image/webp", size_bytes: 100, sha256: ref.sha256, uploaded_by: p.buyer.id });
-    expect(Buffer.from(row.bytes).equals(Buffer.from(webp()))).toBe(true);
+    expect(Buffer.from(openFile(row.deal_id, row.bytes)).equals(Buffer.from(webp()))).toBe(true);
     expect(await events(code)).toHaveLength(n);
 
     for (let i = 1; i <= 3; i++) await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg(100, i) }, deps);
@@ -200,10 +203,10 @@ describe("addFile", () => {
   });
   test("reference only in draft before the seller accepted; evidence only in held before the deadline; 7th evidence -> too_many_files", async () => {
     const code = await build.joined();
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
     const e = await expectError(addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg() }, deps), "invalid_state");
     expect(e.message).toBe("Edit the terms before adding photos.");
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     await expectError(addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes: jpeg() }, deps), "invalid_state");
     await expectError(addFile(code, p.asSeller, { purpose: "evidence", mime: "image/jpeg", bytes: jpeg() }, deps), "invalid_state");
 

@@ -26,7 +26,8 @@ export const personaOf = (email: string): Persona | null =>
 export async function signInDemoPersona(persona: Persona, db: PrismaClient, now = new Date()): Promise<string> {
   if (!demoOn()) throw new DealError("invalid_input", "Demo login is disabled.");
   const { email, display_name } = PERSONAS[persona];
-  const data = persona === "seller" ? { display_name, paypal_email: process.env.DEMO_SELLER_PAYPAL_EMAIL || null } : { display_name };
+  const pp = process.env.DEMO_SELLER_PAYPAL_EMAIL || null; // the sandbox seller account: verified by configuration (trust spec §8)
+  const data = persona === "seller" ? { display_name, paypal_email: pp, paypal_email_verified_at: pp ? now : null, paypal_email_code_hash: null } : { display_name };
   const user = await db.user.upsert({ where: { email }, create: { email, ...data }, update: data, select: { id: true, totp_enabled_at: true } });
   if (!user.totp_enabled_at) {
     await db.user.update({

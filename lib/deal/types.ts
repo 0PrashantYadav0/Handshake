@@ -10,6 +10,17 @@ export type { PayPal } from "@/lib/paypal/types";
 export { PayPalError } from "@/lib/paypal/types";
 export type { Email } from "@/lib/email/types";
 export type { Clock } from "@/lib/clock";
+import type { PublicKey } from "@/lib/contract/signature";
+import type { ContractDoc } from "@/lib/contract/canonical";
+export type { PublicKey } from "@/lib/contract/signature";
+export type { ContractDoc } from "@/lib/contract/canonical";
+
+/** trust spec §6: what a party sees and signs, and who has signed this version. */
+export type ContractSignatureView = {
+  role: Role; terms_version: number; contract_hash: string; signature: string; signed_at: string;
+  key_fingerprint: string; public_key: PublicKey;
+};
+export type ContractView = { document: ContractDoc; hash: string; signatures: ContractSignatureView[] };
 
 export type DealStatus =
   | "draft" | "terms_agreed" | "held" | "proof_submitted"
@@ -37,7 +48,7 @@ export type ConditionInput = { text: string; evidence_type: EvidenceType };
 export type Command =
   | { type: "edit_terms"; item_title: string; amount_minor: number | null; deadline_days: number | null; conditions: ConditionInput[] }
   | { type: "join" }
-  | { type: "accept"; terms_version: number }
+  | { type: "accept"; terms_version: number; contract_hash: string; signature: string; public_key: PublicKey; key_label?: string | null } // trust spec §6: accepting is signing
   | { type: "start_payment" }
   | { type: "confirm_approval"; order_id: string }
   | { type: "submit_evidence"; file_ids: string[]; tracking_number: string | null; note: string | null }
@@ -64,6 +75,7 @@ export type PaypalWebhookEvent = {
 export type TickReport = {
   voided: string[]; // deal codes voided for a passed deadline
   verdicts_rerun: string[]; // deal codes whose verdict step was finished
+  reconciled: string[]; // deal codes where a PayPal fact was applied by reconcile() (E12), once per fact
   errors: { code: string; message: string }[];
 };
 
@@ -149,12 +161,13 @@ export type DealView = {
   seller_accepted_version: number | null;
   fix_attempts_used: 0 | 1;
   buyer: Party;
-  seller: (Party & { has_paypal_email: boolean; paypal_email: string | null }) | null; // paypal_email only when role = "seller"
+  seller: (Party & { has_paypal_email: boolean; payout_email_verified: boolean; paypal_email: string | null }) | null; // paypal_email only when role = "seller"
   conditions: Condition[];
   reference_files: FileRef[];
   submissions: Submission[];
   payment: Payment | null;
   payouts: Payout[]; // ascending by attempt
+  contract: ContractView | null; // null until the seller has joined and the amount and deadline are set
   seeded: boolean;
   created_at: string;
   updated_at: string;
@@ -211,4 +224,7 @@ export type EvidencePack = {
   events: DealEvent[];
   webhook_events: { paypal_event_id: string; event_type: string; verified: boolean; processed_at: string | null; created_at: string }[];
   extraction: { model: string; prompt_version: string; rejected: { text: string; suggestion: string }[] } | null;
+  /** trust spec §6: the current contract with its signatures, and every signature ever made on this deal (all versions). */
+  contract: ContractView | null;
+  signature_history: ContractSignatureView[];
 };

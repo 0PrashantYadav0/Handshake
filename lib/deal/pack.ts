@@ -2,7 +2,7 @@
 import { loadDeal, requireRole } from "./access";
 import { toIso } from "./dates";
 import type { Actor, Deps, EvidencePack } from "./types";
-import { buildDealView, buildSubmissions, toCondition, toEvent, toPayment, toPayout } from "./views";
+import { buildContractView, buildDealView, buildSubmissions, toCondition, toEvent, toPayment, toPayout, toSignature } from "./views";
 
 const DEAL_KEYS = [
   "code", "status", "item_title", "source_text", "amount_minor", "currency", "deadline_days", "deadline_at", "terms_version",
@@ -44,5 +44,7 @@ export async function getEvidencePack(code: string, actor: Actor, deps: Deps): P
     extraction: cp && !deal.seeded
       ? { model: String(cp.model), prompt_version: String(cp.prompt_version), rejected: (cp.rejected as { text: string; suggestion: string }[] | undefined) ?? [] }
       : null,
+    contract: buildContractView(deal),
+    signature_history: deal.signatures.map(toSignature),
   };
 }

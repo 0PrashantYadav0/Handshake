@@ -1050,6 +1050,7 @@ Response:
 type TickReport = {                                   // 02 section 3.1, verbatim
   voided: string[];                                   // deal codes voided for a passed deadline
   verdicts_rerun: string[];                           // deal codes whose verdict step was finished
+  reconciled: string[];                               // deal codes where a late or lost webhook's fact was applied (decisions E12)
   errors: { code: string; message: string }[];        // per-deal failures; the run continues past them
 };
 ```
@@ -1060,7 +1061,8 @@ Side effects (decisions B7, C2, C5), each deal in its own transaction, seeded de
 
 1. Every deal with status `held` or `in_review` and `deadline_at < now`: void call with key `void-{code}` (`PREVIOUSLY_VOIDED` is success), `status = voided`, `payments.status = voided`, event `tick:deadline` (actor `system`, payload `{ deadline_at, authorization_id }`), then fact `authorization_voided` with `source: "api"`. No email (02 section 5.6). Voiding in `in_review` is deliberate: no passing proof by the deadline (FR-10).
 2. Every deal with status `proof_submitted` and `updated_at < now - 2 minutes`: event `tick:reverify` (actor `system`, `proof_submitted` to `proof_submitted`, payload `{ submission_no }`; decisions C6), then 9.1 from step 2 on the latest submission, with one rule: when `verdicts` rows exist for the current `submission_no`, steps 2 to 5 are skipped and `judge()` is not called; `decide()` runs on the stored rows and the PayPal call re-sends the same key (02 sections 5.7 and 6.9). The model is called only when no rows exist (the process died before transaction V). The capture key `capture-{code}-{n}` is unchanged, so a capture that did succeed before the crash is returned, not repeated; a deal that a `PAYMENT.CAPTURE.COMPLETED` webhook already moved to `captured` (11.4) is no longer `proof_submitted` and is not selected.
-3. Nothing else. There is no reauthorize job (decisions B7). `proof_submitted` deals are not deadline-voided; a capture that keeps failing is closed by PayPal's own `PAYMENT.AUTHORIZATION.VOIDED` when the 29-day authorization expires (decisions B7).
+3. Reconciliation (decisions E12; 02 section 5.7): payments `capture_pending` or `approved` with a pending authorization for over 10 minutes, and payouts `pending` with a batch id for over 30 minutes, are read back from PayPal and the fact the missing webhook would have carried is applied once (`source: "reconcile"`); the codes go in `reconciled`.
+4. Nothing else. There is no reauthorize job (decisions B7). `proof_submitted` deals are not deadline-voided; a capture that keeps failing is closed by PayPal's own `PAYMENT.AUTHORIZATION.VOIDED` when the 29-day authorization expires (decisions B7).
 
 The endpoint is idempotent: a second call in the same minute finds nothing to do and returns empty lists.
 
@@ -1176,7 +1178,7 @@ Side effects: one to four Claude calls per turn; nothing is stored.
 | `fact:payout_succeeded` | paypal | captured to paid; paid to paid for an earlier attempt | `payout_item_id`, `payout_batch_id`, `sender_item_id`, `attempt` |
 | `fact:payout_failed` | paypal | captured to captured | `payout_item_id`, `payout_batch_id`, `sender_item_id`, `attempt`, `failure_reason` |
 
-This is the `cause` vocabulary of decisions C6, verbatim and complete; `reason` on `decision:*` is the `DecisionReason` of section 3. Every `fact:*` payload also carries `source` (`"api"` when the fact came from a PayPal API response inside one of our requests, `"webhook"` when it came from `POST /api/webhooks/paypal`) and either `paypal_request_id` (source `api`) or `paypal_event_id` (source `webhook`). Tests detect which source won a race by `payload.source`, never by `cause`. The identity used to apply a fact once is the pair (fact name, PayPal resource id); a second arrival with the same pair writes nothing.
+This is the `cause` vocabulary of decisions C6, verbatim and complete; `reason` on `decision:*` is the `DecisionReason` of section 3. Every `fact:*` payload also carries `source` (`"api"` when the fact came from a PayPal API response inside one of our requests, `"webhook"` when it came from `POST /api/webhooks/paypal`, `"reconcile"` when `tick` read it back from PayPal, with no id) and either `paypal_request_id` (source `api`) or `paypal_event_id` (source `webhook`). Tests detect which source won a race by `payload.source`, never by `cause`. The identity used to apply a fact once is the pair (fact name, PayPal resource id); a second arrival with the same pair writes nothing.
 
 Emails sent by this API, owned by [02-system-design.md](02-system-design.md) section 5.6 and `lib/deal/notify.ts`: the magic link (4.1) plus the two notices below (decisions C2, FR-32), sent through the `email` dep after the transaction commits; a send failure is logged and changes nothing. This is the complete list. No other endpoint sends email: nothing on `held`, `request_fix`, `voided` (any cause), `paid` or `payout_failed` (02 Assumption 16).
 

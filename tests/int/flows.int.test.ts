@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { addFile, applyPaypalEvent, getEvidencePack, handle, tick } from "@/lib/deal";
 import { captureKey, payoutBatchId, voidKey } from "@/lib/deal/keys";
-import { assertEventsInC6, dealBuilder, dealRow, events, expectError, makeJpeg, parties, resetDb, testDeps, webhookEvent, type Parties, type TestDeps } from "./helpers";
+import { assertEventsInC6, dealBuilder, dealRow, events, expectError, makeJpeg, parties, resetDb, testDeps, webhookEvent, type Parties, type TestDeps, signedAccept } from "./helpers";
 
 let deps: TestDeps;
 let p: Parties;
@@ -30,8 +30,8 @@ describe("SB-1 happy path", () => {
     for (const bytes of refs) await addFile(code, p.asBuyer, { purpose: "reference", mime: "image/jpeg", bytes }, deps);
     await deps.db.user.update({ where: { id: p.seller.id }, data: { paypal_email: "seller-pp@test" } }); // PATCH /api/me: no event
     await handle(code, p.asSeller, { type: "join" }, deps);
-    await handle(code, p.asSeller, { type: "accept", terms_version: 1 }, deps);
-    await handle(code, p.asBuyer, { type: "accept", terms_version: 1 }, deps);
+    await handle(code, p.asSeller, await signedAccept(code, p.asSeller, 1), deps);
+    await handle(code, p.asBuyer, await signedAccept(code, p.asBuyer, 1), deps);
     const v0 = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
     await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v0.payment!.paypal_order_id }, deps);
     const v = await build.submit(code);
@@ -86,7 +86,7 @@ describe("SB-2 wrong item, no fix", () => {
 
     deps.clock.set("2026-10-27T10:00:01Z");
     const report = await tick(deps.clock.now(), deps);
-    expect(report).toEqual({ voided: [code], verdicts_rerun: [], errors: [] });
+    expect(report).toEqual({ voided: [code], verdicts_rerun: [], reconciled: [], errors: [] });
     expect(calls("voidAuthorization")).toEqual([{ op: "voidAuthorization", requestId: voidKey(code), args: { authorization_id: "AUTH-1" } }]);
     expect(await dealRow(code)).toMatchObject({ status: "voided", payment: { status: "voided" } });
     const tail = (await events(code)).slice(-2);

@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { applyPaypalEvent, tick } from "@/lib/deal";
 import { captureKey, voidKey } from "@/lib/deal/keys";
+import { sealPayload, sealText } from "@/lib/deal/sealed";
 import { assertEventsInC6, dealBuilder, dealRow, events, expectError, parties, resetDb, testDeps, TRACKING, webhookEvent, type Parties, type TestDeps } from "./helpers";
 
 let deps: TestDeps;
@@ -42,12 +43,12 @@ async function diedBeforeJudging(): Promise<string> {
   await deps.db.evidence.createMany({
     data: [
       ...ids.map((file_id, i) => ({ deal_id: d.id, submission_no: 1, kind: "photo" as const, position: i + 1, file_id, uploaded_by: p.seller.id })),
-      { deal_id: d.id, submission_no: 1, kind: "tracking" as const, position: 0, value: TRACKING, uploaded_by: p.seller.id },
+      { deal_id: d.id, submission_no: 1, kind: "tracking" as const, position: 0, value: sealText("evidence.value", d.id, TRACKING), uploaded_by: p.seller.id },
     ],
   });
   await deps.db.deal.update({ where: { id: d.id }, data: { status: "proof_submitted" } });
   await deps.db.dealEvent.create({
-    data: { deal_id: d.id, from_status: "held", to_status: "proof_submitted", actor: "seller", cause: "submit_evidence", payload: { submission_no: 1, file_ids: ids, tracking_number: TRACKING, carrier_status: "delivered" } },
+    data: { deal_id: d.id, from_status: "held", to_status: "proof_submitted", actor: "seller", cause: "submit_evidence", payload: sealPayload(d.id, { submission_no: 1, file_ids: ids, tracking_number: TRACKING, carrier_status: "delivered" }) },
   });
   return code;
 }
@@ -78,18 +79,18 @@ describe("tick", () => {
     expect((await dealRow(fresh)).status).toBe("held");
 
     const r2 = await run();
-    expect(r2).toEqual({ voided: [failedCode], verdicts_rerun: [], errors: [] });
+    expect(r2).toEqual({ voided: [failedCode], verdicts_rerun: [], reconciled: [], errors: [] });
     expect(calls("voidAuthorization").map((c) => c.requestId).sort()).toEqual([voidKey(a), voidKey(b), voidKey(failedCode)].sort());
     expect(deps.email.sent).toHaveLength(sentBefore);
 
-    expect(await run()).toEqual({ voided: [], verdicts_rerun: [], errors: [] });
+    expect(await run()).toEqual({ voided: [], verdicts_rerun: [], reconciled: [], errors: [] });
   });
 
   test("a deadline void refused as already captured takes the C4 path and is not reported as voided", async () => {
     const code = await build.held();
     deps.clock.set(PAST);
     deps.paypal.failNext("voidAuthorization", { status: 422, name: "AUTHORIZATION_ALREADY_CAPTURED" });
-    expect(await run()).toEqual({ voided: [], verdicts_rerun: [], errors: [] });
+    expect(await run()).toEqual({ voided: [], verdicts_rerun: [], reconciled: [], errors: [] });
     expect(calls("captureAuthorization").map((c) => c.requestId)).toEqual([captureKey(code, 0)]);
     expect(await dealRow(code)).toMatchObject({ status: "held", payment: { status: "captured", capture_id: "CAP-1" } });
   });
@@ -107,7 +108,7 @@ describe("SB-8 capture requested twice with one key", () => {
     deps.clock.advance(121_000);
     await stuckFor(code, 121_000);
     const report = await run();
-    expect(report).toEqual({ voided: [], verdicts_rerun: [code], errors: [] });
+    expect(report).toEqual({ voided: [], verdicts_rerun: [code], reconciled: [], errors: [] });
     expect(judgeCalls()).toBe(1);
     expect(calls("captureAuthorization").map((c) => c.requestId)).toEqual([captureKey(code, 0), captureKey(code, 0)]);
     expect(deps.paypal.captures.size).toBe(1);
@@ -167,7 +168,7 @@ describe("Server death during the verdict", () => {
     const capId = calls("captureAuthorization").length; // CAP-n for the n-th capture in this test
     expect((await applyPaypalEvent(webhookEvent("PAYMENT.CAPTURE.COMPLETED", { id: `CAP-${capId}`, custom_id: late }), deps)).outcome).toBe("applied");
     expect((await dealRow(late)).status).toBe("captured");
-    expect(await run()).toEqual({ voided: [], verdicts_rerun: [], errors: [] });
+    expect(await run()).toEqual({ voided: [], verdicts_rerun: [], reconciled: [], errors: [] });
     expect((await causes(late)).filter((c) => c.startsWith("decision:"))).toEqual([]);
   });
 });

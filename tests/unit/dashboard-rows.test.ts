@@ -14,7 +14,7 @@ const view = (over: Partial<DealView> = {}): DealView => ({
   deadline_at: null, terms_version: 1, buyer_accepted_version: 1, seller_accepted_version: 1, fix_attempts_used: 0,
   buyer: { display_name: null, email: "b@test" }, seller: null,
   conditions: [{ id: "c2", position: 2, text: "Code photo", evidence_type: "photo", system: true }, { id: "c1", position: 1, text: "Matches photos", evidence_type: "photo", system: false }],
-  reference_files: [], submissions: [], payment: null, payouts: [], seeded: false,
+  reference_files: [], submissions: [], payment: null, payouts: [], contract: null, seeded: false,
   created_at: "2026-10-20T10:00:00.000Z", updated_at: "2026-10-20T10:00:00.000Z", ...over,
 });
 const ev = (cause: string, created_at: string): DealEvent => ({ id: "1", from_status: null, to_status: "held", actor: "system", cause, payload: {}, created_at });

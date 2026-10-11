@@ -13,6 +13,7 @@
     "test:int": "vitest run --project int --no-file-parallelism",
     "test:e2e": "playwright test",
     "seed": "tsx prisma/seed.ts",
+    "reseal": "tsx scripts/reseal.ts",
     "eval": "tsx eval/run.ts",
     "sandbox": "tsx scripts/sandbox/scenario.ts",
     "demo:placeholders": "tsx scripts/demo/make-placeholders.ts"

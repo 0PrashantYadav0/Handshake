@@ -21,8 +21,10 @@ import { POST as retry } from "@/app/api/deals/[code]/payout/retry/route";
 import { GET as eventsRoute } from "@/app/api/deals/[code]/events/route";
 import { GET as pack } from "@/app/api/deals/[code]/evidence-pack/route";
 import { GET as download } from "@/app/api/files/[id]/route";
-import { callRoute, dealBuilder, events, makeJpeg, parties, resetDb, signIn, testDeps, TRACKING, type Parties, type TestDeps } from "./helpers";
+import { callRoute, dealBuilder, enrollTotp, events, makeJpeg, parties, resetDb, signedAccept, signIn, testDeps, TRACKING, type Parties, type TestDeps } from "./helpers";
+import { totpAt } from "@/lib/auth/totp";
 
+const withoutType = <T extends { type: string }>({ type: _type, ...rest }: T) => (void _type, rest);
 let deps: TestDeps;
 let p: Parties;
 let build: ReturnType<typeof dealBuilder>;
@@ -168,10 +170,17 @@ describe("one per command, through the routes", () => {
     expect(joined.status).toBe(200);
     expect((await joined.json()).role).toBe("seller");
 
-    const s = await call(accept, "POST", code, "/accept", { cookie: seller, body: { terms_version: 1 } });
+    // trust spec §6: the body is the signed accept plus a fresh authenticator code
+    const [sSecret, bSecret] = [await enrollTotp(p.seller.id), await enrollTotp(p.buyer.id)];
+    const body = async (who: typeof p.asSeller, secret: string) => {
+      const signed = withoutType(await signedAccept(code, who, 1));
+      return { ...signed, totp: totpAt(secret, deps.clock.now().getTime()) };
+    };
+    const s = await call(accept, "POST", code, "/accept", { cookie: seller, body: await body(p.asSeller, sSecret) });
     expect(await s.json()).toMatchObject({ status: "draft", seller_accepted_version: 1 });
-    const b = await call(accept, "POST", code, "/accept", { cookie: buyer, body: { terms_version: 1 } });
+    const b = await call(accept, "POST", code, "/accept", { cookie: buyer, body: await body(p.asBuyer, bSecret) });
     expect(await b.json()).toMatchObject({ status: "terms_agreed", buyer_accepted_version: 1 });
+    expect((await call(read, "GET", code, "", { cookie: buyer }).then((r) => r.json())).contract.signatures).toHaveLength(2);
 
     const pay = await call(payment, "POST", code, "/payment", { cookie: buyer });
     expect(pay.status).toBe(200);

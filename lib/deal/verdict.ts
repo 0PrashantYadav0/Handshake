@@ -1,7 +1,7 @@
 // The verdict step (02 section 5.8; 04 section 9.1 steps 2 to 9; 05 sections 4.1, 6.1): JudgeInput from the rows, the D8 hash check,
 // one model call at most per submission (Tx V), then decide() and the decision's transaction (Tx B). Re-entrant: tick() calls it again
-// after a crash or a PayPal failure and it never re-judges a submission that has verdict rows.
-import type { Prisma } from "@/generated/prisma/client";
+// after a crash or a PayPal failure and it never re-judges a submission that has verdict rows. Photo bytes are opened here,
+// verdict reason and raw_response sealed on write (trust spec §5).
 import { GUARDRAIL_VERSION, type ImgMime, type JudgeInput, type JudgeOutput, type JudgePhoto, type Verdict } from "@/lib/ai/types";
 import { carrierStatus } from "@/lib/carrier";
 import { DEAL_INCLUDE, type Db, type DealRow } from "./access";
@@ -10,6 +10,7 @@ import { DealError } from "./errors";
 import { afterCommit, applyFactTx, captureHold, lockAndLoad, voidHold } from "./facts-db";
 import { voidKey } from "./keys";
 import { notifyBuyerReview } from "./notify";
+import { openDealRow, openFile, openVerdict, sealRaw, sealText } from "./sealed";
 import { transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import type { Deps } from "./types";
 
@@ -53,7 +54,7 @@ export async function buildJudgeInput(deal: DealRow, submission_no: 1 | 2, db: D
   const filesById = new Map(deal.files.map((f) => [f.id, f]));
   const evidence = ev.filter((e) => e.kind === "photo").flatMap((e) => (e.file_id && filesById.has(e.file_id) ? [filesById.get(e.file_id)!] : []));
   const ids = [...refs, ...evidence].map((f) => f.id);
-  const bytes = new Map((await db.file.findMany({ where: { id: { in: ids } }, select: { id: true, bytes: true } })).map((f) => [f.id, f.bytes]));
+  const bytes = new Map((await db.file.findMany({ where: { id: { in: ids } }, select: { id: true, bytes: true } })).map((f) => [f.id, openFile(deal.id, f.bytes)]));
   const photo = (f: DealRow["files"][number]): JudgePhoto => ({ id: f.id, mime: f.mime as ImgMime, sha256: f.sha256, bytes: bytes.get(f.id)! });
   const tracking_number = ev.find((e) => e.kind === "tracking")?.value ?? null;
   return {
@@ -73,7 +74,7 @@ export async function buildJudgeInput(deal: DealRow, submission_no: 1 | 2, db: D
 
 /** 02 section 5.8. Throws paypal_error when the decision's PayPal call fails: the verdict rows stay and the deal stays proof_submitted. */
 export async function runVerdict(code: string, deps: Deps): Promise<void> {
-  const deal = await deps.db.deal.findUniqueOrThrow({ where: { public_code: code }, include: DEAL_INCLUDE });
+  const deal = openDealRow(await deps.db.deal.findUniqueOrThrow({ where: { public_code: code }, include: DEAL_INCLUDE }));
   if (deal.status !== "proof_submitted") throw new DealError("invalid_state", "No verdict is pending on this deal.");
   const no = currentSubmissionNo(deal);
   let rows = deal.verdicts.filter((v) => v.submission_no === no);
@@ -87,15 +88,15 @@ export async function runVerdict(code: string, deps: Deps): Promise<void> {
       if (existing.length > 0) return existing; // another runner stored its rows first: never two judgements of one submission
       await tx.verdict.createMany({
         data: out.verdicts.map((v) => ({
-          deal_id: d.id, condition_id: v.condition_id, submission_no: no, result: v.result, confidence: v.confidence, reason: v.reason,
-          evidence_used: v.evidence_used, model: out.model, prompt_version: out.prompt_version, raw_response: out.raw_response as unknown as Prisma.InputJsonObject,
+          deal_id: d.id, condition_id: v.condition_id, submission_no: no, result: v.result, confidence: v.confidence, reason: sealText("verdicts.reason", d.id, v.reason),
+          evidence_used: v.evidence_used, model: out.model, prompt_version: out.prompt_version, raw_response: sealRaw(d.id, out.raw_response),
         })),
       });
       await writeEvent(tx, d, "ai", "verdict", {
         submission_no: no, model: out.model, prompt_version: out.prompt_version, labels,
         verdicts: out.verdicts.map(({ condition_id, result, confidence }) => ({ condition_id, result, confidence })),
       });
-      return tx.verdict.findMany({ where: { deal_id: d.id, submission_no: no } });
+      return (await tx.verdict.findMany({ where: { deal_id: d.id, submission_no: no } })).map((v) => openVerdict(d.id, v));
     });
   }
   const { decision, reason } = decide(rows, { amount_minor: deal.amount_minor!, fix_attempts_used: deal.fix_attempts_used, conditions: deal.conditions }, getLimits());

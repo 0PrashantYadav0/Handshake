@@ -1,11 +1,12 @@
 // loadDeal(): the deal with everything a view or command needs, plus the caller's role (02 section 9.2; F4).
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { DealError } from "./errors";
+import { openDealRow } from "./sealed";
 import type { Actor, Role } from "./types";
 
 export type Db = PrismaClient | Prisma.TransactionClient;
 
-/** 03 "Evidence pack assembly" steps 1 to 7 (files without bytes: the global omit in lib/db.ts). */
+/** 03 "Evidence pack assembly" steps 1 to 7 (files without bytes: the global omit in lib/db.ts). Every load goes through openDealRow (trust §5). */
 export const DEAL_INCLUDE = {
   buyer: true,
   seller: true,
@@ -16,14 +17,16 @@ export const DEAL_INCLUDE = {
   payment: true,
   payouts: { orderBy: { attempt: "asc" } },
   events: { orderBy: { id: "asc" } },
+  signatures: { include: { key: true }, orderBy: [{ signed_at: "asc" }, { id: "asc" }] }, // trust spec §6
 } satisfies Prisma.DealInclude;
 
 export type DealRow = Prisma.DealGetPayload<{ include: typeof DEAL_INCLUDE }>;
 export type Loaded = { deal: DealRow; role: Role | "preview" };
 
 export async function loadDeal(db: Db, code: string, actor: Actor): Promise<Loaded> {
-  const deal = await db.deal.findUnique({ where: { public_code: code }, include: DEAL_INCLUDE });
-  if (!deal) throw new DealError("deal_not_found");
+  const row = await db.deal.findUnique({ where: { public_code: code }, include: DEAL_INCLUDE });
+  if (!row) throw new DealError("deal_not_found");
+  const deal = openDealRow(row);
   if (deal.buyer_id === actor.user_id) return { deal, role: "buyer" };
   if (deal.seller_id === actor.user_id) return { deal, role: "seller" };
   if (deal.status === "draft" && deal.seller_id === null) return { deal, role: "preview" };

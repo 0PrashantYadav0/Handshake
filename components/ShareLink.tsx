@@ -53,9 +53,9 @@ export function ShareLink({ deal }: { deal: DealView }) {
         <CopyButton text={url} label="Copy link" />
         <ShareButton url={url} title={`Handshake deal ${deal.code}: ${deal.item_title}`} />
       </div>
-      <p className="mt-5 text-sm">You accepted version {deal.terms_version}.</p>
+      <p className="mt-5 text-sm">Version {deal.terms_version} is ready to sign.</p>
       <p className="hs-help mt-1">
-        The seller signs in, adds their PayPal email and accepts. Then you approve the hold with PayPal on the deal page.
+        The seller opens the link, joins, confirms their PayPal email and signs. You sign on the deal page too, then approve the hold with PayPal.
       </p>
       <div className="mt-6 flex items-center gap-4">
         <Link href={`/deal/${deal.code}`} className="hs-btn">Open deal page</Link>
