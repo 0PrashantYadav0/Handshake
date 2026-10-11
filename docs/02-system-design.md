@@ -276,8 +276,8 @@ export class PayPalError extends Error {
 
 Where `PayPalError`'s fields come from:
 
-- SDK calls throw `ApiError` (research/paypal.md "7. `@paypal/paypal-server-sdk`"): `status = e.statusCode`; `body = e.body` is the raw response text, "JSON with name/details[].issue", so the adapter does `JSON.parse` inside a try; `name_ = body.name ?? null`; `debug_id = body.debug_id ?? null`. The research documents `.result` and `.headers` on `ApiResponse`, not on `ApiError`; whether `ApiError` carries them too is UNVERIFIED, so the adapter reads the body and falls back to `null`.
-- Raw `fetch` calls (Payouts, cancel) read `name` and `debug_id` from the JSON body, falling back to the `paypal-debug-id` response header.
+- SDK calls throw `ApiError` (research/paypal.md "7. `@paypal/paypal-server-sdk`"): `status = e.statusCode`; `body = e.body` is the raw response text, "JSON with name/details[].issue", so the adapter does `JSON.parse` inside a try; `name_ = body.details?.[0]?.issue ?? body.name ?? null` (on the real wire `name` is the generic `UNPROCESSABLE_ENTITY` and the useful code, `PREVIOUSLY_VOIDED` or `AUTHORIZATION_VOIDED`, sits in `details[0].issue`, so the issue wins; `errorName` in `lib/paypal/index.ts`); `debug_id = body.debug_id ?? null`. The research documents `.result` and `.headers` on `ApiResponse`, not on `ApiError`; whether `ApiError` carries them too is UNVERIFIED, so the adapter reads the body and falls back to `null`.
+- Raw `fetch` calls (Payouts, cancel) read `name_` the same way and `debug_id` from the JSON body, falling back to the `paypal-debug-id` response header.
 - A timeout (SDK `timeout: 10_000`, `AbortSignal.timeout(10_000)` on fetch) becomes `PayPalError(0, "timeout", null, null)`.
 
 The AI dependency is defined by [05-ai-spec.md](05-ai-spec.md) and is reproduced here verbatim from its sections 1, 2.2, 3.1, 3.6, 4.1, 4.7 and 6.1 so that `lib/deal/verdict.ts` and `lib/deal/commands.ts` compile against `lib/ai` as written there:
@@ -837,14 +837,14 @@ Transaction names used below: **Tx A** (evidence stored, `held -> proof_submitte
 ### 6.4 The buyer rejects (SB-5)
 
 1. As 6.3 steps 1 and 2.
-2. `POST /api/deals/{code}/review { decision: "reject" }` -> `review`: `paypal.voidAuthorization(authorization_id, "void-{code}")` (204; `PREVIOUSLY_VOIDED` counts as success); Tx: `payments.status = voided`, `in_review -> voided`, event `review:reject` with payload `{ note, authorization_id }`, then `applyFact(authorization_voided, source api)`. Answer `200`. No email.
-3. `PAYMENT.AUTHORIZATION.VOIDED` arrives: `noop`.
+2. `POST /api/deals/{code}/review { decision: "reject" }` -> `review`: `paypal.voidAuthorization(authorization_id, "void-{code}")` (204; `PREVIOUSLY_VOIDED` counts as success); Tx: `payments.status = voided`, `in_review -> voided`, event `review:reject` with payload `{ note, authorization_id }`, then `applyFact(authorization_voided, source api)`. Answer `200`. No email. As built, that `applyFact` runs after the transition inside the same Tx, so the log holds two rows: `in_review -> voided` cause `review:reject`, then `voided -> voided` cause `fact:authorization_voided` with `{ source: "api", paypal_request_id: "void-{code}" }`.
+3. `PAYMENT.AUTHORIZATION.VOIDED` arrives: `noop` (`payments.status` is already `voided`).
 
 ### 6.5 Cancel with a hold (SB-11)
 
 1. Deal is `held`. Buyer (or seller) calls `POST /api/deals/{code}/cancel` -> `cancel`.
-2. `paypal.voidAuthorization(authorization_id, "void-{code}")`. A 422 that is not `PREVIOUSLY_VOIDED` means the money is captured: the C4 path in 5.3 re-sends `capture-{code}-{n}`, applies the capture fact and answers `invalid_state`.
-3. Tx: `payments.status = voided`, `held -> voided`, event `cancel` (actor buyer or seller, payload `{ authorization_id, voided: true }`), then `applyFact(authorization_voided, source api)`. Answer `200`. No email.
+2. `paypal.voidAuthorization(authorization_id, "void-{code}")`. A 422 that is not `PREVIOUSLY_VOIDED` means the money is captured: the C4 path in 5.3 re-sends `capture-{code}-{n}`, applies the capture fact and answers `invalid_state`. From `held` that fact is detail-only (`held -> held`, `payments.status = captured`): the C2 row for `capture_completed` moves only `proof_submitted` and `in_review`, so the deal stays `held` with its money captured.
+3. Tx: `payments.status = voided`, `held -> voided`, event `cancel` (actor buyer or seller, payload `{ authorization_id, voided: true }`), then `applyFact(authorization_voided, source api)`. Answer `200`. No email. As built this is two rows: `held -> voided` cause `cancel`, then `voided -> voided` cause `fact:authorization_voided` with `{ source: "api", paypal_request_id: "void-{code}" }`; the later `PAYMENT.AUTHORIZATION.VOIDED` webhook is a `noop`.
 4. From `draft` or `terms_agreed` with no stored authorization, step 2 is skipped: `status = voided`, event `cancel` with `{ authorization_id: null, voided: false }`, and `payments.status` is left as it is (`created` or `approved`; the unapproved order expires on its own). From `terms_agreed` with a `PENDING` authorization stored (7), step 2 runs: `cancel` voids whenever `authorization_id` is set. If an `authorization_created` fact arrives after a cancel without a hold (the buyer approved in a popup they had left open), 5.3 stores the ids and voids it at once with `void-{code}`, which has not been used yet; `CHECKOUT.ORDER.APPROVED` for the cancelled deal is a `noop` (5.5), so Handshake itself never authorizes a cancelled deal.
 
 ### 6.6 Deadline void (SB-2, second half)
@@ -1003,7 +1003,7 @@ The session is a signed cookie, a deal is readable only by its two parties, file
 
 - Every secret is an env var named in decisions J3; `lib/env.ts` validates them with Zod at boot and the app refuses to start without one. `SESSION_SECRET`, `FILE_URL_SECRET` and `CRON_SECRET` are `z.string().min(32)`, so an empty bearer can never match `CRON_SECRET` and sessions and file URLs cannot be forged with an empty key; `PAYPAL_WEBHOOK_ID` is `.min(1)` when `NODE_ENV` is `production`. `.env.example` lists names only.
 - The only value that reaches the browser is `NEXT_PUBLIC_PAYPAL_CLIENT_ID` (the PayPal client id is public by design). `AG_GRID_LICENSE_KEY` is validated in the browser and is not a server secret (research/ag-grid.md).
-- `lib/paypal`, `lib/ai`, `lib/auth`, `lib/db` import `server-only` so a client bundle cannot pull them in.
+- `lib/db.ts` and `lib/auth/session.ts` import `server-only`, so a client bundle cannot pull in the database or a session. As built `lib/paypal` and `lib/ai` do not, because `scripts/sandbox/spike.ts` and `eval/run.ts` run them under `tsx`, where `server-only` throws; the import-graph test (`tests/unit/boundaries.test.ts`) is what keeps them out of the wrong places.
 - `POST /api/jobs/tick` compares the bearer token with `CRON_SECRET` via `timingSafeEqual` after a length check.
 - Logs record PayPal debug ids, event ids and deal codes, never request bodies, tokens or photo bytes. `verdicts.raw_response` is stored in the database, not logged.
 
