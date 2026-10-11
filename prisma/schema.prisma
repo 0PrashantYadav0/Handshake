@@ -94,6 +94,11 @@ model User {
   email        String   @unique
   display_name String?
   paypal_email String?
+  // trust spec §4: TOTP second factor. totp_secret is sealed (lib/crypto/seal.ts); recovery_codes are SHA-256 hashes.
+  totp_secret     String?
+  totp_enabled_at DateTime? @db.Timestamptz(6)
+  totp_last_step  Int?
+  recovery_codes  String[]  @default([])
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @updatedAt @db.Timestamptz(6)
 

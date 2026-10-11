@@ -1,4 +1,4 @@
-// /ledger: first paint from listDeals on the server (08 section 4.2, section 8). Signed out -> /.
+// /ledger: first paint from listDeals on the server (08 section 4.2, section 8). Signed out -> /signin.
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -10,7 +10,7 @@ import { Ledger } from "@/components/Ledger";
 export default async function LedgerPage() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user_id = token ? await readSession(token) : null;
-  if (!user_id) redirect("/?next=/ledger");
+  if (!user_id) redirect("/signin?next=/ledger");
   const rows = await listDeals({ user_id }, getDeps());
 
   return (

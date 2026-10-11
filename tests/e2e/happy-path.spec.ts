@@ -4,11 +4,20 @@ import { approveInPopup } from "./paypal-popup";
 
 const CODE = /^HS-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/;
 const status = (page: Page) => page.getByTestId("deal-status").first();
+/** Demo persona second factor (trust spec §4): fill the published code and continue. */
+async function pass2fa(page: Page) {
+  await page.waitForURL(/\/signin\/2fa/);
+  await page.getByTestId("demo-code").click();
+  await expect(page.locator("#code")).toHaveValue(/^\d{6}$/);
+  await page.getByTestId("verify-2fa").click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+}
 
 test("judge happy path: sentence to released payment", async ({ page: buyer, browser }) => {
   // 1. Buyer persona
-  await buyer.goto("/");
+  await buyer.goto("/signin");
   await buyer.getByTestId("persona-buyer").click();
+  await pass2fa(buyer);
   await expect(buyer.locator("header")).toContainText("Demo Buyer");
 
   // 2. Preset sentence -> extracted terms -> save
@@ -33,6 +42,7 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   const seller = await sellerContext.newPage();
   await seller.goto(`/deal/${code}`);
   await seller.getByTestId("persona-seller").click();
+  await pass2fa(seller);
   await expect(seller.getByTestId("deal-code")).toHaveText(code);
   await seller.getByTestId("join").click();
   await seller.getByTestId("accept-terms").click();
