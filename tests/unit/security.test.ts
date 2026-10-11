@@ -7,7 +7,7 @@ import { buildExtractMessages, buildJudgeMessages } from "@/lib/ai/prompts";
 describe("safeNext", () => {
   it.each(["/ledger", "/deal/HS-7K2Q?x=1"])("keeps %s", (n) => expect(safeNext(n)).toBe(n));
   it.each(["//evil.com", "/\\evil.com", "/\t/evil.com", "/a b", "https://evil.com", "/x\n", ""])("rejects %j", (n) =>
-    expect(safeNext(n)).toBe("/ledger"),
+    expect(safeNext(n)).toBe("/dashboard"),
   );
 });
 
