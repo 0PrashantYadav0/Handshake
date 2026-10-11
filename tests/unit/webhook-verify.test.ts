@@ -79,9 +79,12 @@ test("the cert is fetched once for two verifications of the same url", async () 
   expect(fetchCert).toHaveBeenCalledTimes(1);
 });
 
-test("fetchCert throwing is fetch_failed, not unverified, and is not cached", async () => {
+test("fetchCert throwing is fetch_failed, not unverified; the failure is held for 60 s, then the fetch is retried", async () => {
   fetchCert.mockRejectedValueOnce(new Error("timeout"));
   await expect(verify(sign(BODY))).resolves.toEqual({ result: "fetch_failed", webhook_id: null });
+  await expect(verify(sign(BODY))).resolves.toEqual({ result: "fetch_failed", webhook_id: null }); // negative cache, no second fetch
+  expect(fetchCert).toHaveBeenCalledTimes(1);
+  clearCertCache();
   await expect(verify(sign(BODY))).resolves.toMatchObject({ result: "verified" });
 });
 

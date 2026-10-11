@@ -1,5 +1,18 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+// Security headers (T-45). No CSP yet: the PayPal JS SDK and AG Studio inject inline styles and scripts,
+// so a strict policy needs nonces; tracked in issue #45.
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
+const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
+};
 
 export default nextConfig;

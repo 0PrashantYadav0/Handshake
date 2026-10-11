@@ -13,7 +13,12 @@ export const crc32Decimal = (body: string): string => String(crc32(Buffer.from(b
 // Keyed by cert URL for the process lifetime. The real cert is an X.509 PEM; createPublicKey accepts both a
 // certificate PEM and a bare public key PEM (the unit test signs with a generated SPKI key).
 const certCache = new Map<string, KeyObject>();
-export const clearCertCache = (): void => certCache.clear();
+const failedCert = new Map<string, number>(); // url -> retry-after epoch ms; a failed fetch is not retried for 60 s
+const FAIL_TTL_MS = 60_000;
+export const clearCertCache = (): void => {
+  certCache.clear();
+  failedCert.clear();
+};
 
 const header = (headers: Record<string, string | null>, name: string): string | null =>
   Object.entries(headers).find(([k]) => k.toLowerCase() === name)?.[1] ?? null;
@@ -44,10 +49,12 @@ export async function verifyPaypalSignature(input: {
 
   let key = certCache.get(certUrl);
   if (!key) {
+    if ((failedCert.get(certUrl) ?? 0) > Date.now()) return { result: "fetch_failed", webhook_id: null };
     let pem: string;
     try {
       pem = await fetchCert(certUrl);
     } catch {
+      failedCert.set(certUrl, Date.now() + FAIL_TTL_MS);
       return { result: "fetch_failed", webhook_id: null };
     }
     try {
