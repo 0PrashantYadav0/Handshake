@@ -85,7 +85,9 @@ describe("magic link", () => {
     const token = await createMagicToken("a@test");
     const plain = await callRoute(callback, "GET", `/api/auth/callback?token=${token}`);
     expect(plain.headers.get("location")).toBe("/ledger");
-    const evil = await callRoute(callback, "GET", `/api/auth/callback?token=${token}&next=//evil.example`);
+    const reused = await callRoute(callback, "GET", `/api/auth/callback?token=${token}`);
+    expect(reused.headers.get("location")).toBe("/?error=invalid_link"); // single use
+    const evil = await callRoute(callback, "GET", `/api/auth/callback?token=${await createMagicToken("a@test")}&next=//evil.example`);
     expect(evil.headers.get("location")).toBe("/ledger");
     expect(await deps.db.user.count()).toBe(1); // upsert, not a second row
   });
