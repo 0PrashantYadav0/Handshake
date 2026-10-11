@@ -1,6 +1,6 @@
 // Fixes from the T-45 security review.
 import { describe, expect, it } from "vitest";
-import { safeNext } from "@/lib/auth/magic-link";
+import { createMagicToken, safeNext, verifyMagicToken } from "@/lib/auth/magic-link";
 import { allow } from "@/lib/rate-limit";
 import { buildExtractMessages, buildJudgeMessages } from "@/lib/ai/prompts";
 
@@ -40,5 +40,15 @@ describe("prompt delimiters", () => {
       }),
     );
     expect(judge.split("</untrusted_seller_input>").length).toBe(2); // only our own closing tag
+  });
+});
+
+describe("magic-link tokens are single use", () => {
+  it("the second verification of the same token returns null; a fresh token still works", async () => {
+    process.env.SESSION_SECRET ??= "test-secret-at-least-32-characters-long!!";
+    const t = await createMagicToken("Who@Example.com");
+    expect(await verifyMagicToken(t)).toBe("who@example.com");
+    expect(await verifyMagicToken(t)).toBeNull();
+    expect(await verifyMagicToken(await createMagicToken("who@example.com"))).toBe("who@example.com");
   });
 });

@@ -18,6 +18,7 @@ const secretFromEnv = () => {
 export async function signToken(sub: string, purpose: Purpose, ttlSec: number, secret = secretFromEnv()): Promise<string> {
   return new SignJWT({ purpose })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(crypto.randomUUID())
     .setSubject(sub)
     .setIssuedAt()
     .setExpirationTime(Math.floor(Date.now() / 1000) + ttlSec)
@@ -26,9 +27,15 @@ export async function signToken(sub: string, purpose: Purpose, ttlSec: number, s
 
 /** Returns the subject, or null when the token is invalid, expired, or for another purpose. */
 export async function readToken(token: string, purpose: Purpose, secret = secretFromEnv()): Promise<string | null> {
+  return (await readClaims(token, purpose, secret))?.sub ?? null;
+}
+
+/** Subject plus the token id and expiry, for single-use checks. */
+export async function readClaims(token: string, purpose: Purpose, secret = secretFromEnv()): Promise<{ sub: string; jti: string | null; exp: number } | null> {
   try {
     const { payload } = await jwtVerify(token, key(secret), { algorithms: ["HS256"] });
-    return payload.purpose === purpose && typeof payload.sub === "string" ? payload.sub : null;
+    if (payload.purpose !== purpose || typeof payload.sub !== "string") return null;
+    return { sub: payload.sub, jti: payload.jti ?? null, exp: payload.exp ?? 0 };
   } catch {
     return null;
   }
