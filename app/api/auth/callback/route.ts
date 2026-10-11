@@ -1,7 +1,7 @@
 // GET /api/auth/callback?token=&next= -> upserts the user, sets a partial hs_session, 302 to the second factor (trust spec §4):
 // /signin/2fa when 2FA is on, /security/setup when it is not. Bad token -> 302 /signin?error=invalid_link (04 section 4.2).
 import { safeNext, verifyMagicToken } from "@/lib/auth/magic-link";
-import { sessionCookie, signSession } from "@/lib/auth/session";
+import { issueSession } from "@/lib/auth/session-version";
 import { getDeps } from "@/lib/deps";
 import { route } from "@/lib/http";
 
@@ -15,5 +15,5 @@ export const GET = route(async (req: Request) => {
   const user = await getDeps().db.user.upsert({ where: { email }, create: { email }, update: {}, select: { id: true, totp_enabled_at: true } });
   const next = encodeURIComponent(safeNext(url.searchParams.get("next")));
   const to = user.totp_enabled_at ? `/signin/2fa?next=${next}` : `/security/setup?next=${next}`;
-  return redirect(to, sessionCookie(await signSession(user.id, false), false));
+  return redirect(to, await issueSession(user.id, false, getDeps().db));
 });

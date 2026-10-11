@@ -90,7 +90,11 @@ export async function voidHold(deal: DealRow, deps: Deps): Promise<"voided" | "c
     await deps.paypal.voidAuthorization(p.authorization_id!, voidKey(deal.public_code));
     return "voided";
   } catch (e) {
-    if (!(e instanceof PayPalError && e.status === 422 && e.name_ !== "PREVIOUSLY_VOIDED")) rethrowPaypal(e, "void");
+    // Review finding 3: only "already captured" re-sends the capture (same key, so PayPal answers with the capture that exists;
+    // a fresh key cannot capture a fully captured authorization). A voided or expired authorization already released the money.
+    // Any other refusal is an error, never a reason to capture. The payout that may follow still passes the contract gate.
+    if (e instanceof PayPalError && e.status === 422 && (e.name_ === "AUTHORIZATION_VOIDED" || e.name_ === "AUTHORIZATION_EXPIRED")) return "voided";
+    if (!(e instanceof PayPalError && e.status === 422 && e.name_ === "AUTHORIZATION_ALREADY_CAPTURED")) rethrowPaypal(e, "void");
     const key = captureKey(deal.public_code, p.capture_attempts);
     const cap = await deps.paypal.captureAuthorization(p.authorization_id!, deal.amount_minor!, key).catch(() => rethrowPaypal(e, "void")); // the re-sent capture also failed: the original void error
     const fact = captureFact(cap);

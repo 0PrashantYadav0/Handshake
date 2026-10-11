@@ -99,6 +99,11 @@ model User {
   totp_enabled_at DateTime? @db.Timestamptz(6)
   totp_last_step  Int?
   recovery_codes  String[]  @default([])
+  // Wrong second-factor codes in the current 10-minute window, counted atomically before each check (review finding 1).
+  totp_failures       Int       @default(0)
+  totp_failures_since DateTime? @db.Timestamptz(6)
+  // Bumped by "sign out everywhere"; sessions carry it and stop working when it moves on.
+  session_version     Int       @default(0)
   // trust spec §8: the payout address is proven with an emailed code before anyone can be paid there.
   paypal_email_verified_at     DateTime? @db.Timestamptz(6)
   paypal_email_code_hash       String?
@@ -133,6 +138,9 @@ model Deal {
   buyer_accepted_version  Int?
   seller_accepted_version Int?
   fix_attempts_used       Int        @default(0)
+  // The decision rule in force when the deal was created; part of the signed contract (contract format 2).
+  rule_pass_threshold         Float?
+  rule_auto_capture_max_minor Int?
   seeded                  Boolean    @default(false)
   created_at              DateTime   @default(now()) @db.Timestamptz(6)
   updated_at              DateTime   @updatedAt @db.Timestamptz(6)

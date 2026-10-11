@@ -2,6 +2,8 @@
 import { z } from "zod";
 import { DealError, HTTP_STATUS } from "@/lib/deal/errors";
 import { readSessionClaims, sessionFromCookieHeader } from "@/lib/auth/session";
+import { liveClaims } from "@/lib/auth/session-version";
+import { getDeps } from "@/lib/deps";
 
 export type Actor = { user_id: string };
 
@@ -19,7 +21,7 @@ export async function requireSession(req: Request): Promise<Actor> {
 /** Full or partial: only the second-factor routes accept a partial session. */
 export async function requireAnySession(req: Request): Promise<Actor & { mfa: boolean }> {
   const token = sessionFromCookieHeader(req.headers.get("cookie"));
-  const c = token ? await readSessionClaims(token) : null;
+  const c = await liveClaims(token ? await readSessionClaims(token) : null, getDeps().db);
   if (!c) throw new DealError("not_signed_in");
   return { user_id: c.sub, mfa: c.mfa };
 }

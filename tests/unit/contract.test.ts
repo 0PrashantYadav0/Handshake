@@ -5,9 +5,10 @@ import { b64urlToBytes, bytesToB64url, fingerprint, isPublicKey, verifySignature
 import { hashOf } from "@/lib/deal/contract";
 
 const doc: ContractDoc = {
-  v: 1, code: "HS-ABCD", terms_version: 2, item_title: "Blue mug ☕", amount_minor: 1800, currency: "USD", deadline_days: 5,
+  v: 2, code: "HS-ABCD", terms_version: 2, item_title: "Blue mug ☕", amount_minor: 1800, currency: "USD", deadline_days: 5,
   conditions: [{ position: 1, text: "Matches the \"listing\" photos", evidence_type: "photo" }, { position: 2, text: "Tracking shows delivered", evidence_type: "tracking" }],
   buyer: { id: "b-1", email: "b@test" }, seller: { id: "s-1", email: "s@test" },
+  reference_photos: [{ position: 1, sha256: "a".repeat(64) }], rule: { pass_threshold: 0.85, auto_capture_max_minor: 20000 },
 };
 
 async function keyPair() {
@@ -42,6 +43,8 @@ describe("contract hash", () => {
     expect(hashOf({ ...doc, conditions: [...doc.conditions].reverse() })).not.toBe(h);
     expect(hashOf({ ...doc, seller: { id: "s-2", email: "s@test" } })).not.toBe(h);
     expect(hashOf({ ...doc, terms_version: 3 })).not.toBe(h);
+    expect(hashOf({ ...doc, reference_photos: [{ position: 1, sha256: "b".repeat(64) }] })).not.toBe(h); // format 2: the photos
+    expect(hashOf({ ...doc, rule: { pass_threshold: 0.5, auto_capture_max_minor: 20000 } })).not.toBe(h); // and the rule
   });
 });
 

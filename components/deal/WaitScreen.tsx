@@ -17,7 +17,7 @@ export function WaitScreen({ conditions, uploaded, progress, lost }: Props) {
     return (
       <div role="alert" className="grid gap-3">
         <p className="text-sm">
-          We lost the connection while checking. Reload to see the result. If the check could not finish, Handshake re-runs it at the next daily check (06:00 UTC) or when an operator runs it; nothing is charged until then.
+          We lost the connection while checking. Reload to see the result. If the check could not finish, Handshake re-runs it within 10 minutes; nothing is charged until then.
         </p>
         <button type="button" className="hs-btn justify-self-start" onClick={() => location.reload()}>Reload</button>
       </div>

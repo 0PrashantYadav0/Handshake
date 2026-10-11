@@ -9,6 +9,7 @@ import { newPublicCode } from "../lib/deal/code";
 import { sealPayload, sealRaw, sealText } from "../lib/deal/sealed";
 import { CODE_CONDITION } from "../lib/deal/terms";
 import { contractDocOf, hashOf } from "../lib/deal/contract";
+import { limitsFromEnv } from "../lib/deal/decide";
 import { signingMessage } from "../lib/contract/canonical";
 import { bytesToB64url, fingerprint } from "../lib/contract/signature";
 import type { DealStatus, EventActor, VerdictResult } from "../lib/deal/types";
@@ -147,6 +148,8 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
   };
   const signers = { buyer: await signer(buyer.id), seller: await signer(seller.id) };
 
+  const limits = limitsFromEnv();
+  const rule = { rule_pass_threshold: limits.passThreshold, rule_auto_capture_max_minor: limits.autoCaptureMaxMinor };
   await db.$transaction(async (tx) => {
     for (const [i, [kind, item, amount_minor, deadline_days, age]] of DEALS.entries()) {
       let public_code = newPublicCode();
@@ -160,7 +163,7 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
       const id = crypto.randomUUID(); // the AAD needs the deal id before the insert
       await tx.deal.create({
         data: {
-          id, public_code, seeded: true, buyer_id: buyer.id, seller_id: joined ? seller.id : null,
+          id, public_code, seeded: true, ...rule, buyer_id: buyer.id, seller_id: joined ? seller.id : null,
           status: t.status, source_text: sealText("deals.source_text", id, source_text), item_title: sealText("deals.item_title", id, item),
           amount_minor, deadline_days, deadline_at: t.deadline_at,
           terms_version: 1, buyer_accepted_version: joined ? 1 : null, seller_accepted_version: agreed ? 1 : null,
@@ -171,7 +174,7 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
       });
       await tx.dealEvent.createMany({ data: t.events.map((e) => ({ deal_id: id, ...e, payload: sealPayload(id, e.payload) })) });
       if (joined) {
-        const doc = contractDocOf({ public_code, terms_version: 1, item_title: item, amount_minor, deadline_days, conditions, buyer, seller })!;
+        const doc = contractDocOf({ public_code, terms_version: 1, item_title: item, amount_minor, deadline_days, conditions, buyer, seller, files: [], ...rule })!;
         const hash = hashOf(doc);
         for (const e of t.events.filter((x) => x.cause === "accept")) {
           const role = e.actor as "buyer" | "seller";

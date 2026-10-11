@@ -8,10 +8,10 @@ import { verifySignature } from "@/lib/contract/signature";
 import { money } from "@/lib/ledger-columns";
 
 type Check = { hashOk: boolean; sigs: Partial<Record<Role, boolean>> } | null;
-type Rule = { pass_threshold: number; auto_capture_max_minor: number };
 
-export function ContractVerifier({ contract, rule }: { contract: ContractView; rule: Rule }) {
+export function ContractVerifier({ contract }: { contract: ContractView }) {
   const { document: doc, signatures } = contract;
+  const rule = doc.rule;
   const [check, setCheck] = useState<Check>(null);
   useEffect(() => {
     let live = true;
@@ -75,6 +75,8 @@ export function ContractVerifier({ contract, rule }: { contract: ContractView; r
           <dt className="text-[var(--hs-muted)]">Deadline</dt><dd>{doc.deadline_days} days after PayPal places the hold</dd>
           <dt className="text-[var(--hs-muted)]">Buyer</dt><dd>{doc.buyer.email}</dd>
           <dt className="text-[var(--hs-muted)]">Seller</dt><dd>{doc.seller.email}</dd>
+          <dt className="text-[var(--hs-muted)]">Listing photos</dt>
+          <dd>{doc.reference_photos.length === 0 ? "None" : <ol className="list-decimal pl-5 font-mono text-xs">{doc.reference_photos.map((p) => <li key={p.position} className="break-all">SHA-256 {p.sha256}</li>)}</ol>}</dd>
         </dl>
         <h3 className="mt-4 text-sm font-semibold">Conditions the seller must prove</h3>
         <ol className="mt-1 list-decimal pl-5 text-sm">{doc.conditions.map((c) => <li key={c.position}>{c.text} <span className="hs-help">({c.evidence_type})</span></li>)}</ol>

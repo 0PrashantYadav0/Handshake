@@ -54,8 +54,12 @@ describe("demo sign-in", () => {
     expect((await seller.json()).user).toMatchObject({ email: "demo-seller@handshake.demo", display_name: "Demo Seller", paypal_email: "demo-seller-pp@test" });
 
     const { code: totp } = await (await callRoute(demoCode, "GET", "/api/auth/2fa/demo-code", { cookie })).json();
-    const patched = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { paypal_email: "other@test", display_name: "Mallory", totp } });
-    expect((await patched.json()).user).toMatchObject({ paypal_email: "other@test", paypal_email_verified: false, display_name: "Mallory" });
+    // review finding 5: the shared persona's payout address is locked, even with its (published) code
+    const redirect = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { paypal_email: "other@test", totp } });
+    expect(redirect.status).toBe(409);
+    expect((await deps.db.user.findUniqueOrThrow({ where: { email: "demo-seller@handshake.demo" } })).paypal_email).toBe("demo-seller-pp@test");
+    const patched = await callRoute(patchMe, "PATCH", "/api/me", { cookie, body: { display_name: "Mallory" } });
+    expect((await patched.json()).user).toMatchObject({ display_name: "Mallory" });
 
     const again = await callRoute(demo, "POST", "/api/auth/demo", { body: { persona: "seller" } });
     expect((await again.json()).user).toMatchObject({ display_name: "Demo Seller", paypal_email: "demo-seller-pp@test", paypal_email_verified: true });

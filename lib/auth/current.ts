@@ -3,11 +3,12 @@ import { cookies } from "next/headers";
 import { getMe, type Me } from "@/lib/auth/me";
 import { readSessionClaims, SESSION_COOKIE, type Claims } from "@/lib/auth/session";
 import { getDeps } from "@/lib/deps";
+import { liveClaims } from "./session-version";
 
 /** Full or partial session claims, or null. */
 export async function sessionClaims(): Promise<Claims | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  return token ? readSessionClaims(token) : null;
+  return liveClaims(token ? await readSessionClaims(token) : null, getDeps().db);
 }
 
 /** The user id of a full (second-factor) session only. */

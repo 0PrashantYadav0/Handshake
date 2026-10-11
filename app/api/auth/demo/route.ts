@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { signInDemoPersona } from "@/lib/auth/demo";
 import { getMe } from "@/lib/auth/me";
-import { sessionCookie, signSession } from "@/lib/auth/session";
+import { issueSession } from "@/lib/auth/session-version";
 import { getDeps } from "@/lib/deps";
 import { parseBody, route } from "@/lib/http";
 
@@ -14,5 +14,5 @@ export const POST = route(async (req: Request) => {
   const { db } = getDeps();
   const userId = await signInDemoPersona(persona, db, getDeps().clock.now());
   const user = await getMe(userId, db);
-  return Response.json({ ok: true, user, mfa: "required" }, { headers: { "set-cookie": sessionCookie(await signSession(userId, false), false) } });
+  return Response.json({ ok: true, user, mfa: "required" }, { headers: { "set-cookie": await issueSession(userId, false, getDeps().db) } });
 });

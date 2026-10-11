@@ -132,6 +132,6 @@ describe("over HTTP", () => {
     await handle(code, p.asBuyer, { type: "edit_terms", item_title: "Jacket", amount_minor: 9000, deadline_days: 10, conditions: [{ text: "Matches the photos", evidence_type: "photo" }] }, deps);
     const e = await expectError(handle(code, p.asSeller, await signedAccept(code, p.asSeller, 2), deps), "signature_invalid");
     expect(e.message).toMatch(/revoked/);
-    expect(signingMessage("ab")).toBe("Handshake contract v1\nab");
+    expect(signingMessage("ab")).toBe("Handshake contract v2\nab");
   });
 });

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { currentUserId } from "@/lib/auth/current";
 import { DealError, getDeal } from "@/lib/deal";
-import { getLimits } from "@/lib/deal/verdict";
 import { getDeps } from "@/lib/deps";
 import { ContractVerifier } from "@/components/deal/ContractVerifier";
 
@@ -19,13 +18,12 @@ export default async function ContractPage({ params }: { params: Promise<{ code:
     throw e;
   }
   if (view.role === "preview") notFound();
-  const limits = getLimits();
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <Link href={`/deal/${code}`} className="hs-link text-sm">Back to the deal</Link>
       <h1 className="hs-display mt-2 mb-6 text-4xl">Contract {code}</h1>
       {view.contract ? (
-        <ContractVerifier contract={view.contract} rule={{ pass_threshold: limits.passThreshold, auto_capture_max_minor: limits.autoCaptureMaxMinor }} />
+        <ContractVerifier contract={view.contract} />
       ) : (
         <p className="hs-card">There is no contract to sign yet. It appears once the seller has joined and the amount and deadline are set.</p>
       )}

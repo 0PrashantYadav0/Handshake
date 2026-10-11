@@ -27,6 +27,10 @@ const EnvZ = z.object({
   AG_GRID_LICENSE_KEY: z.string().default(""),
 });
 
-export const env = EnvZ.parse(process.env);
+// Review finding 5: demo personas have a published second factor, so they must never meet live PayPal.
+export const env = EnvZ.refine((e) => e.DEMO_LOGIN !== "true" || e.PAYPAL_API_BASE.includes("sandbox"), {
+  message: "DEMO_LOGIN=true is allowed only with the PayPal sandbox (PAYPAL_API_BASE must be the sandbox API)",
+  path: ["DEMO_LOGIN"],
+}).parse(process.env);
 export const LIMITS = limitsFromEnv(); // evaluated at module load: a bad PASS_THRESHOLD stops the deploy
 export const DEMO_LOGIN = env.DEMO_LOGIN === "true";

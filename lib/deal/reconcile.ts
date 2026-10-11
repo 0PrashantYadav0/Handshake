@@ -4,6 +4,10 @@
 // no-op (C3). Each deal in its own transaction; a PayPal error on one lands in errors and the run goes on. Seeded deals
 // have no PayPal objects (F6) and are skipped.
 import { afterCommit, applyFactTx, captureFact, lockAndLoad, payoutItemFact, rethrowPaypal, type PaypalFact } from "./facts-db";
+import { DEAL_INCLUDE } from "./access";
+import { recordContractFailure, verifyContract } from "./contract";
+import { strayVoidKey } from "./keys";
+import { openDealRow } from "./sealed";
 import { TX_OPTIONS } from "./transition";
 import type { Deps, TickReport } from "./types";
 
@@ -42,7 +46,15 @@ export async function reconcile(now: Date, deps: Deps): Promise<Pick<TickReport,
   for (const p of holds) {
     await attempt(p, async () => {
       const a = await deps.paypal.getAuthorization(p.authorization_id!);
-      if (a.status === "CREATED") return { type: "authorization_created", authorization_id: a.authorization_id, auth_expires_at: a.expiration_time };
+      if (a.status === "CREATED") {
+        // trust spec §7, review finding 4: a hold on a contract that no longer verifies is released instead of recorded.
+        const deal = openDealRow(await deps.db.deal.findUniqueOrThrow({ where: { id: p.deal_id }, include: DEAL_INCLUDE }));
+        const problem = await verifyContract(deal);
+        if (!problem) return { type: "authorization_created", authorization_id: a.authorization_id, auth_expires_at: a.expiration_time };
+        await deps.paypal.voidAuthorization(a.authorization_id, strayVoidKey(a.authorization_id));
+        await recordContractFailure(deal.id, deps, "confirm_approval", problem);
+        return { type: "authorization_voided", authorization_id: a.authorization_id };
+      }
       // DENIED has no webhook and will never hold money: read as a void, so the deal ends instead of blocking start_payment and cancel (E12)
       if (a.status === "VOIDED" || a.status === "DENIED") return { type: "authorization_voided", authorization_id: a.authorization_id };
       return null; // still PENDING review

@@ -18,7 +18,7 @@ import { checkSignature, contractDocOf, contractInvalid, hashOf, requireContract
 import { insertEvent, lockDeal, transition, TX_OPTIONS, writeEvent, type Tx } from "./transition";
 import { commandError, nextStatus } from "./transitions";
 import type { Actor, AddFileInput, Command, CreateDealInput, DealView, Deps, FileRef } from "./types";
-import { runVerdict } from "./verdict";
+import { getLimits, runVerdict } from "./verdict";
 import { buildDealView, toFileRef } from "./views";
 
 const SIX_HOURS = 6 * 3600_000;
@@ -59,6 +59,7 @@ export async function createDeal(actor: Actor, input: CreateDealInput, deps: Dep
         const id = randomUUID(); // the AAD needs the deal id before the insert
         await tx.deal.create({
           data: {
+            rule_pass_threshold: getLimits().passThreshold, rule_auto_capture_max_minor: getLimits().autoCaptureMaxMinor, // signed with the terms
             id, public_code: code, buyer_id: actor.user_id, source_text: sealText("deals.source_text", id, text), item_title: sealText("deals.item_title", id, out.item_title),
             amount_minor: out.amount_minor, deadline_days: out.deadline_days,
             conditions: { create: conditions.map((c, i) => ({ position: i + 1, text: sealText("conditions.text", id, c.text), evidence_type: c.evidence_type })) },
@@ -83,7 +84,8 @@ export async function addFile(code: string, actor: Actor, input: AddFileInput, d
     requireRole(loaded, "buyer");
     requireLive(deal);
     if (deal.status !== "draft") throw new DealError("invalid_state", "Reference photos can be added only while the deal is a draft.");
-    if (deal.seller_accepted_version !== null) throw new DealError("invalid_state", "Edit the terms before adding photos.");
+    // The listing photos are part of the signed contract (format 2): after anyone signs, editing the terms comes first.
+    if (deal.seller_accepted_version !== null || deal.buyer_accepted_version !== null) throw new DealError("invalid_state", "Edit the terms before adding photos.");
     if (deal.files.filter((f) => f.purpose === "reference").length >= 4) throw new DealError("too_many_files", "At most 4 reference photos per deal.");
   } else {
     requireRole(loaded, "seller");
