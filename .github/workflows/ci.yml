@@ -17,6 +17,7 @@ jobs:
       APP_URL: http://localhost:3000
       SESSION_SECRET: ci-only-session-secret-at-least-32-chars
       FILE_URL_SECRET: ci-only-file-url-secret-at-least-32-chars
+      DATA_KEYS: k1:ci-only-data-key-at-least-32-characters-long
       CRON_SECRET: ci-only-cron-secret-at-least-32-characters
       PAYPAL_CLIENT_ID: ci
       PAYPAL_CLIENT_SECRET: ci

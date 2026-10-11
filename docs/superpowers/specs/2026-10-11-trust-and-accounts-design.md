@@ -54,9 +54,9 @@ Status: approved by the user's request of 2026-10-11 ("create plan first and the
 
 **Algorithm.** AES-256-GCM from `node:crypto`, random 96-bit IV per value, 128-bit tag.
 
-**Keys.** `DATA_KEYS="k2:<base64 32 bytes>,k1:<base64 32 bytes>"`. The first key encrypts; any listed key decrypts. Rotation is: add a new key first, redeploy, re-seal with `npm run reseal`, drop the old key. Production refuses to boot without the variable. Tests and local dev use a fixed key from `.env`.
+**Keys.** `DATA_KEYS="k2:<secret>,k1:<secret>"`, each secret at least 32 characters; the AES key is SHA-256 of the secret. A bare secret with no `kid:` prefix is kid `k1`, so Render's `generateValue` works as is. The first key encrypts; any listed key decrypts. Rotation is: add a new key first, redeploy, re-seal with `npm run reseal`, drop the old key. Production refuses to boot without the variable. Tests and local dev use a fixed key from `.env`.
 
-**Format.** Strings become `enc1.<kid>.<iv>.<ciphertext+tag>` in base64url. Bytes become `0x45 0x31`, kid length, kid, IV, tag, ciphertext. Decryption refuses anything without the prefix, so plaintext cannot be slipped into a sealed column.
+**Format.** Strings become `enc1.<kid>.<iv>.<ciphertext+tag>` in base64url. Bytes become `0x45 0x31`, kid length, kid, IV, then ciphertext with the tag appended. Decryption refuses anything without the prefix, so plaintext cannot be slipped into a sealed column.
 
 **Binding.** The additional authenticated data is `<table>.<column>:<deal_id>` (or `<user_id>` for user columns). A value copied into another deal or another column fails to decrypt.
 
