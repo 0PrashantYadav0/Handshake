@@ -121,3 +121,18 @@ describe("extract() + finalizeTerms()", () => {
     expect(client.calls).toBe(1);
   });
 });
+
+describe("no secret or seller text in logs (06 'Security checks')", () => {
+  it("a failed extraction logs one line with the failure kind only", async () => {
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
+    try {
+      const leak = new Error(`401 invalid x-api-key sk-ant-SECRET for "${input.sentence}"`);
+      await rejected(extract(input, fakeClient(leak, leak)), "ai_unavailable");
+      const lines = spies.flatMap((s) => s.mock.calls.map((c) => c.map(String).join(" ")));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/^extract failed after retry: \w+$/);
+    } finally {
+      spies.forEach((s) => s.mockRestore());
+    }
+  });
+});

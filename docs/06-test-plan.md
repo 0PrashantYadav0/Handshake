@@ -614,25 +614,26 @@ Each run is pasted into the release issue as the script's output: scenario id, d
 
 ## Security checks
 
-Each check names the test or command that proves it.
+Each check names the test or command that proves it. Ticked on 2026-10-12 (H-3, #84).
 
-- [ ] A third signed-in user gets 403 `not_a_party` on every deal endpoint: [Access rules](#access-rules-f4-h2) matrix in `tests/int/access.int.test.ts`.
-- [ ] A webhook with a bad signature is stored with `verified = false`, not processed, answered 400: receiver tests.
-- [ ] The cert URL must be https on a host ending in `.paypal.com`: webhook signature unit test.
-- [ ] A file URL stops working after 10 minutes and under any tampering: signed URL unit tests plus `GET /api/files/{id}` integration test with `clock.advance(601_000)`.
-- [ ] No model output can reach PayPal: `tests/unit/boundaries.test.ts` reads the import graph and asserts that only `lib/deal/**` imports `lib/paypal/**`, and that `lib/ai/**` imports nothing from `lib/paypal/**` and nothing from `lib/deal/**` except `lib/deal/errors.ts` (`DealError`, 05 §3.6) (NFR-1).
-- [ ] `decide()` is the only path to capture or void: the property test and the grep above; `lib/deal/` calls `captureAuthorization` only after `decide() === 'capture'` or `review { approve }`.
-- [ ] Untrusted text is never followed: the two injection cases in the eval, plus the prompt delimiting checked by a unit test on the built prompt string (D11).
-- [ ] Uploads are checked by content, not declared type: upload limit tests.
-- [ ] Evidence file ids are bound to the deal, the purpose and one submission: `submit_evidence` integration test.
-- [ ] Session cookie flags and token purposes: config and session unit tests.
-- [ ] `POST /api/jobs/tick` compares the bearer with `timingSafeEqual` and answers 401 otherwise: tick test.
-- [ ] Concurrent commands cannot double-act: concurrency tests.
-- [ ] No secret in the repo: `git grep -nE 'sk-ant-|re_[A-Za-z0-9]{20,}|postgresql://[^ ]*:[^ @]*@' -- ':!docs/**'` returns nothing; `.env` is gitignored; `.env.example` has names only.
-- [ ] No secret in the client bundle: after `npm run build`, `grep -rl "$PAYPAL_CLIENT_SECRET" .next/static` and the same for `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `FILE_URL_SECRET`, `CRON_SECRET` return nothing; only `NEXT_PUBLIC_PAYPAL_CLIENT_ID` is allowed there.
-- [ ] No secret in logs: the PayPal adapter logs only method, status and `debug_id`; the AI adapter logs only request id, model, token counts and latency; a unit test asserts the log line for a failed capture contains neither the bearer token nor the body.
-- [ ] `deal_events` cannot be updated or deleted: audit log test.
-- [ ] Seeded deals cannot trigger PayPal calls: tick selection test.
+- [x] A third signed-in user gets 403 `not_a_party` on every deal endpoint: `tests/int/access.int.test.ts` runs every command, read and upload as a third user on a `joined`, `terms_agreed`, `held`, `in_review`, `paid` and `voided` deal, and checks that nothing changed. The draft preview is in `reads.int.test.ts` "access rules (F4, H2)".
+- [x] A webhook with a bad signature is stored with `verified = false`, not processed, answered 400: `webhook-route.int.test.ts` "bad signature -> 400 invalid_input, row stored verified = false".
+- [x] The cert URL must be https on a host ending in `.paypal.com`: `webhook-verify.test.ts` "rejected before the cert is fetched".
+- [x] A file URL stops working after 10 minutes and under any tampering: `file-urls.test.ts`, and `routes.int.test.ts` "bytes round-trip… expired, tampered, malformed and unknown links" with `clock.advance(601_000)`.
+- [x] No model output can reach PayPal: `tests/unit/boundaries.test.ts` reads the import graph and asserts that only `lib/deal/**` (and `lib/deps.ts`, which builds the adapters) imports `lib/paypal/**`, and that `lib/ai/**` imports nothing from `lib/paypal/**` and nothing from `lib/deal/**` except `lib/deal/errors.ts` (`DealError`, 05 §3.6) (NFR-1).
+- [x] `decide()` is the only path to capture: the property test (`decide.test.ts`) and `boundaries.test.ts` "capture call sites". Only `lib/deal/facts-db.ts` calls `captureAuthorization`, and `captureHold` runs only under `decision === "capture"` and the buyer's `review { approve }`. Voids are not pinned, because they only return money to the buyer: deadlines, stray holds, rejects and cancels.
+- [x] Untrusted text is never followed: the prompt delimiting unit test on the built prompt strings (`security.test.ts` "prompt delimiters", D11). The two eval injection cases run with the eval (#29).
+- [x] Uploads are checked by content, not declared type: `routes.int.test.ts` (text as image/jpeg, gif -> 400) and `reads.int.test.ts` "size and type limits".
+- [x] Evidence file ids are bound to the deal, the purpose and one submission: `evidence.int.test.ts` "another deal's file, a reference file, a used file, a duplicate -> invalid_input".
+- [x] Session cookie flags and token purposes: `session.test.ts`. Sign-in links work once, across restarts and in parallel: `auth.int.test.ts` "H-1" (K10).
+- [x] `POST /api/jobs/tick` compares the bearer with `timingSafeEqual` and answers 401 otherwise: `webhook-route.int.test.ts` "no header, wrong token or wrong length -> 401".
+- [x] Concurrent commands cannot double-act: `evidence.int.test.ts` (two submissions), `review-payout.int.test.ts` (two approves), `two-factor.int.test.ts` and `review-fixes.int.test.ts` (parallel guesses).
+- [x] No secret in the repo: `scripts/check-secrets.sh` (CI). It runs `git grep -P` for `sk-ant-`, `re_…` and Postgres URLs with a password on a host other than localhost, outside `docs/`; it checks that `.env` is not tracked and that `.env.example` has names only.
+- [x] No secret in the client bundle: `scripts/check-secrets.sh` (CI, after `npm run build`) greps `.next/static` for the value of `PAYPAL_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `FILE_URL_SECRET`, `CRON_SECRET`, `RESEND_API_KEY`, `DATABASE_URL` and each `DATA_KEYS` key. Only `NEXT_PUBLIC_PAYPAL_CLIENT_ID` may appear there.
+- [x] No secret in logs: `paypal-adapter.test.ts` (a failed capture or payout logs one line, without the bearer token or the body), and `ai-extract.test.ts` "no secret or seller text in logs" (a failed extraction logs only the failure kind; the AI adapter logs nothing else).
+- [x] `deal_events` cannot be updated or deleted: `audit-log.int.test.ts` "UPDATE and DELETE raise".
+- [x] Seeded deals cannot trigger PayPal calls: `tick-select.test.ts` "any status with seeded = true -> not selected", and `reconcile.int.test.ts`.
+- [x] Pages run under a strict Content-Security-Policy (K11): `hardening.test.ts` "content security policy", and the two-party e2e fails on any violation.
 
 ## End to end (Playwright)
 

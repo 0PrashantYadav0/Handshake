@@ -68,3 +68,27 @@ describe("import boundaries (lib/**)", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// 06 "Security checks": decide() is the only path to a capture. The PayPal capture call lives in facts-db.ts (captureHold, and
+// voidHold's re-send when PayPal says the hold was already captured); captureHold runs only on decide() === "capture" and on the
+// buyer's review approve. Voids are not pinned: they only return money to the buyer (deadlines, stray holds, rejects, cancels).
+describe("capture call sites", () => {
+  const sources = [...files, ...walk(join(ROOT, "app"))].filter((f) => !rel(f).startsWith("lib/paypal/"));
+  const callers = (re: RegExp) => sources.filter((f) => re.test(readFileSync(f, "utf8"))).map(rel).sort();
+
+  it("only lib/deal/facts-db.ts calls PayPal's captureAuthorization", () => {
+    expect(callers(/\.captureAuthorization\(/)).toEqual(["lib/deal/facts-db.ts"]);
+  });
+
+  it("captureHold is called only after decide() === 'capture' and on review approve", () => {
+    expect(callers(/[^.\w]captureHold\(/)).toEqual(["lib/deal/commands.ts", "lib/deal/facts-db.ts", "lib/deal/verdict.ts"]); // facts-db: the definition
+    const guardOf = (file: string) => {
+      const src = readFileSync(join(ROOT, file), "utf8");
+      const calls = [...src.matchAll(/await captureHold\(/g)];
+      expect(calls, file).toHaveLength(1);
+      return src.slice(0, calls[0]!.index).split("\n").slice(-3).join("\n");
+    };
+    expect(guardOf("lib/deal/verdict.ts")).toContain('if (decision === "capture") {');
+    expect(guardOf("lib/deal/commands.ts")).toContain('if (cmd.decision === "approve") {');
+  });
+});
