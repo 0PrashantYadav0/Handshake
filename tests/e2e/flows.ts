@@ -1,6 +1,16 @@
 // Shared e2e steps for the trust features (trust spec §4, §6): the demo second factor and signing a contract.
 import { expect, type Page } from "@playwright/test";
 
+/** H-2: every Content-Security-Policy violation on this page (and the pages it navigates to) lands in the returned list. */
+export async function watchCsp(page: Page): Promise<string[]> {
+  const seen: string[] = [];
+  await page.addInitScript(() =>
+    document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`)),
+  );
+  page.on("console", (m) => { if (m.text().startsWith("CSP violation")) seen.push(`${page.url()} ${m.text()}`); });
+  return seen;
+}
+
 /** Demo persona second factor: fill the published code and continue. */
 export async function pass2fa(page: Page) {
   await page.waitForURL(/\/signin\/2fa/);

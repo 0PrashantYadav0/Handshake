@@ -100,12 +100,13 @@ Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions
 
 Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md).
 
-- **Two-step sign-in for everyone.** An email link, then a 6-digit code from an authenticator app (TOTP, RFC 6238). Enrollment is required before anything else; ten single-use recovery codes back it up. Five wrong codes lock the account for 10 minutes, counted in Postgres. "Sign out everywhere" on `/security` ends every session.
+- **Two-step sign-in for everyone.** An email link that works once (opening it is harmless; its "Continue" button spends it), then a 6-digit code from an authenticator app (TOTP, RFC 6238). Enrollment is required before anything else; ten single-use recovery codes back it up. Five wrong codes lock the account for 10 minutes, counted in Postgres. "Sign out everywhere" on `/security` ends every session.
 - **Step-up.** Signing a contract, changing the payout email, revoking a signing key and making new recovery codes each need a fresh code.
 - **Both parties sign every contract.** Each browser makes an ECDSA P-256 key that never leaves it. The signed document covers the parties, item, amount, deadline, conditions, the listing photos' SHA-256 and the decision rule. Editing anything means signing again. `/deal/{code}/contract` re-verifies both signatures in your browser and downloads the signed contract.
 - **The contract is checked before money moves.** Before an order, an authorization, a capture or a payout, the server rebuilds the contract from the database and verifies both signatures. A change made straight in the database stops the step, records why, and moves no money. Releasing the buyer's hold is never blocked.
 - **Payouts go only to a verified address.** A new PayPal email gets a 6-digit code by email; until it is confirmed, no payout is sent there.
 - **Encrypted at rest and in transit.** Deal text, conditions, evidence notes, photos and verdict reasons are sealed with AES-256-GCM, bound to their deal and column (`DATA_KEYS`, rotatable with `npm run reseal`). HTTPS with HSTS in transit. This is not zero-knowledge encryption: the server must read the terms so Claude can check the proof, so the two parties and the in-app verifier can read a contract, and a database dump cannot.
+- **Content Security Policy.** Every page gets a fresh nonce; only the app's own scripts, and the PayPal SDK they load, can run. No plugins, no framing, no form posts off-site.
 - **Reconciliation.** Every 10 minutes the tick job asks PayPal about captures, holds and payouts still waiting on a webhook, and applies what PayPal reports, once.
 - **Demo accounts.** With `DEMO_LOGIN=true` the two personas share a published authenticator secret, so their payout address, keys and recovery codes are locked, and the app refuses to start in demo mode unless PayPal is the sandbox.
 
