@@ -197,6 +197,6 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try { process.loadEnvFile(); } catch {} // .env is optional; Render and CI inject env vars
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: "-c timezone=UTC" }) });
   seed(prisma).finally(() => prisma.$disconnect());
 }

@@ -13,7 +13,7 @@ Every endpoint lives under `/api`, speaks JSON, and is served by a thin Next.js 
 | Topic | Rule |
 | --- | --- |
 | Body format | `Content-Type: application/json`, except `POST /api/deals/{code}/files` (`multipart/form-data`) and `POST /api/webhooks/paypal` (raw JSON read with `await request.text()`). |
-| Response format | JSON with `Content-Type: application/json`, except `GET /api/files/{id}` (image bytes) and `GET /api/auth/callback` (302 redirect). `POST /api/studio/agent` answers plain JSON (section 15). |
+| Response format | JSON with `Content-Type: application/json`, except `GET /api/files/{id}` (image bytes) and `/api/auth/callback` (302/303 redirects). `POST /api/studio/agent` answers plain JSON (section 15). |
 | Session | Cookie `hs_session`: a `jose` HS256 JWT with claim `sub` = user id, signed with `SESSION_SECRET`, `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` (30 days). `Secure` is dropped when `NODE_ENV !== "production"` so local http works (decisions F1, stack.md section 6). |
 | Who needs a session | Every `/api/me*`, `/api/deals*`, `/api/dashboard/data` and `/api/studio/agent` call. Not needed: `/api/auth/*`, `/api/files/{id}` (the signature is the credential), `/api/webhooks/paypal` (PayPal signature), `/api/jobs/tick` (bearer `CRON_SECRET`), `/api/health`. |
 | Deal identity | `{code}` is `deals.public_code`, format `HS-` + 4 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (decisions I4). Internal UUIDs never appear in URLs. |
@@ -86,7 +86,8 @@ Twenty-seven endpoints, exactly the list in decisions H1.
 | Method | Path | Who | State precondition | What it does |
 | --- | --- | --- | --- | --- |
 | POST | `/api/auth/magic-link` | Anyone | none | Emails a 15-minute sign-in link (console in development) |
-| GET | `/api/auth/callback` | Anyone with a link | none | Verifies the link token, upserts the user, sets `hs_session`, redirects |
+| GET | `/api/auth/callback` | Anyone with a link | none | Forwards to `/signin/link` (spends nothing) |
+| POST | `/api/auth/callback` | Anyone with a link, same origin | none | Uses the link token once, upserts the user, sets a partial `hs_session`, redirects to the second factor |
 | POST | `/api/auth/demo` | Anyone, when `DEMO_LOGIN=true` | none | Signs in as the demo buyer or demo seller |
 | POST | `/api/auth/sign-out` | Anyone | none | Clears `hs_session` |
 | GET | `/api/me` | Signed in | none | Returns the caller's profile |
@@ -265,19 +266,19 @@ Response: `200 { "ok": true }`. The same response is returned whether or not the
 
 Errors: `invalid_input`, `internal_error` (Resend rejected the send; in production only).
 
-Side effects: signs a login JWT `{ sub: email, purpose: "login", next }` with `SESSION_SECRET`, expiry 15 minutes, and sends `{APP_URL}/api/auth/callback?token={jwt}` through the `email` dep (Resend from `EMAIL_FROM`). When `NODE_ENV !== "production"` the link is printed to the server console instead and Resend is not called (decisions F2). No deal event.
+Side effects: signs a login JWT `{ sub: email, purpose: "login", next }` with `SESSION_SECRET`, expiry 15 minutes, and sends `{APP_URL}/signin/link?token={jwt}&next=` through the `email` dep (Resend from `EMAIL_FROM`). When `NODE_ENV !== "production"` the link is printed to the server console instead and Resend is not called (decisions F2). No deal event.
 
 Resend's test sender delivers only to the account owner's address until a domain is verified (stack.md section 7), so judges use demo personas (4.3).
 
-### 4.2 `GET /api/auth/callback?token=`
+### 4.2 `/api/auth/callback` (K10)
 
 Who: anyone holding a link. Preconditions: none.
 
-Request: query `token` (the login JWT).
+`GET ?token=&next=` answers `302 Location: /signin/link?token=&next=` and spends nothing. Mail scanners that open links therefore cannot use up the token. `/signin/link` shows "Continue signing in", a form that POSTs `token` and `next`.
 
-Response: `302` with `Location: {next}` (from the token, default `/ledger`) and `Set-Cookie: hs_session=...; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`. An invalid, expired or wrong-purpose token answers `302 Location: /?error=invalid_link` with no cookie.
+`POST` (form fields `token`, `next`): a request whose `Origin` is not `APP_URL`'s origin is refused (login CSRF). The token's `jti` is inserted into `used_login_tokens`, and only the first insert counts. The response is `303` to `/signin/2fa?next=` (2FA on) or `/security/setup?next=` (not enrolled), with a partial `hs_session` (`Max-Age=900`). An invalid, expired, wrong-purpose or used token, or a foreign origin, answers `303 Location: /signin?error=invalid_link` with no cookie.
 
-Side effects: upserts `users` by `email` (creates the user on first sign-in with `display_name` null). No deal event. A link can be used more than once within its 15 minutes.
+Side effects: upserts `users` by `email` (creates the user on first sign-in with `display_name` null). No deal event.
 
 ### 4.3 `POST /api/auth/demo`
 

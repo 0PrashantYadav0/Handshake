@@ -1,6 +1,6 @@
 // 06 "One per command": profile, demo sign-in, magic link, sign out; "Zod schemas": /api/me, magic-link, demo.
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { GET as callback } from "@/app/api/auth/callback/route";
+import { GET as callbackGet, POST as callback } from "@/app/api/auth/callback/route";
 import { POST as demo } from "@/app/api/auth/demo/route";
 import { POST as magicLink } from "@/app/api/auth/magic-link/route";
 import { POST as signOut } from "@/app/api/auth/sign-out/route";
@@ -26,6 +26,14 @@ afterEach(() => vi.unstubAllEnvs());
 
 const cookieOf = (res: Response) => res.headers.get("set-cookie")?.split(";")[0] ?? "";
 const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+
+/** The "Continue signing in" button on /signin/link: a same-origin form POST (K10). */
+function followLink(token: string, next?: string, handler = callback, headers: Record<string, string> = { origin: "https://handshake.test" }) {
+  const body = new FormData();
+  body.set("token", token);
+  if (next !== undefined) body.set("next", next);
+  return callRoute(handler, "POST", "/api/auth/callback", { body, headers });
+}
 
 /** Demo persona: partial cookie -> demo code -> full cookie (trust spec §4). */
 async function passDemo2fa(partial: string): Promise<string> {
@@ -89,11 +97,15 @@ describe("magic link", () => {
     expect(deps.email.sent).toHaveLength(1);
     const link = deps.email.sent[0].text.match(/https?:\/\/\S+/)?.[0] ?? "";
     expect(deps.email.sent[0].to).toBe("judge@example.com");
-    expect(link).toContain("https://handshake.test/api/auth/callback?token=");
+    expect(link).toContain("https://handshake.test/signin/link?token=");
 
+    // opening the link (or a mail scanner opening it) spends nothing; the old callback URL forwards to the same page
     const url = new URL(link);
-    const cb = await callRoute(callback, "GET", url.pathname + url.search);
-    expect(cb.status).toBe(302);
+    const forwarded = await callRoute(callbackGet, "GET", `/api/auth/callback${url.search}`);
+    expect(forwarded.headers.get("location")).toBe(`/signin/link${url.search}`);
+    expect(await deps.db.usedLoginToken.count()).toBe(0);
+    const cb = await followLink(url.searchParams.get("token")!, url.searchParams.get("next")!);
+    expect(cb.status).toBe(303);
     expect(cb.headers.get("location")).toBe("/security/setup?next=%2Fdeals%2FHS-ABCD");
     expect(cb.headers.get("set-cookie")).toMatch(/^hs_session=.+; Max-Age=900$/);
     const user = await deps.db.user.findUnique({ where: { email: "judge@example.com" } });
@@ -110,19 +122,49 @@ describe("magic link", () => {
     expect((await me.json()).user.id).toBe(user?.id);
 
     // the next sign-in goes to the code screen instead
-    const again = await callRoute(callback, "GET", `/api/auth/callback?token=${await createMagicToken("judge@example.com")}&next=/ledger`);
+    const again = await followLink(await createMagicToken("judge@example.com"), "/ledger");
     expect(again.headers.get("location")).toBe("/signin/2fa?next=%2Fledger");
   });
 
   test("default next is /dashboard; absolute-looking next falls back", async () => {
     const token = await createMagicToken("a@test");
-    const plain = await callRoute(callback, "GET", `/api/auth/callback?token=${token}`);
+    const plain = await followLink(token);
     expect(plain.headers.get("location")).toBe("/security/setup?next=%2Fdashboard");
-    const reused = await callRoute(callback, "GET", `/api/auth/callback?token=${token}`);
+    const reused = await followLink(token);
     expect(reused.headers.get("location")).toBe("/signin?error=invalid_link"); // single use
-    const evil = await callRoute(callback, "GET", `/api/auth/callback?token=${await createMagicToken("a@test")}&next=//evil.example`);
+    const evil = await followLink(await createMagicToken("a@test"), "//evil.example");
     expect(evil.headers.get("location")).toBe("/security/setup?next=%2Fdashboard");
     expect(await deps.db.user.count()).toBe(1); // upsert, not a second row
+  });
+
+  test("H-1: a used link stays used after a restart (fresh module, same database)", async () => {
+    const token = await createMagicToken("a@test");
+    expect((await followLink(token)).headers.get("location")).toMatch(/^\/security\/setup/);
+    vi.resetModules();
+    const { POST: restarted } = await import("@/app/api/auth/callback/route");
+    const res = await followLink(token, undefined, restarted);
+    expect(res.headers.get("location")).toBe("/signin?error=invalid_link");
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  test("H-1: five parallel callbacks with one link -> exactly one session", async () => {
+    const token = await createMagicToken("a@test");
+    const all = await Promise.all(Array.from({ length: 5 }, () => followLink(token)));
+    expect(all.filter((r) => r.headers.get("set-cookie")).length).toBe(1);
+    expect(await deps.db.usedLoginToken.count()).toBe(1);
+  });
+
+  test("H-1: rows of expired links are removed on the next sign-in", async () => {
+    await deps.db.usedLoginToken.create({ data: { jti: "old", expires_at: new Date(Date.now() - 1000) } });
+    await deps.db.usedLoginToken.create({ data: { jti: "live", expires_at: new Date(Date.now() + 60_000) } });
+    await followLink(await createMagicToken("a@test"));
+    const kept = (await deps.db.usedLoginToken.findMany()).map((r) => r.jti);
+    expect(kept).toContain("live");
+    expect(kept).not.toContain("old");
+    expect(await deps.db.usedLoginToken.count()).toBe(2);
+    // the session runs in UTC whatever the server's zone, so app-written instants and now() in SQL agree (lib/db.ts)
+    const [{ tz }] = await deps.db.$queryRaw<{ tz: string }[]>`SELECT current_setting('TimeZone') AS tz`;
+    expect(tz).toBe("UTC");
   });
 
   test("expired, tampered or session-purpose token -> 302 /signin?error=invalid_link with no Set-Cookie", async () => {
@@ -130,12 +172,22 @@ describe("magic link", () => {
     const tampered = (await createMagicToken("a@test")).slice(0, -3) + "xyz";
     const session = await signSession("some-user-id", true);
     for (const token of [expired, tampered, session, ""]) {
-      const res = await callRoute(callback, "GET", `/api/auth/callback?token=${token}&next=/ledger`);
-      expect(res.status).toBe(302);
+      const res = await followLink(token, "/ledger");
+      expect(res.status).toBe(303);
       expect(res.headers.get("location")).toBe("/signin?error=invalid_link");
       expect(res.headers.get("set-cookie")).toBeNull();
     }
     expect(await deps.db.user.count()).toBe(0);
+    expect(await deps.db.usedLoginToken.count()).toBe(0); // nothing claimed for a bad token
+  });
+
+  test("login CSRF: a POST from another origin is refused and spends nothing; no Origin header (same-origin tools) is allowed", async () => {
+    const token = await createMagicToken("a@test");
+    const cross = await followLink(token, undefined, callback, { origin: "https://evil.example" });
+    expect(cross.headers.get("location")).toBe("/signin?error=invalid_link");
+    expect(cross.headers.get("set-cookie")).toBeNull();
+    expect(await deps.db.usedLoginToken.count()).toBe(0);
+    expect((await followLink(token, undefined, callback, {})).headers.get("set-cookie")).toMatch(/^hs_session=/);
   });
 
   test("not an email -> 400 invalid_input and nothing sent", async () => {
