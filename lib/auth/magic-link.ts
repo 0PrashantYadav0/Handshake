@@ -14,15 +14,15 @@ export const createMagicToken = (email: string): Promise<string> =>
  * The lower-cased email, or null when the token is invalid, expired, not a login token, or already used.
  * H-1: the jti is recorded in Postgres, so a link works once even across restarts and instances; the insert is the claim.
  */
-export async function verifyMagicToken(token: string, db: Pick<PrismaClient, "usedLoginToken">, now = new Date()): Promise<string | null> {
+export async function verifyMagicToken(token: string, db: Pick<PrismaClient, "usedLoginToken" | "$executeRaw">): Promise<string | null> {
   const claims = await readClaims(token, "login");
   if (!claims || !claims.jti) return null;
-  await db.usedLoginToken.deleteMany({ where: { expires_at: { lt: now } } });
+  await db.$executeRaw`DELETE FROM used_login_tokens WHERE expires_at < now()`; // the database clock, the same on every instance
   const { count } = await db.usedLoginToken.createMany({ data: [{ jti: claims.jti, expires_at: new Date(claims.exp * 1000) }], skipDuplicates: true });
   return count === 1 ? claims.sub : null;
 }
 
 export function buildMagicLink(token: string, next?: string): string {
   const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  return `${base}/api/auth/callback?${new URLSearchParams({ token, next: safeNext(next) })}`;
+  return `${base}/signin/link?${new URLSearchParams({ token, next: safeNext(next) })}`;
 }

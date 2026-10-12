@@ -116,7 +116,7 @@ export async function reseal(db: Db, opts: { sealPlaintextEvents?: boolean } = {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   try { process.loadEnvFile(); } catch {} // .env is optional; Render injects env vars
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL!, options: "-c timezone=UTC" }) });
   reseal(prisma, { sealPlaintextEvents: process.argv.includes("--seal-plaintext-events") })
     .then((r) => console.log(`reseal: ${r.values} values in ${r.deals} deals now on ${keyring().active}; ${r.events_sealed} plaintext events sealed; event payloads still use: ${r.event_kids.join(", ") || "none"} (keep those kids in DATA_KEYS)`))
     .finally(() => prisma.$disconnect());

@@ -197,7 +197,7 @@ decide(verdicts, deal):
 - **K7.** Demo personas (only with `DEMO_LOGIN=true`, which refuses to boot unless PayPal is the sandbox) share published TOTP secrets, are exempt from lockout, and cannot change payout address, keys or recovery codes.
 - **K8.** Field encryption at rest (AES-256-GCM, `DATA_KEYS` keyring, AAD = column and deal id) for deal text, conditions, evidence values, photos, verdict reasons and raw responses, the contract keys of event payloads, and TOTP secrets. Not zero-knowledge: the server must read terms for Claude to judge them.
 - **K9.** Reconciliation: the tick job reads captures pending over 10 minutes, holds approved over 10 minutes and payouts pending over 30 minutes from PayPal and applies the same facts webhooks would (E12).
-- **K10.** A sign-in link works once: the callback inserts the token's `jti` into `used_login_tokens` (primary key, so a second insert claims nothing), across restarts and instances. Rows past the 15-minute expiry are deleted on the next sign-in.
+- **K10.** A sign-in link works once: the callback inserts the token's `jti` into `used_login_tokens` (primary key, so a second insert claims nothing), across restarts and instances. Rows past the 15-minute expiry are deleted on the next sign-in, by the database clock. The emailed link opens `/signin/link`; only its "Continue" POST (same origin) spends the token, so mail scanners that open links do not.
 
 ## Assumptions
 
