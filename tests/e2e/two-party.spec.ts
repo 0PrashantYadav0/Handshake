@@ -45,5 +45,10 @@ test("both parties sign with device keys; the contract verifies in the browser",
 
   await seller.goto("/security");
   await expect(seller.getByTestId("signing-keys")).toContainText("This browser");
+  for (const path of ["/dashboard/studio", "/ledger", "/wallet"]) { // the AG Studio and AG Grid pages, under the same policy
+    await seller.goto(path);
+    await expect(seller.locator(".ag-root-wrapper, main").first()).toBeVisible();
+  }
+  await seller.waitForTimeout(2_000); // let the Studio canvas and charts draw
   expect([...csp, ...sellerCsp]).toEqual([]); // H-2: the policy blocks nothing the app needs
 });

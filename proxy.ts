@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { buildCsp, newNonce } from "@/lib/csp";
 
 export function proxy(request: NextRequest) {
-  const csp = buildCsp(newNonce(), { dev: process.env.NODE_ENV === "development" });
+  const csp = buildCsp(newNonce(), { dev: process.env.NODE_ENV === "development", https: process.env.APP_URL?.startsWith("https:") ?? false });
   const headers = new Headers(request.headers);
   headers.set("content-security-policy", csp);
   const response = NextResponse.next({ request: { headers } });

@@ -51,6 +51,10 @@ describe("content security policy (H-2)", () => {
     expect(dir(csp, "script-src")).toContain("'unsafe-eval'");
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
+  it("a plain-http production run (APP_URL http://…) does not upgrade subresources to https", () => {
+    expect(buildCsp("n", { https: false })).not.toContain("upgrade-insecure-requests");
+    expect(buildCsp("n", { https: false })).not.toContain("unsafe-eval");
+  });
   it("nonces are 128-bit and differ per call", () => {
     const a = newNonce();
     expect(Buffer.from(a, "base64")).toHaveLength(16);

@@ -4,7 +4,8 @@
 const PAYPAL = "https://*.paypal.com";
 const PAYPAL_STATIC = "https://*.paypalobjects.com";
 
-export function buildCsp(nonce: string, { dev = false }: { dev?: boolean } = {}): string {
+/** https: the site is served over TLS (APP_URL), so http subresources are upgraded; a plain-http run (next start on a LAN IP) must not. */
+export function buildCsp(nonce: string, { dev = false, https = !dev }: { dev?: boolean; https?: boolean } = {}): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${PAYPAL}${dev ? " 'unsafe-eval'" : ""}`, // dev: React's error overlay
@@ -18,7 +19,7 @@ export function buildCsp(nonce: string, { dev = false }: { dev?: boolean } = {})
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(dev ? [] : ["upgrade-insecure-requests"]),
+    ...(https ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 }
 
