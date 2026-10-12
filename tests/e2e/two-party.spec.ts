@@ -1,9 +1,9 @@
 // Two parties, no external services (trust spec §13): demo 2FA for both, join, both sign with browser keys, terms agreed,
-// the contract page verifies both signatures in the browser, and the seller's key shows on /security.
+// the contract page verifies both signatures in the browser, and the seller's key shows on /security. No CSP violation on the way.
 // The draft comes from make-draft.ts (fake model), so this runs without Anthropic or PayPal keys.
 import { execFileSync } from "node:child_process";
 import { expect, test, type Page } from "@playwright/test";
-import { pass2fa, signContract } from "./flows";
+import { pass2fa, signContract, watchCsp } from "./flows";
 
 const status = (page: Page) => page.getByTestId("deal-status").first();
 
@@ -13,6 +13,7 @@ test("both parties sign with device keys; the contract verifies in the browser",
   }).trim().split("\n").at(-1)!;
   expect(code).toMatch(/^HS-[A-Z0-9]{4}$/);
 
+  const csp = await watchCsp(buyer);
   await buyer.goto(`/signin?next=/deal/${code}`);
   await buyer.getByTestId("persona-buyer").click();
   await pass2fa(buyer);
@@ -20,6 +21,7 @@ test("both parties sign with device keys; the contract verifies in the browser",
   await expect(buyer.getByTestId("sign-contract")).toHaveCount(0); // nothing to sign before the seller joins
 
   const seller = await (await browser.newContext()).newPage();
+  const sellerCsp = await watchCsp(seller);
   await seller.goto(`/deal/${code}`);
   await seller.getByTestId("persona-seller").click();
   await pass2fa(seller);
@@ -43,4 +45,5 @@ test("both parties sign with device keys; the contract verifies in the browser",
 
   await seller.goto("/security");
   await expect(seller.getByTestId("signing-keys")).toContainText("This browser");
+  expect([...csp, ...sellerCsp]).toEqual([]); // H-2: the policy blocks nothing the app needs
 });

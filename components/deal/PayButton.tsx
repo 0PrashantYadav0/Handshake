@@ -24,7 +24,7 @@ export function PayButton({ code, clientId, onHeld, onFail }: Props) {
   return (
     <div>
       {banner && <p className="hs-banner mb-3" role="alert">{banner}</p>}
-      <PayPalScriptProvider options={{ clientId, currency: "USD", intent: "authorize", components: "buttons" }}>
+      <PayPalScriptProvider options={{ clientId, currency: "USD", intent: "authorize", components: "buttons", dataCspNonce: pageNonce() }}>
         <Buttons
           createOrder={async () => {
             setBanner(null);
@@ -53,6 +53,9 @@ export function PayButton({ code, clientId, onHeld, onFail }: Props) {
     </div>
   );
 }
+
+// H-2: the page's CSP nonce, for the inline styles and scripts the PayPal SDK adds. Browsers hide the attribute; the property keeps it.
+const pageNonce = () => (typeof document === "undefined" ? undefined : document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce || undefined);
 
 // Grey block of the button's height until the script resolves; the not-loaded line after 10 s or on a load failure.
 function Buttons(props: React.ComponentProps<typeof PayPalButtons>) {

@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
-// Security headers (T-45). No CSP yet: the PayPal JS SDK and AG Studio inject inline styles and scripts,
-// so a strict policy needs nonces; tracked in issue #45.
+// Security headers (T-45). The Content-Security-Policy is set per request in proxy.ts, because it carries a nonce (H-2).
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "X-Content-Type-Options", value: "nosniff" },
