@@ -27,7 +27,7 @@ export type TestDeps = { db: typeof prisma; paypal: FakePaypal; ai: FakeAi; emai
 
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "webhook_events", "contract_signatures", "signing_keys", "deal_events", "payouts", "payments", "verdicts",
+    `TRUNCATE TABLE "used_login_tokens", "webhook_events", "contract_signatures", "signing_keys", "deal_events", "payouts", "payments", "verdicts",
       "evidence", "files", "conditions", "deals", "users" RESTART IDENTITY CASCADE`,
   );
 }

@@ -10,10 +10,11 @@ const redirect = (location: string, cookie?: string) =>
 
 export const GET = route(async (req: Request) => {
   const url = new URL(req.url);
-  const email = await verifyMagicToken(url.searchParams.get("token") ?? "");
+  const { db } = getDeps();
+  const email = await verifyMagicToken(url.searchParams.get("token") ?? "", db);
   if (!email) return redirect("/signin?error=invalid_link");
-  const user = await getDeps().db.user.upsert({ where: { email }, create: { email }, update: {}, select: { id: true, totp_enabled_at: true } });
+  const user = await db.user.upsert({ where: { email }, create: { email }, update: {}, select: { id: true, totp_enabled_at: true } });
   const next = encodeURIComponent(safeNext(url.searchParams.get("next")));
   const to = user.totp_enabled_at ? `/signin/2fa?next=${next}` : `/security/setup?next=${next}`;
-  return redirect(to, await issueSession(user.id, false, getDeps().db));
+  return redirect(to, await issueSession(user.id, false, db));
 });

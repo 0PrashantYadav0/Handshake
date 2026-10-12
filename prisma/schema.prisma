@@ -307,6 +307,14 @@ model WebhookEvent {
   @@map("webhook_events")
 }
 
+// H-1: a sign-in link works once, across restarts and instances. Rows outlive the 15 min token only until the next sign-in.
+model UsedLoginToken {
+  jti        String   @id
+  expires_at DateTime @db.Timestamptz(6)
+
+  @@map("used_login_tokens")
+}
+
 // ---------- trust spec §6: digital signatures ----------
 
 enum PartyRole {

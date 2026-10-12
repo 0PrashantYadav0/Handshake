@@ -172,7 +172,7 @@ decide(verdicts, deal):
 
 ## I. Data
 
-- **I1.** Tables: `users`, `deals`, `conditions`, `files`, `evidence`, `verdicts`, `payments`, `payouts`, `deal_events`, `webhook_events`. No `disputes`, no sessions, no magic-link table.
+- **I1.** Tables: `users`, `deals`, `conditions`, `files`, `evidence`, `verdicts`, `payments`, `payouts`, `deal_events`, `webhook_events`. No `disputes`, no sessions. *Amended (K10):* `used_login_tokens` records each sign-in link's id once; trust spec §6 added `signing_keys` and `contract_signatures`.
 - **I2.** `files`: `id`, `deal_id`, `uploaded_by`, `purpose` (`reference` | `evidence`), `mime`, `size_bytes`, `sha256`, `bytes`, `created_at`. `evidence` rows reference `file_id` for photos; `kind` is `photo` | `tracking` | `note`; `value` holds the tracking number or note text; `submission_no` is 1 or 2. Reference photos are compared against every photo condition, so `conditions.reference_file_ids` is dropped.
 - **I3.** `deals` adds `deadline_days` (1 to 21), `seeded` (boolean), `updated_at`; `deadline_at` is null until `held`. `payments` keeps `authorization_id` (original), `authorized_at`, `auth_expires_at`, `capture_id`, `status` (`created` | `approved` | `authorized` | `capture_pending` | `captured` | `declined` | `voided`), and adds `order_attempts` (integer, default 0; E4) and `capture_attempts` (integer, default 0; incremented only when a `fact:capture_declined` event is applied; E4); no `honor_expires_at`. `payouts` adds `sender_batch_id`, `attempt`, `failure_reason`, `paypal_item_id`.
 - **I4.** `public_code` = `HS-` + 4 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`; regenerate on collision.
@@ -197,6 +197,7 @@ decide(verdicts, deal):
 - **K7.** Demo personas (only with `DEMO_LOGIN=true`, which refuses to boot unless PayPal is the sandbox) share published TOTP secrets, are exempt from lockout, and cannot change payout address, keys or recovery codes.
 - **K8.** Field encryption at rest (AES-256-GCM, `DATA_KEYS` keyring, AAD = column and deal id) for deal text, conditions, evidence values, photos, verdict reasons and raw responses, the contract keys of event payloads, and TOTP secrets. Not zero-knowledge: the server must read terms for Claude to judge them.
 - **K9.** Reconciliation: the tick job reads captures pending over 10 minutes, holds approved over 10 minutes and payouts pending over 30 minutes from PayPal and applies the same facts webhooks would (E12).
+- **K10.** A sign-in link works once: the callback inserts the token's `jti` into `used_login_tokens` (primary key, so a second insert claims nothing), across restarts and instances. Rows past the 15-minute expiry are deleted on the next sign-in.
 
 ## Assumptions
 

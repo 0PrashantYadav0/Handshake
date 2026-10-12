@@ -125,6 +125,30 @@ describe("magic link", () => {
     expect(await deps.db.user.count()).toBe(1); // upsert, not a second row
   });
 
+  test("H-1: a used link stays used after a restart (fresh module, same database)", async () => {
+    const token = await createMagicToken("a@test");
+    expect((await callRoute(callback, "GET", `/api/auth/callback?token=${token}`)).headers.get("location")).toMatch(/^\/security\/setup/);
+    vi.resetModules();
+    const { GET: restarted } = await import("@/app/api/auth/callback/route");
+    const res = await callRoute(restarted, "GET", `/api/auth/callback?token=${token}`);
+    expect(res.headers.get("location")).toBe("/signin?error=invalid_link");
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  test("H-1: five parallel callbacks with one link -> exactly one session", async () => {
+    const token = await createMagicToken("a@test");
+    const all = await Promise.all(Array.from({ length: 5 }, () => callRoute(callback, "GET", `/api/auth/callback?token=${token}`)));
+    expect(all.filter((r) => r.headers.get("set-cookie")).length).toBe(1);
+    expect(await deps.db.usedLoginToken.count()).toBe(1);
+  });
+
+  test("H-1: rows of expired links are removed on the next sign-in", async () => {
+    await deps.db.usedLoginToken.create({ data: { jti: "old", expires_at: new Date(Date.now() - 1000) } });
+    await callRoute(callback, "GET", `/api/auth/callback?token=${await createMagicToken("a@test")}`);
+    expect((await deps.db.usedLoginToken.findMany()).map((r) => r.jti)).not.toContain("old");
+    expect(await deps.db.usedLoginToken.count()).toBe(1);
+  });
+
   test("expired, tampered or session-purpose token -> 302 /signin?error=invalid_link with no Set-Cookie", async () => {
     const expired = await signToken("a@test", "login", -LOGIN_TTL_SEC);
     const tampered = (await createMagicToken("a@test")).slice(0, -3) + "xyz";
@@ -136,6 +160,7 @@ describe("magic link", () => {
       expect(res.headers.get("set-cookie")).toBeNull();
     }
     expect(await deps.db.user.count()).toBe(0);
+    expect(await deps.db.usedLoginToken.count()).toBe(0); // nothing claimed for a bad token
   });
 
   test("not an email -> 400 invalid_input and nothing sent", async () => {
