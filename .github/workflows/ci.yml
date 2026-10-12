@@ -20,13 +20,13 @@ jobs:
       DATA_KEYS: k1:ci-only-data-key-at-least-32-characters-long
       CRON_SECRET: ci-only-cron-secret-at-least-32-characters
       PAYPAL_CLIENT_ID: ci
-      PAYPAL_CLIENT_SECRET: ci
+      PAYPAL_CLIENT_SECRET: ci-only-paypal-client-secret
       PAYPAL_API_BASE: https://api-m.sandbox.paypal.com
       PAYPAL_WEBHOOK_ID: WEBHOOK_ID
       NEXT_PUBLIC_PAYPAL_CLIENT_ID: ci
-      ANTHROPIC_API_KEY: ci
+      ANTHROPIC_API_KEY: ci-only-anthropic-api-key
       AI_MODEL: claude-sonnet-5-5
-      RESEND_API_KEY: ci
+      RESEND_API_KEY: ci-only-resend-api-key
       EMAIL_FROM: Handshake <onboarding@resend.dev>
       PASS_THRESHOLD: '0.85'
       AUTO_CAPTURE_MAX_MINOR: '20000'
@@ -44,3 +44,4 @@ jobs:
       - run: npm test
       - run: npm run test:int
       - run: npm run build
+      - run: bash scripts/check-secrets.sh

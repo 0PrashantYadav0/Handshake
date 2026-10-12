@@ -68,3 +68,28 @@ describe("import boundaries (lib/**)", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// 06 "Security checks": decide() is the only path to a capture. The PayPal capture call lives in facts-db.ts (captureHold, and
+// voidHold's re-send when PayPal says the hold was already captured); captureHold runs only on decide() === "capture" and on the
+// buyer's review approve. Voids are not pinned: they only return money to the buyer (deadlines, stray holds, rejects, cancels).
+describe("capture call sites", () => {
+  // Every mention by name (calls, destructuring, bracket access), not only one call shape; comments do not count.
+  const SCANNED = [...files, ...walk(join(ROOT, "app")), ...walk(join(ROOT, "scripts"))].filter((f) => !rel(f).startsWith("lib/paypal/"));
+  const mentions = (word: string) =>
+    SCANNED.flatMap((f) =>
+      readFileSync(f, "utf8").split("\n").map((line, i, lines) => ({ file: rel(f), line, before: lines.slice(Math.max(0, i - 3), i).join("\n") }))
+        .filter(({ line }) => new RegExp(`\\b${word}\\b`).test(line.replace(/\/\/.*$|\/\*.*?\*\/|^\s*\*.*$/g, ""))),
+    );
+
+  it("only lib/deal/facts-db.ts names PayPal's captureAuthorization (scripts/sandbox: the operator's spike tool)", () => {
+    const files = [...new Set(mentions("captureAuthorization").map((m) => m.file))].sort();
+    expect(files).toEqual(["lib/deal/facts-db.ts", "scripts/sandbox/spike.ts"]);
+  });
+
+  it("captureHold is used only after decide() === 'capture' and on review approve", () => {
+    const uses = mentions("captureHold").filter((m) => !/^\s*import\s/.test(m.line) && !/export async function captureHold\(/.test(m.line));
+    expect(uses.map((u) => u.file).sort()).toEqual(["lib/deal/commands.ts", "lib/deal/verdict.ts"]);
+    const guard = { "lib/deal/verdict.ts": 'if (decision === "capture") {', "lib/deal/commands.ts": 'if (cmd.decision === "approve") {' } as Record<string, string>;
+    for (const u of uses) expect(u.before, `${u.file}: ${u.line.trim()}`).toContain(guard[u.file]);
+  });
+});
