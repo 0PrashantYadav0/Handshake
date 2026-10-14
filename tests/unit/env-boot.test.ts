@@ -4,7 +4,7 @@ import { register } from "@/instrumentation";
 
 const GOOD = {
   NEXT_RUNTIME: "nodejs",
-  DATABASE_URL: "postgresql://u:p@db:5432/h",
+  DATABASE_URL: "postgresql://db:5432/h",
   APP_URL: "https://handshake.example",
   SESSION_SECRET: "s".repeat(32),
   DATA_KEYS: "k1:" + "d".repeat(32),
@@ -19,6 +19,7 @@ const GOOD = {
   EMAIL_FROM: "Handshake <a@b.c>",
   CRON_SECRET: "c".repeat(32),
   DEMO_LOGIN: "true",
+  DEMO_SELLER_PAYPAL_EMAIL: "seller@example.com",
 };
 
 const boot = (env: Record<string, string | undefined>) => {
@@ -27,7 +28,10 @@ const boot = (env: Record<string, string | undefined>) => {
 };
 
 beforeEach(() => vi.resetModules()); // lib/env parses at module load, so each case needs a fresh import
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe("env check at boot", () => {
   it("a complete production environment boots", async () => {
@@ -40,6 +44,7 @@ describe("env check at boot", () => {
     ["a short SESSION_SECRET", { SESSION_SECRET: "short" }],
     ["DEMO_LOGIN on live PayPal", { PAYPAL_API_BASE: "https://api-m.paypal.com" }],
     ["a malformed PASS_THRESHOLD", { PASS_THRESHOLD: "abc" }],
+    ["DEMO_LOGIN without the demo seller payout address", { DEMO_SELLER_PAYPAL_EMAIL: "" }],
   ])("production refuses %s", async (_, env) => {
     await expect(boot({ NODE_ENV: "production", ...env })).rejects.toThrow();
   });
@@ -48,7 +53,6 @@ describe("env check at boot", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await expect(boot({ NODE_ENV: "development", PAYPAL_CLIENT_ID: "", ANTHROPIC_API_KEY: "" })).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
   });
 
   it("the edge runtime skips the check", async () => {

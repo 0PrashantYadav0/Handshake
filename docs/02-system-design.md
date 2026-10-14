@@ -6,7 +6,7 @@ As of 2026-10-09. Names (states, commands, endpoints, tables, columns, env vars)
 
 ## 1. Overview
 
-Handshake is one Next.js 16 app (App Router, TypeScript, Node runtime) with one Postgres database and one daily cron job, all on Render (decisions B1). The browser talks only to `/api/*` and to PayPal's approval popup. Every deal is owned by one deep module, `lib/deal/`, which is the only code that changes `deals.status`, writes `deal_events`, or calls PayPal authorize, capture, void or Payouts (B2). Route handlers are thin (B4). The AI (Claude) returns JSON verdicts; a fixed function in code, `decide()`, turns verdicts into one of four actions (D9); the model never calls PayPal and has no tools. PayPal facts (an authorization was created, a capture completed, a payout succeeded) can arrive from an API response or a webhook, and each is applied exactly once, from whichever arrives first (C3). The verdict runs inside the evidence request: the AI call is capped at 17 s inside a 19 s abort signal, the request typically takes 6 to 12 s and about 40 s in the worst case, and the UI waits 45 s (B5). Photos live in Postgres as `bytea` and are served through HMAC-signed URLs (B6).
+Handshake is one Next.js 16 app (App Router, TypeScript, Node runtime) with one Postgres database and one cron job every 10 minutes, all on Render (decisions B1, J2). The browser talks only to `/api/*` and to PayPal's approval popup. Every deal is owned by one deep module, `lib/deal/`, which is the only code that changes `deals.status`, writes `deal_events`, or calls PayPal authorize, capture, void or Payouts (B2). Route handlers are thin (B4). The AI (Claude) returns JSON verdicts; a fixed function in code, `decide()`, turns verdicts into one of four actions (D9); the model never calls PayPal and has no tools. PayPal facts (an authorization was created, a capture completed, a payout succeeded) can arrive from an API response or a webhook, and each is applied exactly once, from whichever arrives first (C3). The verdict runs inside the evidence request: the AI call is capped at 17 s inside a 19 s abort signal, the request typically takes 6 to 12 s and about 40 s in the worst case, and the UI waits 45 s (B5). Photos live in Postgres as `bytea` and are served through HMAC-signed URLs (B6).
 
 ```
 +------------------------------------------------------------------------------------+
@@ -37,7 +37,7 @@ Handshake is one Next.js 16 app (App Router, TypeScript, Node runtime) with one 
    Postgres    Anthropic     Resend      (photo bytes are in Postgres: files.bytes)
    (Render)    Messages API  email
 
-   Render cron  (0 6 * * *)  --- POST /api/jobs/tick  (Authorization: Bearer CRON_SECRET) --->  Next.js app
+   Render cron (*/10 * * * *) --- POST /api/jobs/tick  (Authorization: Bearer CRON_SECRET) --->  Next.js app
 ```
 
 ## 2. Components
@@ -58,7 +58,7 @@ Each component has one job and a short list of things it must never do.
 | PayPal sandbox | Holds, captures, voids, Payouts, webhooks | | |
 | Anthropic | `claude-sonnet-5-5` for extraction and judging | | Hold tools or credentials |
 | Resend | Magic links and the two notices in 5.6 (test sender delivers only to the account owner until a domain is verified, F2) | | |
-| Render cron (`0 6 * * *`) | `curl -X POST /api/jobs/tick` with `CRON_SECRET` once a day (J2) | | Run app code itself |
+| Render cron (`*/10 * * * *`) | `curl -X POST /api/jobs/tick` with `CRON_SECRET` every 10 minutes (J2) | | Run app code itself |
 
 ## 3. The `lib/deal` interface
 
@@ -870,7 +870,7 @@ Transaction names used below: **Tx A** (evidence stored, `held -> proof_submitte
 
 ### 6.6 Deadline void (SB-2, second half)
 
-1. Render cron runs `curl -fsS --max-time 120 -X POST -H "Authorization: Bearer $CRON_SECRET" https://{host}/api/jobs/tick` at 06:00 UTC.
+1. Render cron runs `curl -fsS --max-time 120 -X POST -H "Authorization: Bearer $CRON_SECRET" https://{host}/api/jobs/tick` every 10 minutes.
 2. The route compares the bearer with `CRON_SECRET` using `timingSafeEqual` and calls `tick(clock.now())`.
 3. For each `held` or `in_review` deal with `deadline_at < now` and `seeded = false`: void with `void-{code}`, then Tx `-> voided` with cause `tick:deadline`. No email.
 4. For each `proof_submitted` deal older than 2 minutes: event `tick:reverify`, then `runVerdict()` (6.9).
@@ -899,7 +899,7 @@ Transaction names used below: **Tx A** (evidence stored, `held -> proof_submitte
 ### 6.9 The server dies during the verdict, and `tick()` retries
 
 1. 6.1 step 8.1 committed Tx A: the deal is `proof_submitted`, evidence rows exist. The process is killed during `ai.judge` (a Render deploy or a crash). The seller's request fails at the network level; a reload shows `proof_submitted` with "Verdict in progress".
-2. Nothing else happens until `tick()` runs (daily cron, or `POST /api/jobs/tick` run by hand). `tick()` selects `proof_submitted` deals with `updated_at` older than 2 minutes, writes `tick:reverify` and calls `runVerdict()`.
+2. Nothing else happens until `tick()` runs (the 10-minute cron, or `POST /api/jobs/tick` run by hand). `tick()` selects `proof_submitted` deals with `updated_at` older than 2 minutes, writes `tick:reverify` and calls `runVerdict()`.
 3. Case A, died before Tx V: no verdict rows exist; `hashCheck()` and, without a match, the model run again; Tx V, the capture, Tx B and the payout follow as in 6.1.
 4. Case B, died after Tx V but before or during the capture call: verdict rows exist, so the model is not called; `decide()` gives the same answer from the same rows; the capture is sent with the same key `capture-{code}-0`. If the dead attempt's capture reached PayPal, PayPal returns the existing capture ("The server does not capture the payment again", research/paypal.md, "4. Idempotency"), and Tx B applies `capture_completed` once. If `PAYMENT.CAPTURE.COMPLETED` arrived in between, 5.3 already moved the deal `proof_submitted -> captured` with `fact:capture_completed`, inserted the `payouts` row and sent the payout (6.8); the deal is then no longer `proof_submitted`, `tick` does not select it, and no `decision:capture` event is written for it. The `verdict` event and the `fact:capture_completed` event together explain the step in the evidence pack.
 5. Case C, died after the capture call but before Tx B: as case B; the re-sent capture returns the existing capture, Tx B writes everything once, including the `pending` payouts row, and `sendPayout` follows.
@@ -1067,7 +1067,7 @@ Internal seams and what each test level covers:
 
 | Decision | Rationale |
 | --- | --- |
-| One Next.js app, one Postgres, one daily cron (B1) | One developer plus an agent and five weeks. Every extra service is a second deploy, a second set of env vars and a second thing to be awake during judging. The $50 Render credit covers exactly this shape (J2). |
+| One Next.js app, one Postgres, one cron (B1) | One developer plus an agent and five weeks. Every extra service is a second deploy, a second set of env vars and a second thing to be awake during judging. The $50 Render credit covers exactly this shape (J2). |
 | One deep module, `lib/deal` (B2) | Every money rule lives in one folder with one interface, so it can be tested against fakes end to end and reviewed in one sitting. Routes cannot drift from the rules because they contain none. |
 | The verdict runs inside the request (B5) | Work left running after a response is lost on a Render restart, and there is no queue to put it in. Answering `200` with the final state after at most 17 s of AI time (about 40 s worst case with the PayPal calls) is simpler for the UI and honest about what happened. `tick()` covers the crash case. |
 | Facts applied once from whichever source is first (C3) | The brief made webhooks the source of truth, which forces the UI to wait and a webhook outage to stall every deal. Treating the API response and the webhook as two carriers of one fact makes SB-6 and SB-7 pass with the same code and lets the demo move at the speed of the API response. |
@@ -1105,7 +1105,7 @@ Two PayPal behaviours are unverified (E11) and three platform limits are undocum
 | 7 | `PREVIOUSLY_VOIDED` on a second void, and void returning 204 | Void the same authorization twice | The `voidAuthorization` adapter's success mapping |
 | 8 | iPhone HEIC uploads through `createImageBitmap` (UNVERIFIED, research/stack.md "Open risks" 5) | Upload from a real iPhone in Safari and in Chrome | The client-side error copy in the UI spec |
 | 9 | Memory of `next start` with a 2 MB multipart upload on `0.5c-512mb` | Upload 6 photos while watching Render metrics | Whether the upload limit must drop |
-| 10 | Whether a cross-service `fromService: { envVarKey: RENDER_EXTERNAL_HOSTNAME }` fills the cron's `APP_HOST` (UNVERIFIED, 07 section 3.4 step 4) | After the first Blueprint deploy, open handshake-tick > Environment and read `APP_HOST` | If empty: `APP_HOST` becomes `sync: false` in `render.yaml` and the host is pasted by hand; without it the daily `tick` never runs |
+| 10 | Whether a cross-service `fromService: { envVarKey: RENDER_EXTERNAL_HOSTNAME }` fills the cron's `APP_HOST` (UNVERIFIED, 07 section 3.4 step 4) | After the first Blueprint deploy, open handshake-tick > Environment and read `APP_HOST` | If empty: `APP_HOST` becomes `sync: false` in `render.yaml` and the host is pasted by hand; without it `tick` never runs |
 
 Remaining risks after the spikes:
 

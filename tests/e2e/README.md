@@ -9,7 +9,7 @@ Shared steps (demo 2FA, signing) live in `flows.ts`.
 
 ## Two-party run
 
-The server needs `DEMO_LOGIN=true` and `DEMO_SELLER_PAYPAL_EMAIL` (the demo seller's address counts as verified). `make-draft.ts` writes to `E2E_DATABASE_URL`, else `DATABASE_URL` from `.env`; it must be the server's database.
+The server needs `DEMO_LOGIN=true` and `DEMO_SELLER_PAYPAL_EMAIL` (the demo seller's address counts as verified). Without `PLAYWRIGHT_BASE_URL`, Playwright runs `next start`, which refuses to serve (500 on `/api/health`, so the runner waits out its 180 s timeout) unless every required env var in `lib/env.ts` is set; placeholders are fine for this spec. `make-draft.ts` writes to `E2E_DATABASE_URL`, else `DATABASE_URL` from `.env`; it must be the server's database.
 
 ```sh
 npm run build && npm run start &                                  # or any running server

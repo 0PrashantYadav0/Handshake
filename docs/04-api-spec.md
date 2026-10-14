@@ -1040,7 +1040,7 @@ Every applied fact writes one `deal_events` row with actor `paypal`, cause `fact
 
 ## 12. `POST /api/jobs/tick`
 
-Who: the Render cron service (schedule `0 6 * * *`, decisions J2), or an operator with the secret. Header `Authorization: Bearer {CRON_SECRET}`, compared with `crypto.timingSafeEqual` after a length check. Module call: `tick(now, deps)`.
+Who: the Render cron service (schedule `*/10 * * * *`, decisions J2), or an operator with the secret. Header `Authorization: Bearer {CRON_SECRET}`, compared with `crypto.timingSafeEqual` after a length check. Module call: `tick(now, deps)`.
 
 Request: empty body.
 

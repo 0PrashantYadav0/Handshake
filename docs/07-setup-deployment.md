@@ -402,7 +402,7 @@ services:
     name: handshake-tick
     runtime: node
     plan: 0.5c-512mb                       # $1/mo minimum
-    schedule: "*/10 * * * *"               # every 10 minutes (J2, trust spec §9)
+    schedule: "*/10 * * * *"               # every 10 minutes: deadline voids, stuck verdicts, PayPal reconciliation (J2, trust §9)
     buildCommand: "true"
     startCommand: >-
       curl -fsS --max-time 120 --retry 3 -X POST
