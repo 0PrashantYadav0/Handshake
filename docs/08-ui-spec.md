@@ -511,7 +511,7 @@ After an `edit_terms` the party who had accepted sees a banner on this card: "Te
 
 | Viewer | Heading | Helper |
 | --- | --- | --- |
-| Buyer | Checking the seller's proof… | "This usually takes under 15 seconds, at most about 40. If the check could not finish, Handshake re-runs it at the next daily check (06:00 UTC) or when an operator runs it; nothing is charged until then." (B5, B7, J2) |
+| Buyer | Checking the seller's proof… | "This usually takes under 15 seconds, at most about 40. If the check could not finish, Handshake re-runs it at the next check (within 10 minutes) or when an operator runs it; nothing is charged until then." (B5, B7, J2) |
 | Seller | Checking your proof… | Same, plus the wait screen (7.8) when this browser submitted. |
 
 **`in_review`**
@@ -659,7 +659,7 @@ While `POST .../evidence` is in flight the Proof card becomes the wait screen:
 - `aria-live="polite"` region announcing step changes; no animation under `prefers-reduced-motion` (the dot is static).
 - On `200`: render the Proof card with verdicts (7.9) and the "What happens next" card for the new status. Focus moves to the decision line.
 - On `paypal_error` (04 section 9.1 step 6: the verdict ran but the capture or void call failed; the deal stays `proof_submitted`): refetch the deal, render the Proof card with the verdicts from the latest submission (empty if none were stored), and the line "PayPal couldn't complete the payment step (debug id {debug_id}). The result is saved; the payment step is retried automatically." The "What happens next" card shows the `proof_submitted` copy from 7.4.
-- On a network failure or no response after 45 s (B5: the UI waits 45 s): "We lost the connection while checking. Reload to see the result. If the check could not finish, Handshake re-runs it at the next daily check (06:00 UTC) or when an operator runs it; nothing is charged until then." (B7, J2). Button "Reload".
+- On a network failure or no response after 45 s (B5: the UI waits 45 s): "We lost the connection while checking. Reload to see the result. If the check could not finish, Handshake re-runs it at the next check (within 10 minutes) or when an operator runs it; nothing is charged until then." (B7, J2). Button "Reload".
 - On `invalid_state` (double submit): the generic refetch from 4.4.
 
 ### 7.9 Verdict display

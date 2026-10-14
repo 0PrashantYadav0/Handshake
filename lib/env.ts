@@ -31,6 +31,9 @@ const EnvZ = z.object({
 export const env = EnvZ.refine((e) => e.DEMO_LOGIN !== "true" || e.PAYPAL_API_BASE.includes("sandbox"), {
   message: "DEMO_LOGIN=true is allowed only with the PayPal sandbox (PAYPAL_API_BASE must be the sandbox API)",
   path: ["DEMO_LOGIN"],
+}).refine((e) => e.DEMO_LOGIN !== "true" || e.DEMO_SELLER_PAYPAL_EMAIL.includes("@"), {
+  message: "DEMO_LOGIN=true needs DEMO_SELLER_PAYPAL_EMAIL (the sandbox account the demo seller is paid to)",
+  path: ["DEMO_SELLER_PAYPAL_EMAIL"],
 }).parse(process.env);
 export const LIMITS = limitsFromEnv(); // evaluated at module load: a bad PASS_THRESHOLD stops the deploy
 export const DEMO_LOGIN = env.DEMO_LOGIN === "true";

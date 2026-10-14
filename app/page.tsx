@@ -46,7 +46,7 @@ const SELLERS = [
 ];
 
 const FAQ = [
-  ["What if the seller never ships?", "Nothing is charged. When the deadline passes (at most 21 days after the hold), a daily job voids the authorization and PayPal releases the hold on the buyer's money."],
+  ["What if the seller never ships?", "Nothing is charged. When the deadline passes (at most 21 days after the hold), a job that runs every 10 minutes voids the authorization and PayPal releases the hold on the buyer's money."],
   ["What if the AI is unsure?", "An unclear verdict, or any confidence below 0.85, never releases money on its own. The deal goes to the buyer, who sees the photos, the conditions and Claude's reasons, then releases the payment or rejects the proof. Deals over $200 always go to the buyer."],
   ["When is my money actually taken?", "Only when the payment is released: either the rule captures the hold after every condition passes, or you release it yourself in review. Until then your PayPal account shows an authorization hold, not a charge."],
   ["What if the item is wrong?", "The first failed check asks the seller for one fix. On the second try, a confident failure voids the hold and the money goes back to the buyer; a less certain one goes to the buyer to decide."],

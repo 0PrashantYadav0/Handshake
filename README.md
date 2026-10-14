@@ -124,7 +124,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Seeded history | The ledger and dashboard show about 25 seeded historical deals (`deals.seeded = true`) with events but no PayPal objects, so there is something to sort and chart. Deals you create are real sandbox deals. |
 | AG Studio trial | `/dashboard` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
 | Demo login | Magic-link email only reaches the account owner's address (Resend test sender), so judges use the two demo personas. The seller persona's payout address comes from `DEMO_SELLER_PAYPAL_EMAIL` and is reset each time you switch to that persona, so edits on `/me` do not stick. |
-| 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the daily job voids the hold. |
+| 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the 10-minute job voids the hold. |
 
 ## Tools used and how
 
@@ -134,7 +134,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Claude `claude-sonnet-5-5` via `@anthropic-ai/sdk` | Two jobs, both structured outputs against hand-written JSON schemas at `effort: low`: extract `item_title`, amount, deadline and 1 to 4 checkable conditions from the sentence (subjective parts come back in `rejected[]` with a rewording); judge each condition from labelled base64 photos, the mock carrier status and the note. Every verdict row stores `model`, `prompt_version` and `raw_response`. |
 | AG Grid Community 36.2 | `/ledger`: every deal of the signed-in persona, sortable, filterable, with status chips and a quick filter. |
 | AG Studio 3.0 | `/dashboard`: three sources from `/api/dashboard/data`, nine widgets on the canvas, a theme bound to the app's CSS tokens, a custom `deal-pipeline` widget (click a stage to cross-filter the page), and the built-in Studio agents plus a custom `auditor` agent, all answered by `claude-sonnet-5-5` through `POST /api/studio/agent`. The one server-run tool, `explain_verdict`, reads the signed-in user's own deal and audit log; the agent cannot change a deal or move money. The prompt box appears only when `ANTHROPIC_API_KEY` is set. Prompts that work: [docs/studio-prompts.md](docs/studio-prompts.md). Loaded client-side only. |
-| Render | One Blueprint (`render.yaml`): web service, Postgres 18, daily cron that calls `POST /api/jobs/tick`. Paid plans so nothing sleeps during judging. |
+| Render | One Blueprint (`render.yaml`): web service, Postgres 18, a cron every 10 minutes that calls `POST /api/jobs/tick`. Paid plans so nothing sleeps during judging. |
 | Prisma 7.10 + Postgres 18 | Schema, migrations (append-only trigger on `deal_events`), photos stored as `bytea` and served through HMAC-signed URLs that expire after 10 minutes. |
 | Next.js 16, React 19, TypeScript 5.9, Tailwind CSS v4, Zod, jose, Resend | The app, validation, HS256 session cookies, magic-link email. |
 | Caveat (SIL OFL 1.1, `public/demo/fonts/OFL.txt`) | The composed deal-code photo in the demo kit. |
@@ -167,7 +167,9 @@ npm run seed                                             # two personas + about 
 npm run dev                                              # http://localhost:3000, click "Continue as buyer"
 ```
 
-Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point the `handshake-local` PayPal app's webhook at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the daily job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
+Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point the `handshake-local` PayPal app's webhook at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
+
+`instrumentation.ts` checks these at server start with `lib/env.ts`. `next dev` only warns about a missing or malformed one; `next start` (production) refuses to serve and answers 500 everywhere, so a local production run needs every required name filled, even with placeholders.
 
 | Env var | Value |
 | --- | --- |
@@ -186,7 +188,7 @@ Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point t
 
 ## Deploy it
 
-Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy` before each deploy), the Postgres 18 database and the 06:00 UTC cron. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). Register a second PayPal webhook on the Render hostname for the `handshake` app. Step by step: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
+Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). Register a second PayPal webhook on the Render hostname for the `handshake` app. Step by step: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
 
 ## Tests
 

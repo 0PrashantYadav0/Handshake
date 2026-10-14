@@ -200,7 +200,7 @@ Source: [stack: 5 "Render"], [stack: "Implications for Handshake"], [hackathon.m
 1. Sign up at render.com with the GitHub account that owns `0PrashantYadav0/Handshake`. Stay on the Hobby workspace ($0). Do not upgrade to Pro ($25/mo).
 2. Claim the $50 hackathon credit through the Render claim link on the Devpost resources page. The next day, open **Billing** and confirm the credit shows; whether it applies to every line item is UNVERIFIED [stack: 5(c)].
 3. **Blueprints > New Blueprint Instance**, connect the repository, branch `main`. Render reads `render.yaml` (section 5) and prompts once for every `sync: false` value. Enter them from section 2; for `PAYPAL_WEBHOOK_ID` enter `pending` and for `AG_GRID_LICENSE_KEY` enter nothing. Click **Apply**. This creates the web service `handshake`, the database `handshake-db` and the cron job `handshake-tick`.
-4. Wait for build, then pre-deploy (`npx prisma migrate deploy`), then live. Open `https://<host>/api/health` and expect `200`. Then open **handshake-tick > Environment** and confirm `APP_HOST` equals the web service's host: the research documents `fromService: { envVarKey }` [stack: 5(a)] but not that it resolves a built-in variable such as `RENDER_EXTERNAL_HOSTNAME` across services, so this is UNVERIFIED. If `APP_HOST` is empty, change the cron's `APP_HOST` in `render.yaml` to `sync: false`, re-apply the Blueprint and paste the host; without it the daily `tick` never runs and no deadline is ever voided.
+4. Wait for build, then pre-deploy (`npx prisma migrate deploy`), then live. Open `https://<host>/api/health` and expect `200`. Then open **handshake-tick > Environment** and confirm `APP_HOST` equals the web service's host: the research documents `fromService: { envVarKey }` [stack: 5(a)] but not that it resolves a built-in variable such as `RENDER_EXTERNAL_HOSTNAME` across services, so this is UNVERIFIED. If `APP_HOST` is empty, change the cron's `APP_HOST` in `render.yaml` to `sync: false`, re-apply the Blueprint and paste the host; without it `tick` never runs and no deadline is ever voided.
 5. Create the webhook (section 3.1 step 6) with that host, then in **handshake > Environment** set `PAYPAL_WEBHOOK_ID` and correct `APP_URL` if the host differs from `https://handshake.onrender.com`. Saving triggers a deploy.
 6. Seed the hosted database once: **handshake > Shell**, run `npm run seed`. Re-running is harmless (section 1, `prisma/seed.ts`).
 7. Later secrets never go in `render.yaml`; `sync: false` values are prompted only at first creation and are edited in the dashboard afterwards.
@@ -316,7 +316,7 @@ A fresh clone runs in under ten minutes with these steps in this order.
 9. Lint and types: `npm run lint` (eslint; `next lint` no longer exists) and `npm run typecheck`.
 10. Eval: `npm run eval` runs the 30 cases in `eval/cases/` and prints the decision-match rate and the wrong-capture rate (D12). It calls the real API: about $2.40 on Sonnet. Challengers: `AI_MODEL=claude-opus-5-5 npm run eval` and `AI_MODEL=claude-haiku-5-5 npm run eval` (D1).
 11. Webhooks locally: in a second terminal `cloudflared tunnel --url http://localhost:3000`, copy the printed host, then in the PayPal dashboard edit the `handshake-local` webhook's URL to `https://<words>.trycloudflare.com/api/webhooks/paypal`. If a new webhook is created instead of edited, copy its new Webhook ID into `.env` and restart `npm run dev`. Repeat each session.
-12. Run the daily job by hand: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
+12. Run the job by hand: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
 
 The `package.json` scripts those steps rely on:
 
@@ -402,7 +402,7 @@ services:
     name: handshake-tick
     runtime: node
     plan: 0.5c-512mb                       # $1/mo minimum
-    schedule: "0 6 * * *"                  # 06:00 UTC daily (J2)
+    schedule: "*/10 * * * *"               # every 10 minutes: deadline voids, stuck verdicts, PayPal reconciliation (J2, trust §9)
     buildCommand: "true"
     startCommand: >-
       curl -fsS --max-time 120 --retry 3 -X POST
@@ -437,7 +437,7 @@ Why each line is what it is [stack: 5, "Implications for Handshake"]:
 | no `region` | Web and database both default to `oregon`; the internal `connectionString` only works in one region. |
 | no `previews` | Disabled by default; full-stack previews need Pro anyway. |
 | cron `curl` | Hits the app over HTTPS with `CRON_SECRET`, so the job reuses app code with no second build. `tick` is idempotent (B7), so a retry or a manual run is safe. Native runtimes include `curl`. |
-| `schedule: "0 6 * * *"` | Render cron schedules are UTC; 06:00 UTC is 22:00 PST, outside judges' working hours. |
+| `schedule: "*/10 * * * *"` | Every 10 minutes: deadline voids, stuck verdicts and PayPal reconciliation (trust spec §9). |
 | `diskSizeGB: 5` | Photos live in Postgres (B6); 100 deals at about 6 MB is 600 MB. Disk can grow but never shrink. |
 | `0.1c-256mb` | Free Postgres expires 30 days after creation and is deleted after a 14-day grace period, before judging. |
 | no PgBouncer | `pg` Pool `max: 10` on one instance against 100 allowed connections. |
@@ -530,7 +530,7 @@ Rules from 2026-11-11 (submission) to 2026-12-15 (end of judging):
 2. No Blueprint sync, no plan change, no region change, no disk change, no Postgres upgrade.
 3. Environment variable edits are allowed only to paste a longer AG Studio key or to rotate a leaked secret. Each edit redeploys the same commit.
 4. Spend caps stay on: Anthropic $75/month; Render stays on Hobby with the three services above and nothing else; Resend stays on the free tier; the Postgres disk stays at 5 GB.
-5. No live deals are pre-made (A2). Judges create deals on demand; `tick` voids any `held` or `in_review` deal past `deadline_at` every day at 06:00 UTC (B7), so nothing outlives its 29-day PayPal hold.
+5. No live deals are pre-made (A2). Judges create deals on demand; `tick` voids any `held` or `in_review` deal past `deadline_at` within 10 minutes (B7), so nothing outlives its 29-day PayPal hold.
 6. The sandbox accounts, the two REST apps and the Render webhook are never edited or deleted. The `handshake-local` app may change freely; it delivers nothing to Render.
 
 Weekly check, every Monday from 2026-11-16 to 2026-12-14, about 15 minutes:
@@ -669,7 +669,7 @@ sentence "the AI returns JSON; only fixed code calls PayPal".
   JSON schemas, vision on base64 photos, effort low | term extraction, per-condition verdicts |
 | AG Grid Community 36.2 | the /ledger |
 | AG Studio 3.0 | the /dashboard: custom theme, custom widget, Claude-backed agent (if built) |
-| Render | web service, Postgres 18, daily cron, from render.yaml |
+| Render | web service, Postgres 18, cron every 10 minutes, from render.yaml |
 | Resend | magic links and notifications |
 | Next.js 16, React 19, TypeScript 5.9, Prisma 7.10, Postgres 18, Tailwind CSS v4, Zod, jose | the app |
 | <typeface name> handwriting font, SIL OFL 1.1 (public/demo/fonts/OFL.txt) | the composed deal-code photo in the demo kit |
