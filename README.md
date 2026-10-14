@@ -94,7 +94,7 @@ decide(verdicts, deal):
 
 Void is the one irreversible automated action against the seller, so on the second submission a `fail` voids only when the model is confident; a low-confidence `fail` goes to the buyer. Before any model call, an evidence photo whose SHA-256 matches a listing photo fails every photo condition at confidence 1 (D8). Untrusted text (notes, text inside photos) is delimited in the prompt and treated as evidence, never as instructions.
 
-Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions.md](docs/decisions.md), [docs/02-system-design.md](docs/02-system-design.md).
+Interactive tour: open [docs/overview.html](docs/overview.html) in a browser (architecture, money flow, state machine, decision simulator, env vars, status). Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions.md](docs/decisions.md), [docs/02-system-design.md](docs/02-system-design.md).
 
 ## Security
 
