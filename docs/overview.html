@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handshake: project overview</title>
+<style>
+:root {
+  --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #dedbd2;
+  --accent: #0b5cad; --accent-soft: #e3eefa; --good: #1f7a46; --good-soft: #e2f3e8;
+  --warn: #9a5b00; --warn-soft: #fbefd9; --bad: #b3261e; --bad-soft: #fbe3e1; --violet: #6a3fb5; --violet-soft: #eee6fb;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #121311; --panel: #1b1c1a; --ink: #ecebe6; --muted: #a09f98; --line: #33342f;
+  --accent: #6fb0f5; --accent-soft: #19304a; --good: #6fd29a; --good-soft: #173826; --warn: #f0b45a; --warn-soft: #3b2c12;
+  --bad: #f2867e; --bad-soft: #43201d; --violet: #b99af2; --violet-soft: #2e2442;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.55 var(--sans); background: var(--bg); color: var(--ink); }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+header { position: sticky; top: 0; z-index: 10; background: var(--panel); border-bottom: 1px solid var(--line); }
+.bar { display: flex; align-items: center; gap: 16px; padding: 12px 24px; max-width: 1280px; margin: 0 auto; }
+.brand { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.brand span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+.bar .spacer { flex: 1; }
+nav { display: flex; gap: 4px; overflow-x: auto; padding: 0 24px 10px; max-width: 1280px; margin: 0 auto; }
+nav button { border: 1px solid transparent; background: none; color: var(--muted); padding: 6px 12px; border-radius: 999px; cursor: pointer; font: inherit; white-space: nowrap; }
+nav button:hover { color: var(--ink); background: var(--accent-soft); }
+nav button[aria-selected="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+main { max-width: 1280px; margin: 0 auto; padding: 24px; }
+section { display: none; }
+section.active { display: block; animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+h1 { font-size: 30px; letter-spacing: -0.02em; margin: 0 0 6px; }
+h2 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+h3 { font-size: 16px; margin: 18px 0 6px; }
+.lede { color: var(--muted); max-width: 820px; margin: 0 0 20px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; overflow-x: auto; }
+@media (max-width: 600px) { main { padding: 12px; } .cond { grid-template-columns: 1fr 1fr; } .kv { grid-template-columns: 1fr; } }
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.stat b { display: block; font-size: 28px; letter-spacing: -0.02em; }
+.stat span { color: var(--muted); font-size: 13px; }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; }
+.ok { color: var(--good); background: var(--good-soft); } .wait { color: var(--warn); background: var(--warn-soft); }
+.no { color: var(--bad); background: var(--bad-soft); } .info { color: var(--accent); background: var(--accent-soft); }
+.vio { color: var(--violet); background: var(--violet-soft); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.split { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+svg text { font-family: var(--sans); fill: var(--ink); }
+.node rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; rx: 10; transition: all .2s; }
+.node { cursor: pointer; }
+.node:hover rect { stroke: var(--accent); }
+.node.sel rect { stroke: var(--accent); stroke-width: 3; fill: var(--accent-soft); }
+.node.dim { opacity: .35; }
+.node .sub { fill: var(--muted); font-size: 11px; }
+.node.ext rect { stroke-dasharray: 5 4; }
+.edge { stroke: var(--line); stroke-width: 1.6; fill: none; transition: all .2s; }
+.edge.hot { stroke: var(--accent); stroke-width: 2.6; }
+.edge.dim { opacity: .25; }
+.elabel { font-size: 10.5px; fill: var(--muted); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+.elabel.hot { fill: var(--accent); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.kv { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+ul.tight { margin: 6px 0; padding-left: 18px; } ul.tight li { margin: 2px 0; }
+.seq-row { cursor: pointer; }
+.seq-row:hover rect.bgrow { fill: var(--accent-soft); }
+.seq-row.cur rect.bgrow { fill: var(--accent-soft); }
+.lane { stroke: var(--line); stroke-dasharray: 4 4; }
+.status-badge { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--violet-soft); color: var(--violet); }
+.log { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; max-height: 220px; overflow: auto; }
+.cond { display: grid; grid-template-columns: 1fr 120px 1fr 40px 28px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.cond input[type=text] { width: 100%; }
+input, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.result-box { border-radius: 12px; padding: 16px; border: 2px solid; }
+.feature h3 { margin-top: 4px; }
+.feature .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+pre.env { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 360px; }
+.timeline { position: relative; padding-left: 22px; }
+.timeline:before { content: ""; position: absolute; left: 7px; top: 4px; bottom: 4px; width: 2px; background: var(--line); }
+.tl-item { position: relative; margin-bottom: 14px; }
+.tl-item:before { content: ""; position: absolute; left: -20px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); }
+.tl-item.done:before { background: var(--good); } .tl-item.later:before { background: var(--muted); }
+.uc-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+footer { color: var(--muted); font-size: 12px; text-align: center; padding: 30px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Handshake <span>pay on proof · PayPal AI Hackathon</span></div>
+    <div class="spacer"></div>
+    <span class="muted small" id="asof">State as of main @ ae24e16 · 2026-10-14</span>
+    <button class="btn" id="theme" title="Toggle dark mode">◐</button>
+  </div>
+  <nav id="tabs" role="tablist"></nav>
+</header>
+<main>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <h1>Money moves when the proof does.</h1>
+  <p class="lede">The buyer describes a deal in one sentence. Claude turns it into checkable conditions, both sides sign the contract with keys kept on their own devices, and PayPal <b>authorizes</b> the buyer's payment without capturing it. The seller uploads proof, Claude judges each condition, and fixed code decides whether to <b>capture</b> (release the money), ask for a fix, send it to the buyer, or <b>void</b> the hold. The model never moves money. A pure function does.</p>
+  <div class="grid g4" id="stats"></div>
+  <h3>The idea in six steps</h3>
+  <div class="grid g3" id="howsteps"></div>
+  <h3>What makes it trustworthy</h3>
+  <div class="grid g3">
+    <div class="card"><b>The model never touches money</b><p class="small muted">Claude only returns pass, fail or unclear with a confidence for each condition. <code>decide()</code> is a pure function with fixed thresholds that both parties signed. It is the only automatic path to capture, and a test pins every capture call site. The other capture is the buyer's own approval in review.</p></div>
+    <div class="card"><b>A signed contract gates every payment step</b><p class="small muted">Each side signs a canonical JSON contract with ECDSA P-256 using a key that never leaves the browser. Before an order, an authorization, a capture or a payout, the server rebuilds the contract from the database and checks both signatures.</p></div>
+    <div class="card"><b>An audit trail that cannot be rewritten</b><p class="small muted">Every change writes a <code>deal_events</code> row, and a Postgres trigger blocks UPDATE and DELETE on that table. Every PayPal call carries a fixed idempotency key, and every PayPal fact is applied at most once.</p></div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section id="usecases">
+  <h2>Use cases</h2>
+  <p class="lede">Any deal between two people who don't trust each other yet, where the proof can be photographed or tracked. Pick a scenario to see how Handshake runs it. The first three are the shipped demo presets; the rest show where the same engine fits.</p>
+  <div class="uc-tabs" id="ucTabs"></div>
+  <div class="split">
+    <div class="card" id="ucBody"></div>
+    <div class="card"><h3 style="margin-top:0">Who it is for</h3>
+      <ul class="tight small">
+        <li><b>Marketplace buyers</b> paying strangers on Facebook Marketplace, Craigslist, Discord or Reddit, where "Goods &amp; Services" protection is weak or missing.</li>
+        <li><b>Sellers</b> who want proof that the buyer has funds before they ship. The hold is real money on the buyer's card.</li>
+        <li><b>Freelancers and makers</b> doing commissions: custom furniture, art, repairs.</li>
+        <li><b>Platforms</b> that want escrow-like assurance without becoming a licensed escrow service. The hold stays with PayPal.</li>
+      </ul>
+      <h3>Why not plain escrow?</h3>
+      <p class="small muted">Escrow needs a human agent and days of review. Handshake settles a clear case in under 15 seconds. Only the unclear ones go to the buyer, and the 21-day cap means a hold never outlives PayPal's 29-day authorization window.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p class="lede">It is one Next.js 16 app (App Router, Node runtime), one Postgres 18 database and one cron job, all on Render. Everything about deals goes through one deep module, <code>lib/deal</code>, which talks to the outside through four ports (db, paypal, ai, email) plus a clock. Tests swap the ports for fakes. <b>Click any box.</b></p>
+  <div class="split">
+    <div class="card" style="padding:8px"><svg id="arch" viewBox="0 0 1000 640" width="100%"></svg></div>
+    <div class="card" id="archInfo"></div>
+  </div>
+  <h3>Repository map</h3>
+  <div class="grid g3 small" id="repomap"></div>
+</section>
+
+<!-- MONEY FLOW -->
+<section id="flow">
+  <h2>Data and money flow</h2>
+  <p class="lede">One deal, from the sentence to the payout. Press <b>Play</b> or click a row. Each step lists who acts, the status afterwards, the PayPal call with its idempotency key, and the events written to the audit log.</p>
+  <div class="chips">
+    <button class="btn primary" id="play">▶ Play</button>
+    <button class="btn" id="prev">← Prev</button>
+    <button class="btn" id="next">Next →</button>
+    <span class="muted small" style="align-self:center" id="stepNo"></span>
+  </div>
+  <div class="split">
+    <div class="card" style="padding:8px"><svg id="seq" width="100%"></svg></div>
+    <div class="card" id="stepInfo"></div>
+  </div>
+</section>
+
+<!-- STATE MACHINE -->
+<section id="states">
+  <h2>Deal state machine</h2>
+  <p class="lede">The transitions are written down as a data table, <code>lib/deal/transitions.ts</code>, which unit tests check against the code. Commands check their own from-status, <code>applyFact</code> computes the fact transitions, and <code>transition()</code> guards the from-status in the same transaction. Click a status to see what leaves it, or walk a deal through the machine with the buttons.</p>
+  <div class="split">
+    <div class="card" style="padding:8px"><svg id="sm" viewBox="0 0 1000 440" width="100%"></svg></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Walk a deal</h3><button class="btn" id="smReset">Reset</button></div>
+      <p class="small">Current status: <span class="status-badge" id="smCur"></span></p>
+      <div class="chips" id="smMoves"></div>
+      <div class="log" id="smLog"></div>
+      <h3>Out of this status</h3>
+      <div id="smInfo" class="small"></div>
+    </div>
+  </div>
+</section>
+
+<!-- DECISION ENGINE -->
+<section id="decide">
+  <h2>Decision engine simulator</h2>
+  <p class="lede">This is a live copy of <code>decide()</code> from <code>lib/deal/decide.ts</code>. Set each condition's verdict and confidence, the amount and the attempt number, and watch the decision change. Both thresholds are snapshotted into the signed contract when the deal is created.</p>
+  <div class="split">
+    <div class="card">
+      <div class="grid g3 small" style="margin-bottom:10px">
+        <label>Amount (USD) <input type="number" id="dAmount" value="18" min="1" step="1" style="width:90px"></label>
+        <label>Submission <select id="dAttempt"><option value="0">First (no fix used)</option><option value="1">Second (after a fix request)</option></select></label>
+        <label><input type="checkbox" id="dReuse"> Evidence reuses a listing photo</label>
+        <label>PASS_THRESHOLD <input type="number" id="dTh" value="0.85" min="0" max="1" step="0.01" style="width:70px"></label>
+        <label>AUTO_CAPTURE_MAX (USD) <input type="number" id="dMax" value="200" min="0" step="1" style="width:80px"></label>
+      </div>
+      <div id="conds"></div>
+      <button class="btn" id="addCond" style="margin-top:10px">+ Add condition</button>
+    </div>
+    <div>
+      <div class="result-box" id="dOut"></div>
+      <div class="card small" style="margin-top:12px">
+        <b>The rules, in order</b>
+        <ol class="small" style="padding-left:18px;margin:6px 0">
+          <li>No conditions → buyer review (unclear)</li>
+          <li>Any <b>fail</b>: on the first submission → request a fix. On the second → void if any fail has confidence ≥ threshold, otherwise buyer review.</li>
+          <li>Any <b>unclear</b> → buyer review</li>
+          <li>Any confidence &lt; threshold → buyer review (low confidence). Exactly 0.85 passes.</li>
+          <li>Amount &gt; auto-capture max → buyer review. Exactly $200 captures.</li>
+          <li>Otherwise → <b>capture</b></li>
+        </ol>
+        <p class="muted">Before Claude is called, <code>hashCheck()</code> compares the evidence photos with the listing photos by SHA-256. A reused photo fails every photo condition at confidence 1 and leaves tracking unclear, without a model call (<code>guardrail-v1</code>).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <h2>Features and how they are built</h2>
+  <p class="lede">Every feature below is on <code>main</code>, covered by tests and merged through a reviewed PR. Filter by area. The badge shows whether it has run against the real external service yet.</p>
+  <div class="chips" id="fFilter"></div>
+  <div class="grid g2" id="fList"></div>
+</section>
+
+<!-- SECURITY -->
+<section id="security">
+  <h2>Security model</h2>
+  <p class="lede">Defense in depth around one rule: money moves only when the code decides, and only within the signed contract. Every row names the code that enforces it. Each one maps to an item in 06 "Security checks", which lists the test that proves it; all 18 are ticked.</p>
+  <div class="card"><table id="secTable"><thead><tr><th>Threat</th><th>Control</th><th>Where</th></tr></thead><tbody></tbody></table></div>
+  <h3>Encryption at rest</h3>
+  <p class="small muted" style="max-width:900px">AES-256-GCM through <code>lib/crypto/seal.ts</code>, with a keyring in <code>DATA_KEYS</code>. The first key encrypts and any listed key decrypts. The AAD binds each value to <code>table.column:deal id</code>, so a ciphertext copied to another row fails to decrypt. Sealed fields: the deal's sentence and title, condition text, evidence values, verdict reasons and raw model output, photo bytes, sensitive event payload keys, and TOTP secrets. True zero-knowledge end-to-end encryption is not possible here, because Claude must read the terms. This is the honest alternative: TLS in transit, sealed at rest, and signatures for integrity.</p>
+</section>
+
+<!-- ENV -->
+<section id="env">
+  <h2>Environment variables</h2>
+  <p class="lede">From this release, <code>instrumentation.ts</code> runs the <code>lib/env.ts</code> check when the server starts (PR #89). In production a missing or malformed value is refused: every request returns 500, so Render's health check fails the deploy. <code>next dev</code> only warns. Use the filters to see what <b>you</b> still have to provide.</p>
+  <div class="chips" id="envFilter"></div>
+  <div class="card"><table id="envTable"><thead><tr><th>Name</th><th>Required</th><th>Where it comes from</th><th>On Render</th><th>Your local .env</th></tr></thead><tbody></tbody></table></div>
+  <h3>Template for the names you still need</h3>
+  <div class="chips"><button class="btn" id="envCopy">Copy</button><span class="muted small" style="align-self:center">Secrets are never shown here. Fill them in your <code>.env</code> or on Render, never in git.</span></div>
+  <pre class="env" id="envTpl"></pre>
+</section>
+
+<!-- STATUS -->
+<section id="status">
+  <h2>What works, what is unverified, what is blocked</h2>
+  <p class="lede">Automated: <b>583 unit tests</b> (1 skipped until a recorded PayPal webhook exists), <b>271 integration tests</b> against Postgres, and a two-party browser test with a CSP watcher. All of them use fakes for PayPal and Claude. Nothing has run against the real services yet, because the accounts don't exist.</p>
+  <div class="chips" id="stFilter"></div>
+  <div class="card"><table id="stTable"><thead><tr><th>Item</th><th>State</th><th>Why / what it needs</th><th>Issue</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <h2>Roadmap and future implementation</h2>
+  <p class="lede">First the path to submission (the deadline is 2026-11-12 12:00 PST, with an internal freeze on 2026-11-08). Then what a production version would add. Each future item names the seam in the code where it plugs in.</p>
+  <div class="split">
+    <div class="card"><h3 style="margin-top:0">To the submission</h3><div class="timeline" id="tl"></div></div>
+    <div class="card"><h3 style="margin-top:0">After the hackathon</h3><div id="future"></div></div>
+  </div>
+</section>
+
+</main>
+<footer>Generated from the code and docs in this repo (<code>docs/</code> is the source of truth; <code>docs/decisions.md</code> is the decision log). Open this file directly in a browser; it has no dependencies.</footer>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, attrs = {}, html = "") => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); e.innerHTML = html; return e; };
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[c]);
+const ISSUE = (n) => `<a href="https://github.com/0PrashantYadav0/Handshake/issues/${n}" target="_blank" rel="noopener">#${n}</a>`;
+
+/* ---------- tabs + theme ---------- */
+const TABS = [["overview","Overview"],["usecases","Use cases"],["architecture","Architecture"],["flow","Money flow"],["states","State machine"],["decide","Decision engine"],["features","Features"],["security","Security"],["env","Env vars"],["status","Status"],["roadmap","Roadmap"]];
+const nav = $("#tabs");
+TABS.forEach(([id, label]) => { const b = el("button", { role: "tab", "data-id": id }, label); b.onclick = () => { location.hash = id; }; nav.append(b); });
+function show() {
+  const id = (location.hash || "#overview").slice(1);
+  const ok = TABS.some(([t]) => t === id) ? id : "overview";
+  document.querySelectorAll("section").forEach((s) => s.classList.toggle("active", s.id === ok));
+  nav.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", b.dataset.id === ok));
+  if (ok !== "flow") stopPlay();
+}
+addEventListener("hashchange", show);
+const prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
+document.documentElement.dataset.theme = localStorage.getItem("hs-theme") || (prefersDark ? "dark" : "light");
+$("#theme").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; localStorage.setItem("hs-theme", t); };
+
+/* ---------- overview ---------- */
+[["13","Postgres models"],["14","pages"],["37","API handlers (34 route files)"],["583 + 271","unit + integration tests"],["8","deal statuses"],["9","commands"],["2","Claude jobs (extract, judge)"],["4","ports: db, paypal, ai, email"]]
+  .forEach(([b, s]) => $("#stats").append(el("div", { class: "card stat" }, `<b>${b}</b><span>${s}</span>`)));
+[["1 · Describe","The buyer types one sentence. Claude extracts the item, amount, deadline and 1 to 4 conditions, each with its evidence type. When a condition needs a photo, the server adds a 'deal code visible' condition itself (5 at most)."],
+ ["2 · Join & sign","The seller opens the link and joins. Both sides confirm with TOTP and sign the canonical contract with a P-256 key kept in their browser."],
+ ["3 · Hold","The buyer approves in the PayPal popup. Handshake creates an order with intent AUTHORIZE and authorizes it. The money is held, not taken."],
+ ["4 · Prove","The seller uploads up to 6 photos, plus tracking if the deal needs it. The deal code is written by hand in a photo, which proves the photo is fresh."],
+ ["5 · Judge","A hash check catches reused listing photos. Then Claude returns pass, fail or unclear with a confidence for each condition. decide() applies the signed rules."],
+ ["6 · Settle","Capture, then a payout to the seller's verified PayPal address. Or one fix request, a buyer review, or a void. The cron job voids anything past its deadline."]]
+  .forEach(([t, d]) => $("#howsteps").append(el("div", { class: "card" }, `<b>${t}</b><p class="small muted" style="margin:6px 0 0">${d}</p>`)));
+
+/* ---------- use cases ---------- */
+const UC = [
+  { id: "mug", label: "$18 mug (demo)", sentence: "I'll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered",
+    conds: [["The item is a blue ceramic mug matching the listing photos","photo"],["Tracking shows delivered","tracking"],["The deal code HS-XXXX is visible, handwritten, in a photo","photo"]],
+    evidence: "Two photos of the mug next to a card with the handwritten code, and a tracking number.", outcome: ["capture","all_pass","Every condition passes with confidence ≥ 0.85 and $18 is under $200, so the hold is captured and the payout goes to the seller's verified PayPal email."] },
+  { id: "lamp", label: "$35 lamp, wrong item (demo)", sentence: "I'll pay $35 for the wooden desk lamp if it arrives within 7 days, matches the listing photos and tracking shows delivered",
+    conds: [["The item is the wooden desk lamp from the listing","photo"],["Tracking shows delivered","tracking"],["The deal code is visible in a photo","photo"]],
+    evidence: "Photos of a different lamp.", outcome: ["request_fix","fail","The first failure asks the seller for a fix and the deal goes back to held. If the second submission fails with confidence ≥ 0.85, the hold is voided and the buyer is never charged."] },
+  { id: "reuse", label: "Reused listing photo (demo)", sentence: "Same mug deal; the seller submits a listing photo as proof",
+    conds: [["Matches the listing photos","photo"],["Deal code visible","photo"]],
+    evidence: "A photo whose SHA-256 equals one of the buyer's reference photos.", outcome: ["request_fix","fail","hashCheck() fails every photo condition at confidence 1 without calling Claude, and the seller is asked for a real photo."] },
+  { id: "camera", label: "$480 film camera", sentence: "I'll pay $480 for the Canon AE-1 if it arrives in 7 days, the shutter fires at 1/1000 and the serial matches 1234567",
+    conds: [["The camera is a Canon AE-1","photo"],["The serial number reads 1234567","photo"],["Tracking shows delivered","tracking"],["Deal code visible","photo"]],
+    evidence: "Photos of the body and serial plate, and tracking.", outcome: ["buyer_review","amount_over_limit","Even if everything passes, $480 is above the $200 auto-capture limit, so the buyer reviews the evidence and approves or rejects it. A human signs off on large amounts."] },
+  { id: "repair", label: "Phone screen repair", sentence: "I'll pay $90 to replace my phone screen within 3 days; show the new screen powered on with no cracks",
+    conds: [["The phone screen is powered on and shows no cracks","photo"],["Deal code visible","photo"]],
+    evidence: "A photo of the repaired phone with the code card. A blurry photo gets unclear.", outcome: ["buyer_review","unclear","If Claude can't tell, the verdict is unclear and the buyer decides. The model is never allowed to guess its way to a capture."] },
+  { id: "commission", label: "Custom furniture commission", sentence: "I'll pay $150 for a walnut side table, 45 cm tall, finished in oil, within 14 days",
+    conds: [["A walnut side table","photo"],["About 45 cm tall, shown against a tape measure","photo"],["Oil finish, no visible defects","photo"],["Deal code visible","photo"]],
+    evidence: "Photos of the table, the tape measure and the code card.", outcome: ["capture","all_pass","The seller is paid the moment the proof is accepted, not after a shipping and dispute window. The buyer's money was provably held from the start."] },
+];
+let ucCur = "mug";
+function renderUC() {
+  $("#ucTabs").innerHTML = "";
+  UC.forEach((u) => { const b = el("button", { class: "chip", "aria-pressed": u.id === ucCur }, u.label); b.onclick = () => { ucCur = u.id; renderUC(); }; $("#ucTabs").append(b); });
+  const u = UC.find((x) => x.id === ucCur);
+  const cls = { capture: "ok", request_fix: "wait", buyer_review: "info", void: "no" }[u.outcome[0]];
+  $("#ucBody").innerHTML = `<h3 style="margin-top:0">The sentence</h3><p style="font-size:17px">“${u.sentence}”</p>
+   <h3>Conditions Claude extracts (the server adds the code condition)</h3><table><tbody>${u.conds.map(([t, e], i) => `<tr><td class="mono">c${i + 1}</td><td>${t}</td><td><span class="pill ${e === "photo" ? "vio" : "info"}">${e}</span></td></tr>`).join("")}</tbody></table>
+   <h3>Evidence</h3><p class="small">${u.evidence}</p>
+   <h3>Outcome</h3><p><span class="pill ${cls}">${u.outcome[0]}</span> <span class="mono small muted">reason: ${u.outcome[1]}</span></p><p class="small">${u.outcome[2]}</p>
+   <p class="small muted"><a href="#decide" onclick="loadDecide('${u.id}')">Try this one in the decision simulator →</a></p>`;
+}
+renderUC();
+
+/* ---------- architecture ---------- */
+const NODES = [
+  { id: "browser", x: 330, y: 20, w: 340, h: 62, t: "Browser: buyer & seller", s: "React 19 pages · PayPal JS SDK · AG Grid / AG Studio · device key (IndexedDB)",
+    info: { files: ["app/**/page.tsx","components/","lib/contract/device-key.ts","lib/client-api.ts"], does: ["Renders the role-aware deal page, the dashboards, the ledger and the wallet","Signs the contract with a non-extractable ECDSA P-256 key","Opens the PayPal popup (Smart Buttons with a CSP nonce)","Checks both signatures in the browser on /deal/[code]/contract"] } },
+  { id: "cron", x: 800, y: 20, w: 180, h: 62, t: "Render cron", s: "*/10 * * * * · curl POST /api/jobs/tick", ext: 1,
+    info: { files: ["render.yaml","app/api/jobs/tick/route.ts","lib/deal/tick.ts","lib/deal/reconcile.ts"], does: ["Voids held and in_review deals past their deadline","Re-runs verdicts stuck in proof_submitted for more than 2 minutes","Reconciles with PayPal: captures pending for 10+ min, authorizations still PENDING after 10+ min, payouts with a batch id pending for 30+ min","Bearer CRON_SECRET, compared in constant time"] } },
+  { id: "proxy", x: 20, y: 140, w: 180, h: 62, t: "proxy.ts", s: "fresh CSP nonce on every page request",
+    info: { files: ["proxy.ts","lib/csp.ts"], does: ["Builds a strict Content-Security-Policy: 'nonce' + 'strict-dynamic', PayPal hosts only","Next.js adds the nonce to its own scripts","Skips api/, _next/, demo/ and prefetches"] } },
+  { id: "pages", x: 240, y: 140, w: 220, h: 62, t: "Server pages", s: "App Router · 14 routes",
+    info: { files: ["app/page.tsx (landing)","app/dashboard, app/deal/[code], app/new, app/ledger, app/wallet, app/security, app/signin"], does: ["Server components read the session cookie and render with real data","/deal/[code] is role-aware: buyer, seller or preview","Never writes data: every change goes through /api"] } },
+  { id: "api", x: 500, y: 140, w: 260, h: 62, t: "API routes  /api/*", s: "37 handlers · Zod-validated · error map",
+    info: { files: ["app/api/**/route.ts","lib/http.ts","lib/http-schemas.ts","lib/rate-limit.ts"], does: ["Thin: parse, check the session and 2FA, call lib/deal, map errors to HTTP","Step-up TOTP on accept, payout email change, key revoke","Webhook route: 64 KB Content-Length cap, our own signature check, then lib/deal/webhooks","Rate limits per user, email and IP (in memory)"] } },
+  { id: "auth", x: 20, y: 260, w: 190, h: 80, t: "lib/auth", s: "JWT session · magic link · TOTP 2FA · demo personas",
+    info: { files: ["lib/auth/session.ts","lib/auth/magic-link.ts","lib/auth/totp.ts","lib/auth/mfa.ts","lib/auth/demo.ts"], does: ["HS256 cookie. A partial session lasts 15 min until 2FA passes; a full one lasts 30 days","Sign-in links work once (used_login_tokens) behind a Continue page","TOTP: replay floor, recovery codes, lockout after 5 failures","Sign out everywhere bumps session_version"] } },
+  { id: "deal", x: 250, y: 260, w: 510, h: 90, t: "lib/deal: the core", s: "commands · transitions table · decide() · verdict · facts · contract gate · tick · reconcile · webhooks · views",
+    info: { files: ["lib/deal/commands.ts","lib/deal/transitions.ts","lib/deal/decide.ts","lib/deal/verdict.ts","lib/deal/facts.ts","lib/deal/contract.ts","lib/deal/webhooks.ts"], does: ["handle(code, user, command, deps) is the single entry point for a change","Row lock, status check, event row: all in one transaction","decide() is pure and the only automatic path to capture or void; otherwise it is the buyer's review, a cancel, the deadline, or PayPal reporting a void","PayPal facts apply at most once (the C3 rule), whether they come from the API response, a webhook or reconciliation"] } },
+  { id: "seal", x: 800, y: 260, w: 180, h: 80, t: "lib/crypto/seal", s: "AES-256-GCM · DATA_KEYS keyring",
+    info: { files: ["lib/crypto/seal.ts","lib/deal/sealed.ts","scripts/reseal.ts"], does: ["Encrypts text, photo bytes and sensitive event keys","The AAD binds each value to its table, column and deal","Key rotation: prepend a new kid, deploy, run npm run reseal"] } },
+  { id: "ai", x: 250, y: 420, w: 170, h: 62, t: "lib/ai", s: "extract-v1 · judge-v1 · JSON schema",
+    info: { files: ["lib/ai/extract.ts","lib/ai/judge.ts","lib/ai/call-json.ts","lib/ai/prompts.ts","eval/run.ts"], does: ["Extract: 7 s per attempt, 2 attempts, 503 ai_unavailable if both fail","Judge: 17 s, never throws; any failure makes every condition unclear","A pass that cites no evidence becomes unclear","Structured output validated with Zod"] } },
+  { id: "pp", x: 460, y: 420, w: 180, h: 62, t: "lib/paypal", s: "Orders v2 · Payments · Payouts · webhook verify",
+    info: { files: ["lib/paypal/index.ts","lib/paypal/verify.ts","lib/paypal/token.ts","lib/deal/keys.ts"], does: ["Order with intent AUTHORIZE, then authorize, capture, void, payout","Every call has a fixed PayPal-Request-Id: order-, auth-, capture-, void-, payout-{code}-{n}","Webhook signature: CRC32 + RSA-SHA256 against the cert from *.paypal.com, cached"] } },
+  { id: "email", x: 680, y: 420, w: 170, h: 62, t: "lib/email", s: "Resend · console in dev",
+    info: { files: ["lib/email/index.ts","lib/deal/notify.ts"], does: ["Sign-in links, buyer-review notices, payout address codes","Logs and swallows failures: a lost email never fails a deal"] } },
+  { id: "db", x: 20, y: 420, w: 180, h: 80, t: "Postgres 18", s: "13 models · Prisma 7 · append-only events and signatures",
+    info: { files: ["prisma/schema.prisma","prisma/migrations/","lib/db.ts"], does: ["Users, deals, conditions, files (bytea), evidence, verdicts, payments, payouts","deal_events and contract_signatures: triggers block UPDATE and DELETE","webhook_events (dedupe), used_login_tokens, signing_keys","Every connection runs in UTC"] } },
+  { id: "claude", x: 250, y: 560, w: 170, h: 56, t: "Claude API", s: "claude-sonnet-5-5 · effort low", ext: 1,
+    info: { files: ["ANTHROPIC_API_KEY","AI_MODEL"], does: ["Reads the sentence and returns terms","Reads the photos and tracking status and returns a verdict per condition","Has no tools and cannot move money"] } },
+  { id: "paypal", x: 460, y: 560, w: 180, h: 56, t: "PayPal sandbox", s: "REST API · popup · webhooks", ext: 1,
+    info: { files: ["PAYPAL_CLIENT_ID / SECRET","PAYPAL_WEBHOOK_ID"], does: ["Holds the buyer's money (authorization, valid 29 days)","Platform as merchant: captures to the business account, then pays the seller through Payouts","Sends webhooks: authorization, capture, payout item"] } },
+  { id: "resend", x: 680, y: 560, w: 170, h: 56, t: "Resend", s: "transactional email", ext: 1,
+    info: { files: ["RESEND_API_KEY","EMAIL_FROM"], does: ["Delivers the emails","The onboarding sender only reaches the account owner until a domain is verified"] } },
+];
+// [from, to, label, sideways bend]. Lines run under the boxes; labels sit on the curve's midpoint, above the boxes.
+const EDGES = [
+  ["browser","proxy","page request"],["proxy","pages","nonce"],["browser","api","fetch JSON"],["pages","deal","views"],["pages","auth","session"],
+  ["api","auth",""],["api","deal","handle(cmd)"],["cron","api","POST /jobs/tick"],["deal","seal",""],["deal","ai","extract / judge",-60],
+  ["deal","pp","hold · capture · payout"],["deal","email",""],["deal","db","tx + row lock"],["auth","db","users"],
+  ["ai","claude","Messages API"],["pp","paypal","REST + idempotency"],["paypal","api","webhooks",120],["email","resend",""],
+];
+const arch = $("#arch");
+const center = (n) => [n.x + n.w / 2, n.y + n.h / 2];
+const edgeEls = [];
+EDGES.forEach(([a, b, label, bend = 0]) => {
+  const A = NODES.find((n) => n.id === a), B = NODES.find((n) => n.id === b);
+  const [x1, y1] = center(A), [x2, y2] = center(B);
+  const cx = (x1 + x2) / 2 + bend, cy = (y1 + y2) / 2;
+  const p = svgEl("path", { d: `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`, class: "edge", "marker-end": "url(#arrow)" });
+  const t = svgEl("text", { x: (x1 + 2 * cx + x2) / 4, y: (y1 + 2 * cy + y2) / 4 + 4, class: "elabel", "text-anchor": "middle" }); t.textContent = label;
+  arch.append(p); edgeEls.push({ a, b, p, t });
+});
+const defs = svgEl("defs"); const mk = svgEl("marker", { id: "arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse" });
+mk.append(svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: "currentColor", style: "color:var(--muted)" })); defs.append(mk); arch.prepend(defs);
+const nodeEls = {};
+NODES.forEach((n) => {
+  const g = svgEl("g", { class: "node" + (n.ext ? " ext" : ""), tabindex: "0" });
+  g.append(svgEl("rect", { x: n.x, y: n.y, width: n.w, height: n.h }));
+  const t = svgEl("text", { x: n.x + n.w / 2, y: n.y + 22, "text-anchor": "middle", "font-weight": "700", "font-size": "14" }); t.textContent = n.t;
+  g.append(t);
+  wrap(n.s, Math.floor(n.w / 6.3)).forEach((line, i) => { const s = svgEl("text", { x: n.x + n.w / 2, y: n.y + 39 + i * 14, "text-anchor": "middle", class: "sub" }); s.textContent = line; g.append(s); });
+  g.onclick = () => selectNode(n.id); g.onkeydown = (e) => { if (e.key === "Enter") selectNode(n.id); };
+  arch.append(g); nodeEls[n.id] = g;
+});
+edgeEls.forEach((e) => arch.append(e.t));
+// Up to two lines, breaking only between " · " parts; the rest is cut with an ellipsis.
+function wrap(text, max) {
+  const lines = [""];
+  for (const part of text.split(" · ")) {
+    const cur = lines[lines.length - 1], next = cur ? cur + " · " + part : part;
+    if (next.length <= max || !cur) lines[lines.length - 1] = next; else lines.push(part);
+  }
+  if (lines.length > 2) lines.splice(1, lines.length, lines.slice(1).join(" · ").slice(0, max - 1) + "…");
+  return lines.map((l) => (l.length > max ? l.slice(0, max - 1) + "…" : l));
+}
+function selectNode(id) {
+  const n = NODES.find((x) => x.id === id);
+  const linked = new Set([id]);
+  edgeEls.forEach((e) => { const hot = e.a === id || e.b === id; if (hot) { linked.add(e.a); linked.add(e.b); } e.p.classList.toggle("hot", hot); e.t.classList.toggle("hot", hot); e.p.classList.toggle("dim", !hot); });
+  Object.entries(nodeEls).forEach(([k, g]) => { g.classList.toggle("sel", k === id); g.classList.toggle("dim", !linked.has(k)); });
+  $("#archInfo").innerHTML = `<h3 style="margin-top:0">${n.t}</h3><p class="small muted">${n.s}</p>
+    <b class="small">Responsibilities</b><ul class="tight small">${n.info.does.map((d) => `<li>${d}</li>`).join("")}</ul>
+    <b class="small">${n.ext ? "Configured by" : "Files"}</b><ul class="tight small">${n.info.files.map((f) => `<li><code>${f}</code></li>`).join("")}</ul>
+    <p class="small muted">Connected to: ${[...linked].filter((x) => x !== id).map((x) => `<a href="#architecture" onclick="selectNode('${x}');return false">${NODES.find((m) => m.id === x).t}</a>`).join(", ")}</p>`;
+}
+selectNode("deal");
+[["lib/deal/","The deal module: commands, transitions, decide, verdict, facts, contract, tick, reconcile, webhooks, views, summary"],
+ ["lib/auth/ · lib/contract/","Sessions, sign-in links, TOTP, demo personas · canonical JSON, P-256 signatures, device keys"],
+ ["lib/ai/ · lib/paypal/ · lib/email/","Adapters behind ports. Each has a fake in tests (fake.ts, console.ts)"],
+ ["app/ · components/","Pages and API routes · client components (deal page, NewDealFlow, Ledger, StudioCanvas, PayButton)"],
+ ["prisma/","schema.prisma, 8 migrations, seed.ts (2 personas, 25 historical deals)"],
+ ["scripts/ · eval/","reseal, check-secrets, sandbox spike/scenario/record-webhook · eval runner for the judge"],
+ ["tests/","unit (38 files), int (26 files against Postgres), e2e (two-party, happy-path)"],
+ ["docs/","01 requirements … 09 AG Studio, decisions.md, plan.md, the trust and accounts spec"],
+ ["render.yaml · .github/","Blueprint: web, Postgres, cron · CI: lint, typecheck, unit, int, build, check-secrets"]]
+ .forEach(([a, b]) => $("#repomap").append(el("div", { class: "card" }, `<code>${a}</code><p class="muted" style="margin:6px 0 0">${b}</p>`)));
+
+/* ---------- money flow (sequence) ---------- */
+const LANES = ["Buyer", "Seller", "Handshake", "Claude", "PayPal"];
+const STEPS = [
+  { t: "Describe the deal", from: 0, to: 2, msg: "POST /api/deals {sentence}", status: "draft", paypal: "—", events: ["create"],
+    d: "The buyer signs in (magic link or demo persona, then TOTP). The sentence is sealed. A public code HS-XXXX is generated. The rule snapshot (threshold 0.85, auto-capture max $200) is copied into the deal." },
+  { t: "Extract terms", from: 2, to: 3, msg: "extract-v1 (JSON schema)", status: "draft", paypal: "—", events: [],
+    d: "Claude returns the title, amount, deadline and 1 to 4 conditions with their evidence type. If any condition needs a photo, the server appends the handwritten deal-code condition (5 at most). 7 s per attempt, 2 attempts, then 503." },
+  { t: "Reference photos", from: 0, to: 2, msg: "POST /files purpose=reference", status: "draft", paypal: "—", events: [],
+    d: "Up to 4 listing photos, uploaded before anyone signs. The bytes are sealed and their SHA-256 goes into the contract, so they can't be swapped later." },
+  { t: "Seller joins", from: 1, to: 2, msg: "POST /join", status: "draft", paypal: "—", events: ["join"],
+    d: "A non-party opening a draft that has no seller sees a preview and joins as the seller." },
+  { t: "Both sign", from: 1, to: 2, msg: "POST /accept {hash, signature, key}", status: "terms_agreed", paypal: "—", events: ["accept", "accept"],
+    d: "Step-up TOTP. Each side signs 'Handshake contract v2' + sha256(canonical JSON) with ECDSA P-256 from IndexedDB. The seller's payout email must be verified. When both accepted versions match, the status becomes terms_agreed." },
+  { t: "Start payment", from: 0, to: 4, msg: "createOrder intent=AUTHORIZE", status: "terms_agreed", paypal: "order-{code}-{n}", events: ["start_payment"],
+    d: "Contract gate: the server rebuilds the contract and verifies both signatures. An order still 'created' and under 6 h old is reused." },
+  { t: "Approve & authorize", from: 0, to: 4, msg: "popup approve → authorizeOrder", status: "held", paypal: "auth-{code}", events: ["fact:authorization_created"],
+    d: "The buyer approves in the PayPal popup. confirm_approval authorizes the order. The money is now held on the buyer's account, and deadline_at = now + deadline_days. If this request never reaches the server, the CHECKOUT.ORDER.APPROVED webhook authorizes the order instead. An authorization that comes back PENDING is polled by reconcile()." },
+  { t: "Upload proof", from: 1, to: 2, msg: "POST /files + POST /evidence", status: "proof_submitted", paypal: "—", events: ["submit_evidence"],
+    d: "Up to 6 photos, plus tracking if a condition needs it. Carrier status is mocked. The verdict runs in the same request." },
+  { t: "Hash check, then judge", from: 2, to: 3, msg: "judge-v1 (photos r1..r4, e1..e6)", status: "proof_submitted", paypal: "—", events: ["verdict"],
+    d: "If an evidence photo equals a listing photo by SHA-256, every photo condition fails at confidence 1 with no model call. Otherwise Claude judges each condition. Verdict rows are stored once per submission." },
+  { t: "decide() → capture", from: 2, to: 4, msg: "captureAuthorization", status: "captured", paypal: "capture-{code}-{n}", events: ["decision:capture", "fact:capture_completed"],
+    d: "The pure decision says capture. The contract gate runs again, then the original authorization is captured. The other decisions are request_fix (back to held), buyer_review (in_review) and void." },
+  { t: "Payout to seller", from: 2, to: 4, msg: "createPayout → verified email", status: "captured", paypal: "payout-{code}-{n}", events: [],
+    d: "payoutAllowed checks that the contract verifies, the amount equals the contract amount and the recipient is the verified address. A failure can be retried by the seller (retry_payout)." },
+  { t: "Payout succeeds", from: 4, to: 2, msg: "webhook PAYOUTS-ITEM.SUCCEEDED", status: "paid", paypal: "—", events: ["fact:payout_succeeded"],
+    d: "Our own code verifies the webhook signature. The event is deduplicated by its PayPal id and applied once. If the webhook is lost, the cron's reconcile() asks PayPal after 30 minutes." },
+];
+const seq = $("#seq"); const LW = 150, TOP = 46, RH = 40, W = 40 + LW * LANES.length;
+seq.setAttribute("viewBox", `0 0 ${W} ${TOP + RH * STEPS.length + 10}`);
+LANES.forEach((l, i) => { const x = 40 + LW * i + LW / 2 - 20; const t = svgEl("text", { x, y: 24, "text-anchor": "middle", "font-weight": "700", "font-size": "13" }); t.textContent = l;
+  seq.append(t, svgEl("line", { x1: x, y1: 32, x2: x, y2: TOP + RH * STEPS.length, class: "lane" })); });
+const rows = [];
+STEPS.forEach((s, i) => {
+  const y = TOP + RH * i; const g = svgEl("g", { class: "seq-row" });
+  g.append(svgEl("rect", { x: 0, y, width: W, height: RH, fill: "transparent", class: "bgrow", rx: 6 }));
+  const x1 = 40 + LW * s.from + LW / 2 - 20, x2 = 40 + LW * s.to + LW / 2 - 20;
+  g.append(svgEl("line", { x1, y1: y + 26, x2: x2 + (x2 > x1 ? -4 : 4), y2: y + 26, stroke: "var(--accent)", "stroke-width": 2, "marker-end": "url(#arrow2)" }));
+  const lab = svgEl("text", { x: (x1 + x2) / 2, y: y + 18, "text-anchor": "middle", "font-size": "11.5" }); lab.textContent = `${i + 1}. ${s.msg}`;
+  g.append(lab); g.onclick = () => { stopPlay(); setStep(i); }; seq.append(g); rows.push(g);
+});
+const d2 = svgEl("defs"); const m2 = svgEl("marker", { id: "arrow2", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+m2.append(svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--accent)" })); d2.append(m2); seq.prepend(d2);
+let step = 0, timer = null;
+function setStep(i) {
+  step = (i + STEPS.length) % STEPS.length; const s = STEPS[step];
+  rows.forEach((r, k) => r.classList.toggle("cur", k === step));
+  $("#stepNo").textContent = `Step ${step + 1} of ${STEPS.length}`;
+  $("#stepInfo").innerHTML = `<h3 style="margin-top:0">${step + 1}. ${s.t}</h3>
+    <dl class="kv"><dt>Actor</dt><dd>${LANES[s.from]} → ${LANES[s.to]}</dd><dt>Status after</dt><dd><span class="status-badge">${s.status}</span></dd>
+    <dt>PayPal key</dt><dd class="mono">${s.paypal}</dd><dt>Events</dt><dd>${s.events.length ? s.events.map((e) => `<code>${e}</code>`).join(" ") : "<span class='muted'>none</span>"}</dd></dl>
+    <p class="small">${s.d}</p>`;
+}
+function stopPlay() { clearInterval(timer); timer = null; $("#play").textContent = "▶ Play"; }
+$("#play").onclick = () => { if (timer) return stopPlay(); $("#play").textContent = "❚❚ Pause"; timer = setInterval(() => setStep(step + 1), 2600); };
+$("#prev").onclick = () => { stopPlay(); setStep(step - 1); };
+$("#next").onclick = () => { stopPlay(); setStep(step + 1); };
+setStep(0);
+
+/* ---------- state machine ---------- */
+const SP = { draft: [70, 210], terms_agreed: [250, 210], held: [440, 210], proof_submitted: [640, 210], in_review: [640, 370], captured: [830, 110], paid: [925, 290], voided: [440, 380] };
+const T = [
+  ["draft","draft","edit_terms / join / one accept","command"],
+  ["draft","terms_agreed","accept (both signed this version)","command"],
+  ["draft","voided","cancel","command"],
+  ["terms_agreed","draft","edit_terms (before any payment)","command"],
+  ["terms_agreed","terms_agreed","start_payment","command"],
+  ["terms_agreed","held","confirm_approval / fact:authorization_created","fact"],
+  ["terms_agreed","voided","cancel / fact:authorization_voided","command"],
+  ["held","proof_submitted","submit_evidence","command"],
+  ["held","voided","cancel / tick:deadline / fact:authorization_voided","tick"],
+  ["proof_submitted","captured","decision:capture / fact:capture_*","decision"],
+  ["proof_submitted","held","decision:request_fix (once)","decision"],
+  ["proof_submitted","in_review","decision:buyer_review","decision"],
+  ["proof_submitted","voided","decision:void / fact:authorization_voided","decision"],
+  ["in_review","captured","review:approve / fact:capture_*","command"],
+  ["in_review","voided","review:reject / tick:deadline / fact:authorization_voided","command"],
+  ["captured","in_review","fact:capture_declined","fact"],
+  ["captured","captured","retry_payout","command"],
+  ["captured","paid","fact:payout_succeeded (latest attempt)","fact"],
+  ["paid","paid","fact:payout_succeeded (an earlier attempt)","fact"],
+];
+const KCOL = { command: "var(--accent)", fact: "var(--good)", decision: "var(--violet)", tick: "var(--warn)" };
+const sm = $("#sm"); const smEdges = [];
+const sd = svgEl("defs"); ["command","fact","decision","tick"].forEach((k) => { const m = svgEl("marker", { id: "a-" + k, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse" }); m.append(svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: KCOL[k] })); sd.append(m); }); sm.append(sd);
+const BOX = { w: 130, h: 40 };
+function edgePt([x, y], [tx, ty]) { const dx = tx - x, dy = ty - y; const sx = BOX.w / 2 / Math.abs(dx || 1e-6), sy = BOX.h / 2 / Math.abs(dy || 1e-6); const s = Math.min(sx, sy); return [x + dx * s, y + dy * s]; }
+T.forEach(([a, b, label, kind], i) => {
+  if (a === b) return;
+  const A = SP[a], B = SP[b]; const back = T.some(([x, y]) => x === b && y === a);
+  const off = back ? (a < b ? 22 : -22) : 0;
+  const nx = -(B[1] - A[1]), ny = B[0] - A[0], len = Math.hypot(nx, ny) || 1;
+  const P1 = edgePt(A, B), P2 = edgePt(B, A);
+  const mx = (P1[0] + P2[0]) / 2 + (nx / len) * off * 1.6, my = (P1[1] + P2[1]) / 2 + (ny / len) * off * 1.6;
+  const p = svgEl("path", { d: `M${P1[0]},${P1[1]} Q${mx},${my} ${P2[0]},${P2[1]}`, fill: "none", stroke: KCOL[kind], "stroke-width": 1.8, "marker-end": `url(#a-${kind})`, opacity: .8 });
+  sm.append(p); smEdges.push({ a, b, p });
+});
+const smNodes = {};
+Object.entries(SP).forEach(([s, [x, y]]) => {
+  const g = svgEl("g", { class: "node" }); g.append(svgEl("rect", { x: x - BOX.w / 2, y: y - BOX.h / 2, width: BOX.w, height: BOX.h }));
+  const t = svgEl("text", { x, y: y + 5, "text-anchor": "middle", "font-size": "13", "font-weight": "600", "font-family": "ui-monospace,Menlo,monospace" }); t.textContent = s;
+  g.append(t); g.onclick = () => smInfo(s); sm.append(g); smNodes[s] = g;
+});
+const leg = svgEl("g"); Object.entries(KCOL).forEach(([k, c], i) => { leg.append(svgEl("line", { x1: 20 + i * 120, y1: 30, x2: 48 + i * 120, y2: 30, stroke: c, "stroke-width": 3 })); const t = svgEl("text", { x: 54 + i * 120, y: 34, "font-size": "12" }); t.textContent = k; leg.append(t); }); sm.append(leg);
+const TERMINAL = { paid: "Terminal: the seller has been paid. A late success for an earlier payout attempt is recorded without a status change.", voided: "Terminal: the hold is released and the buyer is never charged." };
+function smInfo(s) {
+  Object.entries(smNodes).forEach(([k, g]) => g.classList.toggle("sel", k === s));
+  smEdges.forEach((e) => e.p.setAttribute("opacity", e.a === s ? 1 : .3));
+  const out = T.filter(([a, b]) => a === s && !(s === "paid" && b === "paid"));
+  $("#smInfo").innerHTML = out.length ? `<table><tbody>${out.map(([, b, l, k]) => `<tr><td><span class="pill" style="color:${KCOL[k]}">${k}</span></td><td>${l}</td><td>→ <span class="status-badge">${b}</span></td></tr>`).join("")}</tbody></table>` : `<p class="muted">${TERMINAL[s]}</p>`;
+}
+let smCur = "draft"; const smPath = [];
+function smRender() {
+  $("#smCur").textContent = smCur; smInfo(smCur);
+  $("#smMoves").innerHTML = "";
+  T.filter(([a]) => a === smCur).forEach(([, b, l, k]) => { const btn = el("button", { class: "chip" }, `${l.split(" / ")[0]} → ${b}`); btn.style.borderColor = KCOL[k];
+    btn.onclick = () => { smPath.push(`${smCur} --${l.split(" / ")[0]}--> ${b}`); smCur = b; smRender(); }; $("#smMoves").append(btn); });
+  if (TERMINAL[smCur]) $("#smMoves").append(el("span", { class: "muted small" }, TERMINAL[smCur]));
+  $("#smLog").innerHTML = smPath.length ? smPath.map((p, i) => `${i + 1}. ${p}`).join("<br>") : "<span class='muted'>Pick a move above.</span>";
+}
+$("#smReset").onclick = () => { smCur = "draft"; smPath.length = 0; smRender(); };
+smRender();
+
+/* ---------- decision simulator ---------- */
+let conds = [];
+const PRESET = {
+  mug: { amt: 18, att: 0, reuse: false, c: [["Blue ceramic mug matching the listing", "photo", "pass", .95], ["Tracking shows delivered", "tracking", "pass", .99], ["Deal code visible", "photo", "pass", .93]] },
+  lamp: { amt: 35, att: 0, reuse: false, c: [["Wooden desk lamp from the listing", "photo", "fail", .92], ["Tracking shows delivered", "tracking", "pass", .99], ["Deal code visible", "photo", "pass", .9]] },
+  reuse: { amt: 18, att: 0, reuse: true, c: [["Matches the listing photos", "photo", "pass", .97], ["Deal code visible", "photo", "pass", .9]] },
+  camera: { amt: 480, att: 0, reuse: false, c: [["Canon AE-1", "photo", "pass", .95], ["Serial reads 1234567", "photo", "pass", .9], ["Tracking delivered", "tracking", "pass", .99], ["Deal code visible", "photo", "pass", .9]] },
+  repair: { amt: 90, att: 0, reuse: false, c: [["Screen on, no cracks", "photo", "unclear", .5], ["Deal code visible", "photo", "pass", .9]] },
+  commission: { amt: 150, att: 0, reuse: false, c: [["Walnut side table", "photo", "pass", .93], ["About 45 cm tall", "photo", "pass", .88], ["Oil finish, no defects", "photo", "pass", .9], ["Deal code visible", "photo", "pass", .95]] },
+};
+function loadDecide(id) { const p = PRESET[id]; $("#dAmount").value = p.amt; $("#dAttempt").value = p.att; $("#dReuse").checked = p.reuse; conds = p.c.map(([text, type, result, conf]) => ({ text, type, result, conf })); renderConds(); }
+window.loadDecide = loadDecide; window.selectNode = selectNode;
+function renderConds() {
+  const box = $("#conds"); box.innerHTML = `<div class="cond small muted"><span>Condition</span><span>Verdict</span><span>Confidence</span><span></span><span></span></div>`;
+  conds.forEach((c, i) => {
+    const row = el("div", { class: "cond" });
+    row.innerHTML = `<input type="text" value="${c.text.replace(/"/g, "&quot;")}"><select>${["pass","fail","unclear"].map((r) => `<option ${r === c.result ? "selected" : ""}>${r}</option>`).join("")}</select>
+      <input type="range" min="0" max="1" step="0.01" value="${c.conf}"><span class="mono small">${c.conf.toFixed(2)}</span><button class="btn" title="Remove" style="padding:2px 8px">×</button>`;
+    const [txt, sel, rng, out, del] = [row.children[0], row.children[1], row.children[2], row.children[3], row.children[4]];
+    txt.oninput = () => { c.text = txt.value; };
+    sel.onchange = () => { c.result = sel.value; runDecide(); };
+    rng.oninput = () => { c.conf = +rng.value; out.textContent = c.conf.toFixed(2); runDecide(); };
+    del.onclick = () => { conds.splice(i, 1); renderConds(); };
+    box.append(row);
+  });
+  runDecide();
+}
+function decide(verdicts, amountMinor, fixUsed, th, maxMinor) {
+  if (verdicts.length === 0) return ["buyer_review", "unclear"];
+  const fails = verdicts.filter((v) => v.result === "fail");
+  if (fails.length) { if (fixUsed === 0) return ["request_fix", "fail"]; return [fails.some((v) => v.confidence >= th) ? "void" : "buyer_review", "fail"]; }
+  if (verdicts.some((v) => v.result === "unclear")) return ["buyer_review", "unclear"];
+  if (verdicts.some((v) => v.confidence < th)) return ["buyer_review", "low_confidence"];
+  if (amountMinor > maxMinor) return ["buyer_review", "amount_over_limit"];
+  return ["capture", "all_pass"];
+}
+const OUTCOME = {
+  capture: ["ok", "Capture", "captureAuthorization(capture-{code}-{n}) → status captured → payout to the seller's verified PayPal email → paid."],
+  request_fix: ["wait", "Request a fix", "fix_attempts_used = 1, back to held. The seller gets one more submission before the deadline."],
+  buyer_review: ["info", "Buyer review", "Status in_review. The buyer is emailed and approves (capture) or rejects (void). The cron voids it at the deadline if nobody acts."],
+  void: ["no", "Void", "voidAuthorization(void-{code}) → voided. PayPal releases the hold; the buyer is never charged."],
+};
+function runDecide() {
+  const reuse = $("#dReuse").checked;
+  const verdicts = conds.map((c, i) => !reuse ? { condition_id: "c" + i, result: c.result, confidence: c.conf } // hashCheck: photo conditions fail at 1, tracking becomes unclear at 0 (verdict.ts)
+    : c.type === "tracking" ? { condition_id: "c" + i, result: "unclear", confidence: 0 } : { condition_id: "c" + i, result: "fail", confidence: 1 });
+  const [d, r] = decide(verdicts, Math.round(+$("#dAmount").value * 100), +$("#dAttempt").value, +$("#dTh").value, Math.round(+$("#dMax").value * 100));
+  const [cls, title, next] = OUTCOME[d];
+  const o = $("#dOut"); o.className = "result-box " + cls; o.style.borderColor = "currentColor";
+  o.innerHTML = `<div class="small">decide() returns</div><div style="font-size:26px;font-weight:700">${title}</div><div class="mono small">{ decision: "${d}", reason: "${r}" }</div><p class="small" style="color:var(--ink)">${next}</p>${reuse ? `<p class="small" style="color:var(--ink)">hashCheck: photo conditions failed at confidence 1 and tracking conditions set to unclear by <code>guardrail-v1</code>, with no Claude call.</p>` : ""}`;
+}
+["#dAmount","#dAttempt","#dReuse","#dTh","#dMax"].forEach((s) => $(s).addEventListener("input", runDecide));
+$("#addCond").onclick = () => { if (conds.length >= 5) return; conds.push({ text: "New condition", type: "photo", result: "pass", conf: .9 }); renderConds(); };
+loadDecide("mug");
+
+/* ---------- features ---------- */
+const AREAS = ["All","Payments","AI","Trust & identity","Dashboards","Ops & quality"];
+const F = [
+  ["Payments","Authorize-then-capture escrow","PayPal Orders v2 with intent AUTHORIZE. Captures always use the original authorization, the amount must equal the contract, and every call carries a fixed PayPal-Request-Id.","lib/deal/commands.ts, lib/deal/facts-db.ts, lib/paypal/index.ts","fake"],
+  ["Payments","Payouts with retry","Platform as merchant: the capture lands in the business account, then Payouts pays the seller's verified email. Attempts are numbered (payout-{code}-n). An UNCLAIMED payout is cancelled before a retry.","lib/deal/commands.ts (retry_payout), lib/deal/facts.ts","fake"],
+  ["Payments","Webhooks + reconciliation","Our own signature check (CRC32 + RSA-SHA256, cert URL host must end in .paypal.com). Events are deduplicated by PayPal id, and each fact applies once. The 10-minute cron asks PayPal about pending captures, PENDING authorizations and payouts with a batch id. A payout that never got a batch id needs retry_payout.","lib/paypal/verify.ts, lib/deal/webhooks.ts, lib/deal/reconcile.ts","fake"],
+  ["Payments","Deadline voids","Deals are capped at 21 days, inside the 29-day authorization. tick() voids held and in_review deals past their deadline and re-runs verdicts stuck for more than 2 minutes.","lib/deal/tick.ts, render.yaml","local"],
+  ["AI","One-sentence terms","Claude extracts the item, amount, deadline and 1 to 4 conditions as schema-validated JSON. The server, not the model, adds the deal-code condition when a photo is needed.","lib/ai/extract.ts, lib/deal/terms.ts","fake"],
+  ["AI","Evidence judge","Per-condition pass, fail or unclear with a confidence, citing evidence ids. It never throws: a timeout or bad output makes every condition unclear. A pass with no cited evidence becomes unclear.","lib/ai/judge.ts, lib/deal/verdict.ts","fake"],
+  ["AI","Reuse guardrail","SHA-256 hash check of evidence against the listing photos before any model call.","lib/deal/verdict.ts (hashCheck)","local"],
+  ["AI","Eval harness","eval/run.ts reports the decision-match rate, the wrong-capture rate (must be 0) and latency. The cases need the real photos.","eval/run.ts, eval/README.md","blocked"],
+  ["Trust & identity","Passwordless sign-in","Email magic link, single use (used_login_tokens), behind a Continue page so mail scanners can't spend it, with a same-origin check against login CSRF.","lib/auth/magic-link.ts, app/signin/link","local"],
+  ["Trust & identity","Mandatory 2FA","TOTP (RFC 6238) with a replay floor, 10 recovery codes, lockout after 5 failures, and a step-up for signing, a payout email change or a key revoke.","lib/auth/totp.ts, lib/auth/mfa.ts","local"],
+  ["Trust & identity","Device-key signatures","ECDSA P-256 keys that cannot be extracted, kept in IndexedDB. Each signs the canonical contract. Signatures are verified on the server and again in the browser, and the signed bundle can be downloaded.","lib/contract/*, app/deal/[code]/contract","local"],
+  ["Trust & identity","Encryption at rest","AES-256-GCM field sealing with a rotatable keyring, AAD bound to table, column and deal.","lib/crypto/seal.ts, scripts/reseal.ts","local"],
+  ["Trust & identity","Verified payout address","The seller confirms their PayPal email with a code before they can sign. Demo personas are verified by configuration.","app/api/me/paypal-email/*","local"],
+  ["Dashboards","Dashboard home","Held as buyer, held for you, released this month, paid out. A 'Needs you' list, buying and selling, and a security card.","app/dashboard, lib/deal/summary.ts","local"],
+  ["Dashboards","AG Studio analytics","Value tiles, a custom pipeline widget with cross-filter, a status donut, confidence bands and an over-time chart. A Claude-backed Studio agent with an explain_verdict tool.","components/StudioCanvas.tsx, lib/studio-agent.ts","blocked"],
+  ["Dashboards","Ledger & wallet","An AG Grid ledger of every deal. The wallet shows holds, captures and payouts with their PayPal ids and retry links.","components/Ledger.tsx, app/wallet","local"],
+  ["Ops & quality","Strict CSP","A fresh nonce on every request, strict-dynamic, PayPal hosts only. The e2e test fails on any violation.","proxy.ts, lib/csp.ts","local"],
+  ["Ops & quality","Boot-time env check","Zod schema for every variable. Production refuses to serve if one is missing (new in #89).","instrumentation.ts, lib/env.ts","local"],
+  ["Ops & quality","Secret scanning in CI","Checks the repo and the built client bundle for every server secret's value.","scripts/check-secrets.sh, .github/workflows/ci.yml","local"],
+  ["Ops & quality","Demo kit & seed","Two personas with published 2FA (sandbox only), 25 historical deals, sentence chips, Use-sample buttons, and a photo of the code drawn on a card.","prisma/seed.ts, public/demo/presets.json","local"],
+];
+const FSTATE = { fake: ["wait","Tested with fakes; real sandbox pending"], local: ["ok","Working and tested locally"], blocked: ["no","Needs an external input"] };
+let fArea = "All";
+function renderF() {
+  $("#fFilter").innerHTML = ""; AREAS.forEach((a) => { const b = el("button", { class: "chip", "aria-pressed": a === fArea }, a); b.onclick = () => { fArea = a; renderF(); }; $("#fFilter").append(b); });
+  $("#fList").innerHTML = ""; F.filter((f) => fArea === "All" || f[0] === fArea).forEach(([area, t, d, files, st]) => {
+    $("#fList").append(el("div", { class: "card feature" }, `<div class="tags"><span class="pill info">${area}</span><span class="pill ${FSTATE[st][0]}">${FSTATE[st][1]}</span></div><h3>${t}</h3><p class="small">${d}</p><p class="small muted"><code>${files}</code></p>`));
+  });
+}
+renderF();
+
+/* ---------- security ---------- */
+[["Someone who isn't a party reads or changes a deal","Roles come from the row (buyer, seller, preview). Every command, read and upload is checked. The access matrix test covers 6 states: joined draft, terms_agreed, held, in_review, captured and voided.","lib/deal/access.ts · tests/int/access.int.test.ts"],
+ ["The model is talked into releasing money","The model returns verdicts only. decide() is pure, and capture is called from exactly two guarded places, which a test pins.","lib/deal/decide.ts · tests/unit/boundaries.test.ts"],
+ ["Terms changed after signing","The contract hash covers the terms, the parties, the photo hashes and the rule. It is re-verified before order, authorize, capture and payout.","lib/deal/contract.ts · contract-gate.int.test.ts"],
+ ["Double capture or double payout","Fixed idempotency keys, a row lock and C3 apply-once facts. Repeated webhooks are no-ops.","lib/deal/keys.ts · facts.ts"],
+ ["Forged webhooks","Own RSA-SHA256 verification. The cert URL must be *.paypal.com. Unverified events are stored, never applied.","lib/paypal/verify.ts"],
+ ["Stolen session or replayed link","HttpOnly cookie, session_version for signing out everywhere, single-use links, TOTP replay floor and lockout.","lib/auth/*"],
+ ["XSS","Strict nonce CSP, no inline scripts, React escaping.","proxy.ts"],
+ ["Database leak","Field encryption with AAD binding. Recovery codes stored as SHA-256 only.","lib/crypto/seal.ts"],
+ ["Leaked secrets","Names only in .env.example. CI greps the repo and the client bundle. Model errors are logged as a type, never the content.","scripts/check-secrets.sh"],
+ ["Guessing file URLs","HMAC-signed, 10-minute URLs for photo bytes.","lib/files/urls.ts"],
+ ["Demo personas on real money","The env check refuses DEMO_LOGIN=true unless PayPal is the sandbox, and now actually runs at boot.","lib/env.ts · instrumentation.ts"],
+ ["Brute force and abuse","Rate limits on links (per email and IP), deal creation, reads, Studio and payout codes.","lib/rate-limit.ts (single instance)"]]
+ .forEach(([a, b, c]) => $("#secTable tbody").append(el("tr", {}, `<td>${a}</td><td>${b}</td><td class="small"><code>${c}</code></td>`)));
+
+/* ---------- env ---------- */
+// need: "you" = you must supply it; "auto" = Render generates or presets it; "opt" = optional
+const ENV = [
+  ["DATABASE_URL","always","Postgres connection string","from the handshake-db database","set","auto"],
+  ["APP_URL","always","The exact public origin. Sign-in links and the callback origin check use it","you set it after the first deploy (https://<host>)","set","you"],
+  ["SESSION_SECRET","always, ≥ 32 chars","Random","generated","set","auto"],
+  ["FILE_URL_SECRET","always, ≥ 32 chars","Random","generated","set","auto"],
+  ["CRON_SECRET","always, ≥ 32 chars","Random. The cron job sends it as a Bearer token","generated, shared with the cron","set","auto"],
+  ["DATA_KEYS","always, ≥ 32 chars","Keyring: one secret, or k2:<s>,k1:<s>. Never edit a key in place","generated","set","auto"],
+  ["PAYPAL_CLIENT_ID","always","developer.paypal.com → sandbox REST app (Merchant)","you paste it (#1)","missing","you"],
+  ["PAYPAL_CLIENT_SECRET","always","The same sandbox app","you paste it (#1)","missing","you"],
+  ["NEXT_PUBLIC_PAYPAL_CLIENT_ID","always","The same client id. Inlined into the browser bundle at build time, so set it before building","you paste it (#1)","missing","you"],
+  ["PAYPAL_API_BASE","always","https://api-m.sandbox.paypal.com","preset","set","auto"],
+  ["PAYPAL_WEBHOOK_ID","production","The webhook created on the app for the hosted URL (order, authorization, capture, payout events)","you paste it after the deploy (#20)","empty (OK in dev)","you"],
+  ["ANTHROPIC_API_KEY","always","console.anthropic.com","you paste it (#2)","missing","you"],
+  ["AI_MODEL","default","claude-sonnet-5-5","preset","set","auto"],
+  ["RESEND_API_KEY","production","resend.com. In dev, links print to the server console","you paste it (#2)","empty (OK in dev)","you"],
+  ["EMAIL_FROM","always","Handshake <onboarding@resend.dev>. That sender only reaches your own Resend account email until you verify a domain","preset","set","auto"],
+  ["PASS_THRESHOLD","default 0.85","Confidence a verdict needs to count","preset","set","auto"],
+  ["AUTO_CAPTURE_MAX_MINOR","default 20000","Cents. Above this, the buyer reviews","preset","set","auto"],
+  ["DEMO_LOGIN","optional","true shows the demo personas. Refused unless PAYPAL_API_BASE is the sandbox","preset true","set","auto"],
+  ["DEMO_SELLER_PAYPAL_EMAIL","when DEMO_LOGIN=true","The sandbox personal account that receives demo payouts. Now enforced at boot","you paste it (#1)","missing","you"],
+  ["AG_GRID_LICENSE_KEY","optional","AG Studio trial key. Without it, the ledger still works","you paste it (#44)","missing","opt"],
+  ["TEST_DATABASE_URL","tests","The integration suite's database (handshake_test)","CI only","default","opt"],
+  ["E2E_PAYPAL_BUYER_EMAIL / _PASSWORD","e2e","Sandbox personal account 1 for the happy-path popup","not on Render","missing","opt"],
+  ["PLAYWRIGHT_BASE_URL","e2e","Run the specs against a running server, e.g. the hosted URL","not on Render","unset","opt"],
+];
+const ENVF = [["all","All"],["you","You must supply"],["missing","Missing in your local .env"],["auto","Generated or preset"],["opt","Optional / test"]];
+let envF = "you";
+function renderEnv() {
+  $("#envFilter").innerHTML = ""; ENVF.forEach(([k, l]) => { const b = el("button", { class: "chip", "aria-pressed": k === envF }, l); b.onclick = () => { envF = k; renderEnv(); }; $("#envFilter").append(b); });
+  const rowsE = ENV.filter((e) => envF === "all" || (envF === "missing" ? /missing|empty/.test(e[4]) : e[5] === envF));
+  $("#envTable tbody").innerHTML = rowsE.map(([n, req, src, render, local, who]) => `<tr><td><code>${esc(n)}</code></td><td class="small">${esc(req)}</td><td class="small">${esc(src)}</td><td class="small">${esc(render)}</td><td><span class="pill ${local === "set" || local === "default" ? "ok" : /OK/.test(local) ? "wait" : local === "unset" ? "info" : "no"}">${local}</span></td></tr>`).join("");
+  $("#envTpl").textContent = "# Names you still need (values from the services listed above)\n" + ENV.filter((e) => e[5] === "you" || (e[5] === "opt" && e[0] === "AG_GRID_LICENSE_KEY")).map(([n, , src]) => `# ${src}\n${n.split(" ")[0]}=`).join("\n");
+}
+$("#envCopy").onclick = () => navigator.clipboard?.writeText($("#envTpl").textContent).then(() => { $("#envCopy").textContent = "Copied"; setTimeout(() => ($("#envCopy").textContent = "Copy"), 1200); });
+renderEnv();
+
+/* ---------- status ---------- */
+const ST = [
+  ["Full deal lifecycle, state machine, decide(), contract gate, encryption, 2FA, signatures","works","Unit and integration tests against Postgres, with fake PayPal and Claude","—"],
+  ["Two parties sign in a real browser; contract verified client-side; no CSP violations","works","tests/e2e/two-party.spec.ts on a production build","—"],
+  ["Boot-time env validation","works","Fixed today: lib/env.ts was never imported, so production would have started without RESEND_API_KEY or DEMO_SELLER_PAYPAL_EMAIL","88"],
+  ["Real PayPal sandbox: order, authorize, capture, void, payout","unverified","Never called: no sandbox accounts or REST app yet. The spike scripts are ready","1, 12"],
+  ["PayPal webhook signature against a real recorded event","unverified","1 unit test is skipped until tests/fixtures/webhooks/*.json and cert.pem are recorded","12, 13"],
+  ["PayPal popup in the happy-path e2e","unverified","The selectors must be re-recorded with codegen once there is a sandbox buyer login","42"],
+  ["Claude extraction and judging quality","unverified","No API key yet. Behaviour is tested with the fake model only","2, 27"],
+  ["Eval: decision-match and wrong-capture rates","blocked","eval/cases/ is empty. The 30 verdict cases need real photos. The README numbers are TODO","23, 29, 30"],
+  ["Demo photos","blocked","All 14 images in public/demo are generated placeholders, not photographs","23"],
+  ["Hosted deploy on Render, cron proven, seed on Render","blocked","Needs the Render account and the env vars above. APP_HOST in the cron is UNVERIFIED","20, 34, 35"],
+  ["Emails to anyone but you","limited","onboarding@resend.dev only delivers to the Resend account owner. Judges use the demo personas, or verify a domain","2"],
+  ["AG Studio dashboard and its agent","limited","Renders without a key. The full Studio needs the trial key, and the agent needs ANTHROPIC_API_KEY","44"],
+  ["Carrier tracking","by design","Mocked: an even last digit means delivered, odd means in transit","—"],
+  ["Rate limiting","by design","In memory, so correct for the single Render instance only","—"],
+  ["Memory under 6 × 2 MB uploads on the 512 MB plan","unverified","Spike 9 has to run on Render","45"],
+  ["Outside testers, video, submission","blocked","Needs people and the hosted URL","43, 48, 49"],
+  ["Local dev rows written before the UTC fix","limited","On this Asia/Kolkata Postgres, older local rows may read 5.5 h off. CI and Render are UTC","—"],
+];
+const STC = { works: "ok", unverified: "wait", blocked: "no", limited: "info", "by design": "vio" };
+let stF = "all";
+function renderSt() {
+  $("#stFilter").innerHTML = ""; ["all", ...Object.keys(STC)].forEach((k) => { const n = k === "all" ? ST.length : ST.filter((s) => s[1] === k).length; const b = el("button", { class: "chip", "aria-pressed": k === stF }, `${k} (${n})`); b.onclick = () => { stF = k; renderSt(); }; $("#stFilter").append(b); });
+  $("#stTable tbody").innerHTML = ST.filter((s) => stF === "all" || s[1] === stF).map(([a, s, w, iss]) => `<tr><td>${a}</td><td><span class="pill ${STC[s]}">${s}</span></td><td class="small">${w}</td><td class="small">${iss === "—" ? "—" : iss.split(", ").map(ISSUE).join(" ")}</td></tr>`).join("");
+}
+renderSt();
+
+/* ---------- roadmap ---------- */
+[["done","Done","Spec, plan, 50 tasks, the full code path, the trust work (2FA, signatures, encryption), hardening (single-use links, CSP, checklist, boot env check)"],
+ ["now","Now · you","PayPal sandbox: 3 accounts, 2 REST apps (#1). Anthropic, Resend, Render accounts and the hackathon credit (#2)"],
+ ["now","Day 1 after keys","Sandbox spikes SB-0 to SB-8 and recorded webhooks (#12). The fixture test switches on by itself (#13). One real held → captured → paid run (#27)"],
+ ["now","Deploy","Apply the Blueprint, env vars, hosted webhook, cron proven, seed (#20, #34, #35). Scenario runs on the hosted URL (#22, #31)"],
+ ["now","Proof quality","Real photos (#23), 30 eval cases (#29), baseline plus prompt tuning to zero wrong captures (#30). Fill the README numbers"],
+ ["later","2026-11-02 → 11-08","AG Studio key (#44), outside testers (#43), spike 9 memory, freeze on 11-08 (#45)"],
+ ["later","2026-11-09 → 11-12","Final deploy and e2e on the hosted URL (#47), README (#46), video (#48), repo public and submit (#49). Monitor until 2026-12-15 (#50)"]]
+ .forEach(([c, t, d]) => $("#tl").append(el("div", { class: "tl-item " + c }, `<b>${t}</b><div class="small muted">${d}</div>`)));
+[["Disputes","PayPal Disputes API and the CUSTOMER.DISPUTE.* webhooks map to new facts in lib/deal/webhooks.ts, plus a disputed status in the transitions table. The evidence pack export is already there (GET /evidence-pack).","FR-15, FR-16"],
+ ["Direct seller payee (multiparty)","Replace platform-as-merchant plus Payouts with PayPal multiparty onboarding: the seller is the payee on the order and the platform takes a fee. This changes lib/paypal and payoutAllowed; decide() stays the same.","E10"],
+ ["Milestones and split payouts","Several conditions sets per deal, each with its own capture (partial captures on one authorization), or splits between payees.","FR-18"],
+ ["Code delivery proof","A GitHub PR or commit as evidence for freelance work: a new evidence type that the judge reads as text, with a CI status as a deterministic check like tracking.","FR-17"],
+ ["Real carrier tracking","Swap the mock in lib/carrier.ts for EasyPost or Shippo. Delivered then becomes a fact, not a model judgement.","—"],
+ ["Longer deals","Reauthorization, or vaulted payment methods with a scheduled charge, for deals past 21 days. Needs a reauthorize job aware of the 3-day block.","B7"],
+ ["Passkeys and Log in with PayPal","WebAuthn passkeys to replace TOTP and the IndexedDB signing keys, which survive device loss and are phishing-resistant. Log in with PayPal also proves the payout email.","Trust §14"],
+ ["KMS-held keys","Move DATA_KEYS to a KMS with envelope encryption. seal.ts already carries a kid, so rotation stays the same.","Trust §14"],
+ ["Scale out","Redis or Postgres rate limits instead of in-memory, a queue for verdicts and payouts, and webhook processing off the request path.","—"],
+ ["AI calibration","Use eval results to calibrate the threshold per condition type. Add video evidence, multilingual sentences, and a second-model cross-check for high-value deals.","05 §7"],
+ ["Ratings and identity","Seller reputation from deal history (paid versus voided), and optional ID verification for high-value deals.","Non-goal for now"],
+ ["Exports and mobile","PDF of the signed contract and evidence (FR-14), push or SMS notifications, a mobile app that uses the same API.","FR-14"]]
+ .forEach(([t, d, ref]) => $("#future").append(el("div", { class: "card", style: "margin-bottom:10px" }, `<b>${t}</b> <span class="pill info" style="margin-left:6px">${ref}</span><p class="small muted" style="margin:6px 0 0">${d}</p>`)));
+
+show();
+</script>
+</body>
+</html>

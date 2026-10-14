@@ -6,6 +6,7 @@ As of 2026-10-09. Every name (state, command, endpoint, table, column, env var) 
 
 | Document | What it decides | Read it when |
 | --- | --- | --- |
+| [overview.html](overview.html) | Nothing new: an interactive tour of what is built, generated from the code and these documents. Architecture diagram, money flow, state machine, a live copy of `decide()`, features, security, env vars, status and roadmap | First, to get the whole picture in ten minutes; open it in a browser |
 | [decisions.md](decisions.md) | Every decision taken after the brief, and the spelling of every name: states, transitions, event causes, AI settings, PayPal keys and webhooks, sign-in, UI pages, API endpoints and error codes, tables, stack, hosting | First, and again whenever two documents seem to disagree; it is the tie-breaker |
 | [hackathon.md](hackathon.md) | The rules, dates, judging criteria, prize targets and sponsor facts the plan depends on | Before planning any scope change, and on submission day |
 | [plan.md](plan.md) | Weeks, milestones, the 50 tasks with acceptance criteria, risk register, cut order, submission checklist, post-submission monitoring | Every morning to pick the next task; on 2026-10-30 for the cut decision; from 2026-11-11 for the weekly check |
