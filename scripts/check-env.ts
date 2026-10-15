@@ -12,6 +12,9 @@ const line = (ok: boolean, name: string, detail: string) => {
   console.log(`${ok ? "ok  " : "FAIL"}  ${name.padEnd(28)} ${detail}`);
 };
 
+const scrub = (msg: string) =>
+  Object.values(env).filter((v): v is string => !!v && v.trim().length >= 8).reduce((m, v) => m.split(v).join("<redacted>").split(v.trim()).join("<redacted>"), msg);
+
 async function rules() {
   try {
     await import("@/lib/env");
@@ -66,7 +69,8 @@ async function resend() {
 async function main() {
   await rules();
   for (const [name, probe] of [["PayPal", paypal], ["Anthropic", anthropic], ["Resend", resend]] as const) {
-    try { await probe(); } catch (e) { line(false, name, e instanceof Error ? e.message : String(e)); }
+    // fetch echoes a header value it rejects (a key with a pasted newline), so strip every env value from the message.
+    try { await probe(); } catch (e) { line(false, name, scrub(e instanceof Error ? e.message : String(e))); }
   }
   if (failed) process.exitCode = 1;
 }
