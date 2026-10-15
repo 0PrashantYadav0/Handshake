@@ -77,7 +77,10 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   await expect(status(buyer)).toHaveText(/^(in_review|captured|paid)$/, { timeout: 30_000 }); // the seller's page can still show the judging step
   if ((await status(buyer).textContent()) === "in_review") {
     await buyer.getByTestId("review-approve").click();
-    await buyer.getByTestId("confirm-dialog-confirm").click(); // ReviewPanel confirms with the ConfirmDialog
+    await Promise.all([
+      buyer.waitForResponse((r) => r.url().endsWith(`/api/deals/${code}/review`), { timeout: 30_000 }),
+      buyer.getByTestId("confirm-dialog-confirm").click(), // ReviewPanel confirms with the ConfirmDialog
+    ]);
   }
   // The approve call waits for PayPal's capture (seconds); reloading before it answers would show in_review again.
   await expect(async () => {
