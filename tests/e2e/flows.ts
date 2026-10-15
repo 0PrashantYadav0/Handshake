@@ -11,11 +11,18 @@ export async function watchCsp(page: Page): Promise<string[]> {
   return seen;
 }
 
+/** Each 30 s code works once (replay guard), so after a recent sign-in the server answers "Wait a few seconds": click again until it fills. */
+async function fillDemoCode(page: Page, button: string, input: string) {
+  await expect(async () => {
+    await page.getByTestId(button).click();
+    await expect(page.locator(input)).toHaveValue(/^\d{6}$/, { timeout: 2_000 });
+  }).toPass({ timeout: 65_000, intervals: [3_000] });
+}
+
 /** Demo persona second factor: fill the published code and continue. */
 export async function pass2fa(page: Page) {
   await page.waitForURL(/\/signin\/2fa/);
-  await page.getByTestId("demo-code").click();
-  await expect(page.locator("#code")).toHaveValue(/^\d{6}$/);
+  await fillDemoCode(page, "demo-code", "#code");
   await page.getByTestId("verify-2fa").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
 }
@@ -24,7 +31,6 @@ export async function pass2fa(page: Page) {
 export async function signContract(page: Page) {
   await page.getByTestId("sign-contract").waitFor();
   await page.getByTestId("sign-agree").check();
-  await page.getByTestId("sign-demo-code").click();
-  await expect(page.locator("#sign-totp")).toHaveValue(/^\d{6}$/);
+  await fillDemoCode(page, "sign-demo-code", "#sign-totp");
   await page.getByTestId("accept-terms").click();
 }

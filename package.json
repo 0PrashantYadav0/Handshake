@@ -1,7 +1,9 @@
 {
   "name": "handshake",
   "private": true,
-  "engines": { "node": ">=24 <27" },
+  "engines": {
+    "node": ">=24 <27"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -16,7 +18,8 @@
     "reseal": "tsx scripts/reseal.ts",
     "eval": "tsx eval/run.ts",
     "sandbox": "tsx scripts/sandbox/scenario.ts",
-    "demo:placeholders": "tsx scripts/demo/make-placeholders.ts"
+    "demo:placeholders": "tsx scripts/demo/make-placeholders.ts",
+    "check-env": "tsx scripts/check-env.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.132.1",
