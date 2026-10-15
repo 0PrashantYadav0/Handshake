@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { personaOf } from "@/lib/auth/demo";
 import { consoleEmail } from "./console";
 import type { Email } from "./types";
 
@@ -9,6 +10,8 @@ export function resendEmail(apiKey: string, from: string): Email {
   const client = new Resend(apiKey);
   return {
     async send(msg) {
+      // The demo personas' addresses are not mailboxes: sending would bounce and hurt the sending domain's reputation.
+      if (personaOf(msg.to)) return consoleEmail.send(msg);
       try {
         const { error } = await client.emails.send({ from, ...msg });
         if (error) console.error("[email] resend error", error);

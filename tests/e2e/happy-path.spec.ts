@@ -53,10 +53,11 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
     !process.env.E2E_PAYPAL_BUYER_EMAIL || !process.env.E2E_PAYPAL_BUYER_PASSWORD,
     "Steps 6-10 need the sandbox buyer: set E2E_PAYPAL_BUYER_EMAIL and E2E_PAYPAL_BUYER_PASSWORD (README, sandbox personal account 1)",
   );
-  const popup = await Promise.all([
-    buyer.waitForEvent("popup"),
-    buttons.locator('[data-funding-source="paypal"]').click(),
-  ]).then(([p]) => p);
+  // The SDK draws the button before its click handler is wired; a click in that gap is dropped, so click until the popup opens.
+  let popup!: Page;
+  await expect(async () => {
+    [popup] = await Promise.all([buyer.waitForEvent("popup", { timeout: 5_000 }), buttons.locator('[data-funding-source="paypal"]').click()]);
+  }).toPass({ timeout: 60_000 });
   await approveInPopup(popup);
   await popup.waitForEvent("close", { timeout: 60_000 });
   await expect(status(buyer)).toHaveText("held", { timeout: 30_000 });
@@ -72,13 +73,17 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   for (const row of await rows.all()) await expect(row.locator(".hs-help").first()).not.toBeEmpty();
 
   // 8. in_review -> buyer approves; otherwise the rule already captured
-  if ((await status(seller).textContent()) === "in_review") {
-    await buyer.reload();
+  await buyer.reload();
+  await expect(status(buyer)).toHaveText(/^(in_review|captured|paid)$/, { timeout: 30_000 }); // the seller's page can still show the judging step
+  if ((await status(buyer).textContent()) === "in_review") {
     await buyer.getByTestId("review-approve").click();
     await buyer.getByTestId("confirm-dialog-confirm").click(); // ReviewPanel confirms with the ConfirmDialog
   }
-  await buyer.reload();
-  await expect(status(buyer)).toHaveText(/^(captured|paid)$/, { timeout: 30_000 });
+  // The approve call waits for PayPal's capture (seconds); reloading before it answers would show in_review again.
+  await expect(async () => {
+    await buyer.reload();
+    await expect(status(buyer)).toHaveText(/^(captured|paid)$/, { timeout: 2_000 });
+  }).toPass({ timeout: 30_000, intervals: [2_000] });
   const final = await status(buyer).textContent();
 
   // 9. Ledger row (AG Grid virtualises columns: filter down, then assert the pinned code cell)
