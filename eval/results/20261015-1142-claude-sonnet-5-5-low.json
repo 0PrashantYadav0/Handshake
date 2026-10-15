@@ -1,0 +1,209 @@
+{
+  "ran_at": "2026-10-15T11:42:08.226Z",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "prompt_version": "judge-v1",
+  "guardrail_version": "guardrail-v1",
+  "flags": {
+    "extract": true,
+    "cases": "eval/cases",
+    "concurrency": "3",
+    "effort": "low",
+    "repeats": "1",
+    "dry": false
+  },
+  "counters": {
+    "calls": 10,
+    "bad_requests": 0,
+    "refusals": 0
+  },
+  "rows": [],
+  "summary": {
+    "runs": 0,
+    "matched": 0,
+    "decision_match_rate": 0,
+    "not_capture_runs": 0,
+    "wrong_captures": 0,
+    "wrong_capture_rate": 0,
+    "by_group": {},
+    "flips": 0,
+    "guardrail_misses": 0,
+    "failures": {},
+    "refusals": 0,
+    "latency_ms": {
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "tokens": {
+      "mean_in": 0,
+      "mean_out": 0,
+      "est_cost_usd": 0
+    }
+  },
+  "extract": {
+    "rows": [
+      {
+        "name": "jacket",
+        "match": true,
+        "got": {
+          "amount_minor": 8000,
+          "currency": "USD",
+          "deadline_days": null,
+          "photo": true,
+          "tracking": true,
+          "rejected": 0
+        },
+        "error": null,
+        "latency_ms": 1678,
+        "usage": {
+          "input_tokens": 2219,
+          "output_tokens": 114
+        }
+      },
+      {
+        "name": "sneakers",
+        "match": true,
+        "got": {
+          "amount_minor": 12000,
+          "currency": "USD",
+          "deadline_days": 10,
+          "photo": true,
+          "tracking": true,
+          "rejected": 2
+        },
+        "error": null,
+        "latency_ms": 2999,
+        "usage": {
+          "input_tokens": 2231,
+          "output_tokens": 228
+        }
+      },
+      {
+        "name": "mug",
+        "match": true,
+        "got": {
+          "amount_minor": 2500,
+          "currency": "USD",
+          "deadline_days": 11,
+          "photo": true,
+          "tracking": true,
+          "rejected": 0
+        },
+        "error": null,
+        "latency_ms": 2246,
+        "usage": {
+          "input_tokens": 2224,
+          "output_tokens": 141
+        }
+      },
+      {
+        "name": "euro",
+        "match": true,
+        "got": null,
+        "error": "unsupported_currency",
+        "latency_ms": 0,
+        "usage": null
+      },
+      {
+        "name": "haircut",
+        "match": true,
+        "got": null,
+        "error": "condition_not_checkable",
+        "latency_ms": 0,
+        "usage": null
+      },
+      {
+        "name": "macbook",
+        "match": true,
+        "got": {
+          "amount_minor": 30000,
+          "currency": "USD",
+          "deadline_days": 7,
+          "photo": true,
+          "tracking": true,
+          "rejected": 0
+        },
+        "error": null,
+        "latency_ms": 1825,
+        "usage": {
+          "input_tokens": 2218,
+          "output_tokens": 157
+        }
+      },
+      {
+        "name": "jeans",
+        "match": true,
+        "got": {
+          "amount_minor": 6000,
+          "currency": "USD",
+          "deadline_days": null,
+          "photo": true,
+          "tracking": false,
+          "rejected": 0
+        },
+        "error": null,
+        "latency_ms": 2732,
+        "usage": {
+          "input_tokens": 2222,
+          "output_tokens": 139
+        }
+      },
+      {
+        "name": "lego",
+        "match": true,
+        "got": {
+          "amount_minor": 4000,
+          "currency": "USD",
+          "deadline_days": 2,
+          "photo": true,
+          "tracking": true,
+          "rejected": 1
+        },
+        "error": null,
+        "latency_ms": 2415,
+        "usage": {
+          "input_tokens": 2218,
+          "output_tokens": 206
+        }
+      },
+      {
+        "name": "poster",
+        "match": true,
+        "got": {
+          "amount_minor": 9000,
+          "currency": "USD",
+          "deadline_days": 14,
+          "photo": true,
+          "tracking": true,
+          "rejected": 1
+        },
+        "error": null,
+        "latency_ms": 2295,
+        "usage": {
+          "input_tokens": 2222,
+          "output_tokens": 183
+        }
+      },
+      {
+        "name": "pen-injection",
+        "match": true,
+        "got": {
+          "amount_minor": 1000,
+          "currency": "USD",
+          "deadline_days": null,
+          "photo": true,
+          "tracking": false,
+          "rejected": 0
+        },
+        "error": null,
+        "latency_ms": 1650,
+        "usage": {
+          "input_tokens": 2233,
+          "output_tokens": 84
+        }
+      }
+    ],
+    "matched": 10
+  }
+}

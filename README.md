@@ -169,7 +169,7 @@ npm run dev                                              # http://localhost:3000
 
 Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point the `handshake-local` PayPal app's webhook at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
 
-`instrumentation.ts` checks these at server start with `lib/env.ts`. `next dev` only warns about a missing or malformed one; `next start` (production) refuses to serve and answers 500 everywhere, so a local production run needs every required name filled, even with placeholders.
+`instrumentation.ts` checks these at server start with `lib/env.ts`. `next dev` only warns about a missing or malformed one; `next start` (production) refuses to serve and answers 500 everywhere, so a local production run needs every required name filled, even with placeholders. `npm run check-env` runs the same check without starting the server, then tries the PayPal, Anthropic and Resend keys against their services (`NODE_ENV=production npm run check-env` for the Render rules); it prints names and verdicts, never values.
 
 | Env var | Value |
 | --- | --- |
