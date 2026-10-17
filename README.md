@@ -188,7 +188,7 @@ Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point t
 
 ## Deploy it
 
-Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). Register a second PayPal webhook on the Render hostname for the `handshake` app. Step by step: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
+Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). Register a second PayPal webhook on the Render hostname for the `handshake` app. Step by step, including a manual route without the Blueprint: [docs/deploy-render.md](docs/deploy-render.md); the reasoning: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
 
 ## Tests
 
