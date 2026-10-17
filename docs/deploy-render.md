@@ -6,7 +6,12 @@ You end up with three Render pieces: a web service `handshake` ($7/month), a Pos
 
 ## 0. Before you start
 
-- [ ] `npm run check-env` passes on your machine. The deploy uses the same PayPal app, Anthropic key and Resend key.
+- [ ] `npm run check-env` passes on your machine.
+- [ ] A **second PayPal app for Render**, separate from the one in your `.env`.
+  - Create it under **Apps & Credentials > Create App**: name `handshake`, type Merchant, linked to the **same US business account** as your local app. Tick **Payouts** under Features.
+  - Copy its Client ID and Secret; Render uses these, not the ones in `.env`.
+  - Why: PayPal sends webhooks to every URL on an app, and events match deals by deal code. If local and Render shared an app, a local deal's event could land on a hosted deal with the same code, and the reverse.
+- [ ] Optional: a separate Anthropic key named `handshake-prod`, so hosted spend shows on its own line. The local key also works.
 - [ ] Render account signed in with the GitHub account that owns the repo. Workspace **Hobby**. Never pick Pro.
 - [ ] A card is on file under **Billing**. Render requires one for paid services. Indian cards need international or online transactions turned on in the bank app first.
 - [ ] The $50 credit has been claimed from the [Devpost resources page](https://paypalaihackathon.devpost.com/resources). The next day, check that **Billing** shows it.
@@ -21,12 +26,12 @@ Pick **one** of the two routes below. They produce the same result.
 ## Route A: Blueprint (fewer clicks)
 
 1. **New > Blueprint**, pick the repo, branch `main`. Render reads `render.yaml`.
-2. It asks once for every secret. Enter them from your `.env`, with these exceptions:
+2. It asks once for every secret. For the three PayPal ones, use the `handshake` app from step 0. Take the rest from your `.env`, with these exceptions:
    - `PAYPAL_WEBHOOK_ID`: type `pending`. Step 4 of "After either route" replaces it.
    - `AG_GRID_LICENSE_KEY`: leave it empty.
    - `APP_URL`: type `https://handshake.onrender.com`. Correct it after the first deploy if Render gives a different host.
 3. Click **Apply**. Render generates `SESSION_SECRET`, `FILE_URL_SECRET`, `DATA_KEYS` and `CRON_SECRET` by itself.
-4. When the deploy is live, open **handshake-tick > Environment** and check that `APP_HOST` holds the web host, for example `handshake.onrender.com`. If it is empty, set it by hand. Without it the cron never reaches the app.
+4. When the deploy is live, open **handshake-tick > Environment** and check that `APP_HOST` holds the web host, for example `handshake.onrender.com`. Without it the cron never reaches the app. If it is empty, don't type it in by hand: the next Blueprint sync would wipe it. Send the host to the agent, which changes `APP_HOST` in `render.yaml` to `sync: false` (07 section 3.4 step 4); then re-apply the Blueprint and paste the host.
 
 Then continue at "After either route".
 
@@ -66,7 +71,7 @@ When it is ready, copy the **Internal Database URL**.
 
 Never put the migration in the build command. If a deploy fails after its build has already migrated, the database is left changed under the old code.
 
-**Environment variables** (Advanced > Add environment variable). Generate each of the four secrets on your machine with `openssl rand -base64 32`, a different value for each:
+**Environment variables** (the Environment Variables section of the same form, above Advanced). Generate each of the four secrets on your machine with `openssl rand -base64 32`, a different value for each:
 
 | Name | Value |
 | --- | --- |
@@ -76,12 +81,12 @@ Never put the migration in the build command. If a deploy fails after its build 
 | `FILE_URL_SECRET` | new `openssl rand -base64 32` |
 | `DATA_KEYS` | new `openssl rand -base64 32`. **Never change it later**: it encrypts stored data. To rotate, prepend a new key (`k2:<new>,k1:<old>`) |
 | `CRON_SECRET` | new `openssl rand -base64 32`. Also used in B3 |
-| `PAYPAL_CLIENT_ID` | from `.env` |
-| `PAYPAL_CLIENT_SECRET` | from `.env` |
+| `PAYPAL_CLIENT_ID` | Client ID of the `handshake` app from step 0 (not the one in `.env`) |
+| `PAYPAL_CLIENT_SECRET` | Secret of the `handshake` app |
 | `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | the same as `PAYPAL_CLIENT_ID` |
 | `PAYPAL_API_BASE` | `https://api-m.sandbox.paypal.com` |
 | `PAYPAL_WEBHOOK_ID` | `pending` for now |
-| `ANTHROPIC_API_KEY` | from `.env` |
+| `ANTHROPIC_API_KEY` | `handshake-prod` key, or the one in `.env` |
 | `AI_MODEL` | `claude-sonnet-5-5` |
 | `RESEND_API_KEY` | from `.env` (required in production) |
 | `EMAIL_FROM` | `Handshake <onboarding@resend.dev>` |
@@ -122,7 +127,7 @@ Environment variables:
 2. **APP_URL.** If the host isn't `handshake.onrender.com`, set `APP_URL` on the web service to the real one. If you used Route B, also set the cron's `APP_HOST`. Saving redeploys.
 3. **Cron.** Open **handshake-tick > Trigger Run**, then check its log. It should exit 0 and print a small JSON body.
 4. **Webhook.** In the PayPal developer dashboard:
-   - Open the same app you use locally, then **Features > Sandbox Webhooks > Add Webhook**.
+   - Open the `handshake` app from step 0 (not your local app), then **Features > Sandbox Webhooks > Add Webhook**.
    - URL: `https://<host>/api/webhooks/paypal`.
    - Tick these eleven events:
      ```
