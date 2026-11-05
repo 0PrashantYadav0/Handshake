@@ -138,8 +138,6 @@ export function AgentDesk({ clientId }: { clientId: string }) {
       <div>
         <button type="button" className="hs-btn" onClick={start} disabled={busy || (!!gate && status === "terms_agreed")} data-testid="desk-start">{busy ? "The agents are working…" : started ? "Run it again" : "Start the agents"}</button>
       </div>
-      {message && <p className="hs-banner" role="status">{message}</p>}
-
       {started && (
         <ol className="hs-card flex flex-col gap-2.5 p-4 md:p-5" aria-live="polite" data-testid="desk-feed">
           {lines.map((l) => <Bubble key={l.n} line={l as Extract<DeskEvent, { t: "say" | "guard" | "tool" }>} />)}
@@ -147,6 +145,8 @@ export function AgentDesk({ clientId }: { clientId: string }) {
           <li ref={end} />
         </ol>
       )}
+
+      {message && <p className="hs-banner" data-tone="info" role="status" data-testid="desk-message">{message}</p>}
 
       {gate && status === "terms_agreed" && (
         <section className="hs-card border-[var(--hs-accent)] p-5" data-testid="desk-gate">

@@ -3,6 +3,7 @@
 // as an unsigned decimal, verified RSA-SHA256 against the cert fetched from PAYPAL-CERT-URL. Never throws.
 import { createPublicKey, createVerify, type KeyObject } from "node:crypto";
 import { crc32 } from "node:zlib";
+import { getToken } from "./token";
 
 export type VerifyResult = { result: "verified" | "unverified" | "fetch_failed"; webhook_id: string | null };
 export type FetchCert = (url: string) => Promise<string>;
@@ -87,6 +88,38 @@ const fetchCertReal: FetchCert = async (url) => {
   return res.text();
 };
 
+/**
+ * PAYPAL_WEBHOOK_ID first, then the webhooks registered on this app. The id is inside the signed message and only PayPal can sign,
+ * so an id PayPal lists for our own app is as good as the configured one, and a stale env value can't silently lose every event.
+ */
+export async function verifyWithOwnIds(
+  rawBody: string,
+  headers: Record<string, string | null>,
+  input: { webhookId: string | null; ownIds: () => Promise<string[]>; fetchCert: FetchCert; env?: string },
+): Promise<VerifyResult> {
+  const { webhookId, ownIds, fetchCert, env } = input;
+  const first = await verifyPaypalSignature({ headers, rawBody, webhookId, fetchCert, env });
+  if (first.result !== "unverified" || !header(headers, "paypal-transmission-sig")) return first;
+  for (const id of (await ownIds()).filter((x) => x !== webhookId)) {
+    const r = await verifyPaypalSignature({ headers, rawBody, webhookId: id, fetchCert, env });
+    if (r.result === "verified") return r;
+  }
+  return first;
+}
+
+let own: { ids: string[]; at: number } | null = null;
+async function ownWebhookIds(): Promise<string[]> {
+  if (own && Date.now() - own.at < 10 * 60_000) return own.ids;
+  try {
+    const res = await fetch(`${process.env.PAYPAL_API_BASE}/v1/notifications/webhooks`, { headers: { Authorization: `Bearer ${await getToken()}` }, signal: AbortSignal.timeout(10_000) });
+    const body = (await res.json()) as { webhooks?: { id: string }[] };
+    own = { ids: res.ok ? (body.webhooks ?? []).map((w) => w.id) : [], at: Date.now() };
+  } catch {
+    return own?.ids ?? [];
+  }
+  return own.ids;
+}
+
 /** The PayPal port's seventh method (types.ts); wired in index.ts. */
 export const verifyWebhook = (rawBody: string, headers: Record<string, string | null>): Promise<VerifyResult> =>
-  verifyPaypalSignature({ headers, rawBody, webhookId: process.env.PAYPAL_WEBHOOK_ID ?? null, fetchCert: fetchCertReal });
+  verifyWithOwnIds(rawBody, headers, { webhookId: process.env.PAYPAL_WEBHOOK_ID ?? null, ownIds: ownWebhookIds, fetchCert: fetchCertReal });

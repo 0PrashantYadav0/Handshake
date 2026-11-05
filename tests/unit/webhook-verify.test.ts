@@ -5,7 +5,7 @@ import { createSign, generateKeyPairSync } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { clearCertCache, crc32Decimal, verifyPaypalSignature } from "@/lib/paypal/verify";
+import { clearCertCache, crc32Decimal, verifyPaypalSignature, verifyWithOwnIds } from "@/lib/paypal/verify";
 
 const FIXTURES = join(__dirname, "..", "fixtures", "webhooks");
 const CERT_URL = "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-TEST";
@@ -37,6 +37,22 @@ afterEach(() => vi.unstubAllEnvs());
 
 test("crc32 from node:zlib is PayPal's unsigned decimal", () => {
   expect(crc32Decimal("hello")).toBe("907060870");
+});
+
+test("a stale PAYPAL_WEBHOOK_ID still verifies against a webhook registered on this app, and only then", async () => {
+  const headers = sign(BODY, "WH-REGISTERED");
+  const ownIds = vi.fn(async () => ["WH-REGISTERED"]);
+  const check = (h = headers, body = BODY, ids = ownIds) => verifyWithOwnIds(body, h, { webhookId: "pending", ownIds: ids, fetchCert, env: "production" });
+  await expect(check()).resolves.toEqual({ result: "verified", webhook_id: "WH-REGISTERED" });
+  await expect(check(headers, BODY.replace("CAP-1", "CAP-2"))).resolves.toMatchObject({ result: "unverified" }); // a changed body fails on every id
+  await expect(check(headers, BODY, vi.fn(async () => ["WH-SOMEONE-ELSE"]))).resolves.toMatchObject({ result: "unverified" });
+});
+
+test("the configured id answers first, and a request with no signature never asks PayPal", async () => {
+  const ownIds = vi.fn(async () => ["WH-REGISTERED"]);
+  await expect(verifyWithOwnIds(BODY, sign(BODY), { webhookId: WEBHOOK_ID, ownIds, fetchCert, env: "production" })).resolves.toEqual({ result: "verified", webhook_id: WEBHOOK_ID });
+  await expect(verifyWithOwnIds(BODY, {}, { webhookId: WEBHOOK_ID, ownIds, fetchCert, env: "production" })).resolves.toMatchObject({ result: "unverified" });
+  expect(ownIds).not.toHaveBeenCalled();
 });
 
 test("valid signature verifies and reports the webhook id", async () => {
