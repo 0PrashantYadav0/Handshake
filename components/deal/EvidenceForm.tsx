@@ -83,7 +83,7 @@ export function EvidenceForm({ deal, demo, onChecking, onDone, onPaypalError, fa
     if (!kit || !preset) return;
     const set = preset.sets[setId];
     try {
-      const { base, box } = preset.code_photo;
+      const { base, box } = set.code_photo ?? preset.code_photo;
       const files = await Promise.all([...set.photos.map(fetchSample), composeCodePhoto(base, deal.code, box, kit.font)]);
       await add(files, { replace: true, skipListingCheck: !!set.skip_listing_check });
       setTracking(kit.tracking_number);

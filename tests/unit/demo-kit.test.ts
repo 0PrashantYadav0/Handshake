@@ -17,7 +17,7 @@ describe("presets.json", () => {
   });
 
   it("points only at files that exist", () => {
-    const urls = kit.presets.flatMap((p) => [...p.reference, p.code_photo.base, ...Object.values(p.sets).flatMap((s) => s.photos)]);
+    const urls = kit.presets.flatMap((p) => [...p.reference, p.code_photo.base, ...Object.values(p.sets).flatMap((s) => [...s.photos, ...(s.code_photo ? [s.code_photo.base] : [])])]);
     expect(urls.length).toBeGreaterThan(0);
     expect(urls.filter((u) => !existsSync(pub(u)))).toEqual([]);
   });
@@ -43,6 +43,9 @@ describe("findPreset", () => {
   });
   it("resolves an extra to its preset", () => {
     expect(findPreset(kit, kit.extras[0].sentence).id).toBe("mug");
+  });
+  it("finds the item in a sentence whose price was negotiated", () => {
+    expect(findPreset(kit, "I'll pay $33 for the wooden desk lamp if it arrives within 7 days").id).toBe("lamp");
   });
   it("falls back to the first preset for an edited sentence", () => {
     expect(findPreset(kit, "I'll pay $9 for a hat").id).toBe("mug");

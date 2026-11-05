@@ -2,7 +2,7 @@
 export type DealErrorCode =
   | "invalid_input" | "not_signed_in" | "not_a_party" | "deal_not_found" | "file_too_large"
   | "invalid_state" | "terms_not_accepted" | "terms_version_mismatch" | "paypal_email_required"
-  | "condition_not_checkable" | "unsupported_currency" | "too_many_files" | "rate_limited"
+  | "condition_not_checkable" | "unsupported_currency" | "too_many_files" | "rate_limited" | "mandate_exceeded"
   | "internal_error" | "paypal_error" | "ai_unavailable"
   // trust spec §12
   | "mfa_required" | "totp_invalid" | "signature_invalid" | "contract_invalid" | "payout_email_unverified";
@@ -17,7 +17,7 @@ export class DealError extends Error {
 export const HTTP_STATUS: Record<DealErrorCode, number> = {
   invalid_input: 400, not_signed_in: 401, not_a_party: 403, deal_not_found: 404, file_too_large: 413,
   invalid_state: 409, terms_not_accepted: 409, terms_version_mismatch: 409, paypal_email_required: 409,
-  condition_not_checkable: 422, unsupported_currency: 422, too_many_files: 422, rate_limited: 429,
+  condition_not_checkable: 422, unsupported_currency: 422, too_many_files: 422, rate_limited: 429, mandate_exceeded: 403,
   internal_error: 500, paypal_error: 502, ai_unavailable: 503,
   mfa_required: 401, totp_invalid: 400, signature_invalid: 400, contract_invalid: 409, payout_email_unverified: 409,
 };

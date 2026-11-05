@@ -6,15 +6,15 @@ import { toResponse } from "@/lib/http";
 const EXPECTED: Record<DealErrorCode, number> = {
   invalid_input: 400, not_signed_in: 401, not_a_party: 403, deal_not_found: 404, file_too_large: 413,
   invalid_state: 409, terms_not_accepted: 409, terms_version_mismatch: 409, paypal_email_required: 409,
-  condition_not_checkable: 422, unsupported_currency: 422, too_many_files: 422, rate_limited: 429,
+  condition_not_checkable: 422, unsupported_currency: 422, too_many_files: 422, rate_limited: 429, mandate_exceeded: 403,
   internal_error: 500, paypal_error: 502, ai_unavailable: 503,
   mfa_required: 401, totp_invalid: 400, signature_invalid: 400, contract_invalid: 409, payout_email_unverified: 409,
 };
 
 describe("error mapping (H2)", () => {
-  it("the code list is exactly 21 and has no other member", () => {
+  it("the code list is exactly 22 and has no other member", () => {
     expect(Object.keys(HTTP_STATUS).sort()).toEqual(Object.keys(EXPECTED).sort());
-    expect(Object.keys(HTTP_STATUS)).toHaveLength(21);
+    expect(Object.keys(HTTP_STATUS)).toHaveLength(22);
   });
 
   it.each(Object.entries(EXPECTED) as [DealErrorCode, number][])("%s -> %i with { error: { code, message } }", async (code, status) => {

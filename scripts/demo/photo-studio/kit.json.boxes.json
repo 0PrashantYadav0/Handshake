@@ -1,0 +1,37 @@
+{
+ "public/demo/reference/mug/code-base.jpg": {
+  "x": 952,
+  "y": 586,
+  "w": 554,
+  "h": 309,
+  "angle": 0.054
+ },
+ "public/demo/reference/lamp/code-base.jpg": {
+  "x": 954,
+  "y": 810,
+  "w": 364,
+  "h": 206,
+  "angle": 0.049
+ },
+ "public/demo/evidence/wrong-item/code-base.jpg": {
+  "x": 954,
+  "y": 810,
+  "w": 364,
+  "h": 206,
+  "angle": 0.049
+ },
+ "public/demo/reference/bottle/code-base.jpg": {
+  "x": 860,
+  "y": 772,
+  "w": 419,
+  "h": 240,
+  "angle": 0.047
+ },
+ "public/demo/evidence/blurry/code-base.jpg": {
+  "x": 522,
+  "y": 569,
+  "w": 765,
+  "h": 444,
+  "angle": 0.013
+ }
+}

@@ -25,6 +25,20 @@ export interface RawResponse {
   error: AiFailure | null;
 }
 
+/** One turn of an agent negotiation (docs/agents.md). limit_minor is private to the agent whose turn it is. */
+export interface NegotiateInput {
+  role: "buyer" | "seller";
+  item: string;
+  limit_minor: number;
+  list_minor: number;
+  history: { role: "buyer" | "seller"; say: string; offer_minor: number }[];
+}
+export interface NegotiateOutput {
+  say: string;
+  offer_minor: number;
+  accept: boolean;
+}
+
 export interface ExtractInput {
   sentence: string; // 1 to 500 characters, validated by the route before this call (H3)
   today: Date; // deps.clock.now()
@@ -78,4 +92,5 @@ export interface JudgeOutput {
 export interface AiDep {
   extract(input: ExtractInput): Promise<ExtractOutput>; // throws DealError (05 section 3.6)
   judge(input: JudgeInput): Promise<JudgeOutput>; // never throws (05 section 5)
+  negotiate(input: NegotiateInput): Promise<NegotiateOutput>; // throws DealError
 }
