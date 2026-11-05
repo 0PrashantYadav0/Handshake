@@ -153,11 +153,14 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 
 `npm run eval` runs every case folder in `eval/cases/` through the real judge and compares `decide()`'s output with the case's `expected.json`. The set is 30 cases in seven groups (correct item, wrong item, listing photo reused, missing deal code, blurry, tracking not delivered, two prompt-injection cases; [docs/05-ai-spec.md](docs/05-ai-spec.md) section 9.1) plus ten extraction sentences with `--extract`. Two numbers matter: the decision-match rate, and the wrong-capture rate, which must be zero or the runner exits 1. Each run writes `eval/results/<date>-<model>-<effort>.json`.
 
-<!-- TODO(T-30): eval numbers. Fill from the last run before submission: model, prompt versions (extract-v1, judge-v1), case count, decision-match rate, wrong-capture rate, p95 latency, run date, results file path. -->
+| Model | Prompt versions | Cases | Decision match | Wrong captures | Latency | Run date |
+| --- | --- | --- | --- | --- | --- | --- |
+| `claude-sonnet-5-5`, effort low, 3 repeats | judge-v1 | 30 (90 runs) | 87/90 (96.7%) | 0 of 63 | p50 3.5 s, p95 4.8 s | 2026-11-05 |
+| `claude-sonnet-5-5`, effort low, second run | judge-v1 | 30 | 29/30 (96.7%) | 0 of 21 | p50 3.4 s, p95 4.1 s | 2026-11-05 |
 
-| Model | Prompt versions | Cases | Decision match | Wrong captures | Run date |
-| --- | --- | --- | --- | --- | --- |
-| `claude-sonnet-5-5`, effort low | extract-v1, judge-v1 | 30 | TODO | TODO | TODO |
+Results: `eval/results/20261105-1819-claude-sonnet-5-5-low.json` and `20261105-1820-claude-sonnet-5-5-low.json`. Every miss is one case Claude passed at 0.80, under the 0.85 threshold, so a person decides: the safe direction. Both prompt-injection cases held in every run, and no case changed decision between repeats. Extraction (extract-v1) matched 10 of 10 sentences. An earlier run with two wrong captures is kept in `eval/results/`; it traced to two bad test photos, as explained in [eval/README.md](eval/README.md).
+
+The eval photos are generated renders of eight original items (see Disclosures), so these numbers don't promise the same result on phone photos.
 
 See [eval/README.md](eval/README.md) for flags, challenger models and how to add a case.
 
@@ -208,6 +211,8 @@ npx playwright install chromium        # once
 E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
                                        # builds and starts the app, runs the judge happy path end to end (sandbox personal account 1);
                                        # without the two variables it runs up to the PayPal popup and skips the rest
+PLAYWRIGHT_BASE_URL=https://<host> E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test agents
+                                       # the agent desk on real Claude and the sandbox: honest, cheating and hijacking sellers
 PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party
                                        # both demo personas: 2FA, join, sign on both sides, contract verified in the browser;
                                        # needs no Anthropic or PayPal key (tests/e2e/make-draft.ts)

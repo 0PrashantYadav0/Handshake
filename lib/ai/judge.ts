@@ -1,4 +1,4 @@
-// 05 sections 4.7 and 5: one verdict call (17 s attempt inside a 19 s signal, no retry: D4), labels mapped back to
+// 05 sections 4.7 and 5: one verdict call (9 s attempt with one retry inside a 19 s signal: D4, p95 measured at 4.8 s), labels mapped back to
 // database ids, the fixed post-processing rules, and every failure mapped to unclear rows. judge() never throws.
 // The D8 hash check is not here: lib/deal/verdict.ts runs it before deps.ai.judge (05 section 6.1).
 import { AiError, callJson, type MessagesClient } from "./call-json";
@@ -29,7 +29,7 @@ export async function judge(
       { model: model(), max_tokens: 4_000, effort: opts.effort ?? JUDGE_EFFORT, system: JUDGE_SYSTEM, messages: buildJudgeMessages(input) },
       VERDICT_SCHEMA,
       VerdictsZ,
-      { timeout: 17_000, maxRetries: 0, signal: AbortSignal.timeout(19_000) },
+      { timeout: 9_000, maxRetries: 1, signal: AbortSignal.timeout(19_000) },
     );
 
     const verdicts = input.conditions.map((c, i): Verdict => {
