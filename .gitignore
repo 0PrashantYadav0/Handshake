@@ -33,3 +33,7 @@ scripts/sandbox/.state.json
 
 # agent worktrees
 .claude/worktrees/
+
+# videos and raw footage (uploaded, not committed)
+submission/
+brag-output*/
