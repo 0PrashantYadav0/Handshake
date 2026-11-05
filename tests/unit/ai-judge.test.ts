@@ -87,11 +87,11 @@ describe("buildJudgeMessages (D5, D11)", () => {
 });
 
 describe("judge() post-processing (05 section 4.7)", () => {
-  it("sends effort low, 4000 max_tokens, the schema, and a 17 s timeout with no retries; maps labels to database ids", async () => {
+  it("sends effort low, 4000 max_tokens, the schema, and a 9 s timeout with one retry; maps labels to database ids", async () => {
     const client = fakeClient(output(ok));
     const out = await judge(input, client);
     expect(client.params).toMatchObject({ model: "claude-sonnet-5-5", max_tokens: 4_000, system: JUDGE_SYSTEM, output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } } });
-    expect(client.opts).toMatchObject({ timeout: 17_000, maxRetries: 0 });
+    expect(client.opts).toMatchObject({ timeout: 9_000, maxRetries: 1 });
     expect(client.opts?.signal).toBeInstanceOf(AbortSignal);
     expect(out).toMatchObject({ model: "claude-sonnet-5-5", prompt_version: JUDGE_PROMPT_VERSION });
     expect(out.verdicts).toEqual([

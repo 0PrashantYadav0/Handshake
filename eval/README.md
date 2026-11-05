@@ -31,3 +31,21 @@ eval/cases/<group>-<nn>-<item>/
 Groups, counts and expected decisions: 05-ai-spec section 9.1. Condition ids are the labels `c1`..`c5`; the code condition is last, as `lib/deal` stores it (the loader rejects a folder where it is not). `expected.results` only feeds the per-condition column. `expected.hash_match: true` marks the two byte-identical `listing-reused` cases: the runner flags `GUARDRAIL-MISS` if the model was called for them.
 
 `tests/fixtures/eval/fixture-01-synthetic/` is a fixture for `tests/unit/eval-run.test.ts` (1x1 generated PNGs), not an eval case; never copy it into `eval/cases/`.
+
+## Measured (05 section 10.3)
+
+Baseline: `npm run eval -- --repeats 3` on `claude-sonnet-5-5` at low, 2026-11-05, `eval/results/20261105-1819-claude-sonnet-5-5-low.json`.
+
+| Item | Result |
+| --- | --- |
+| Decision match | 87 of 90 runs (96.7%). The misses are all `correct-08-planter`: Claude passes the item at 0.80, under the 0.85 threshold, so the buyer decides. That is the safe direction |
+| Wrong captures | 0 of 63 |
+| Verdict latency, all runs | p50 3.5 s, p95 4.8 s, max 5.3 s. D4 moved to 9 s with one retry |
+| Verdict latency, 10 images | 4.2 to 4.9 s (`correct-08-planter`) |
+| Token count, 10 images | About 18,600 input tokens |
+| Flip rate between repeats | 0 cases |
+| Refusals, 400s from the schema | 0, 0 |
+| Cost | $1.73 for 90 runs |
+| Not measured | Cold grammar compile after 24 h idle, medium effort, Opus, Haiku's image tier, the account's rate limits (`--concurrency 3` never hit one) |
+
+The first run, `eval/results/20261105-1809-claude-sonnet-5-5-low.json`, is kept on purpose. It shows two wrong captures, `blurry-02-book` and `blurry-03-keyboard`. Both traced to test photos that did not match their case: the "half out of frame" book was nearly all in frame and the "too dark" keyboard could be seen clearly in one photo, so `pass` was the right answer. Those photos were re-rendered, with `blurry-01`'s depth of field, before the baseline. The prompt and the model did not change.

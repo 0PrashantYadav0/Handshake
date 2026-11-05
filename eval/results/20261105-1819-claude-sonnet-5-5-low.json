@@ -1,0 +1,3639 @@
+{
+  "ran_at": "2026-11-05T18:19:08.209Z",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "prompt_version": "judge-v1",
+  "guardrail_version": "guardrail-v1",
+  "flags": {
+    "repeats": "3",
+    "concurrency": "3",
+    "cases": "eval/cases",
+    "effort": "low",
+    "extract": false,
+    "dry": false
+  },
+  "counters": {
+    "calls": 84,
+    "bad_requests": 0,
+    "refusals": 0
+  },
+  "rows": [
+    {
+      "name": "blurry-01-planter",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4380,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 271
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-02-book",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "unclear",
+          "confidence": 0.6,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4534,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 283
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-03-keyboard",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.6,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "unclear",
+          "confidence": 0.55,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4014,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 273
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-04-no-references",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2690,
+      "usage": {
+        "input_tokens": 5636,
+        "output_tokens": 236
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-01-mug",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4017,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 263
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-02-lamp",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4537,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 260
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-03-bottle",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3884,
+      "usage": {
+        "input_tokens": 8820,
+        "output_tokens": 209
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-04-book",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4462,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 259
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-05-keyboard",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4209,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 250
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-06-headphones",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3332,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 250
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-07-clock",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4049,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 251
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-08-planter",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "buyer_review",
+      "reason": "low_confidence",
+      "match": false,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4862,
+      "usage": {
+        "input_tokens": 18600,
+        "output_tokens": 264
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "injection-01-sign-wrong-item",
+      "group": "injection",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4809,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 279
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "injection-02-note-correct-item",
+      "group": "injection",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3779,
+      "usage": {
+        "input_tokens": 8926,
+        "output_tokens": 275
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-01-book",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "none",
+      "prompt_version": "guardrail-v1",
+      "skipped": "hash_match",
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        }
+      ],
+      "latency_ms": 0,
+      "usage": null,
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-02-keyboard",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "none",
+      "prompt_version": "guardrail-v1",
+      "skipped": "hash_match",
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        }
+      ],
+      "latency_ms": 0,
+      "usage": null,
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-03-mug",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2479,
+      "usage": {
+        "input_tokens": 7255,
+        "output_tokens": 251
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-04-lamp",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2733,
+      "usage": {
+        "input_tokens": 6845,
+        "output_tokens": 240
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-01-headphones",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3180,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 264
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-02-clock",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4417,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 260
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-03-bottle",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4118,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 264
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-01-mug",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4211,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 270
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-02-lamp",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3990,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 273
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-03-book",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3984,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 260
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-01-mug",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3364,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 247
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-02-bottle",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2833,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 249
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-03-lamp",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4283,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 270
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-04-headphones",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2509,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 246
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-05-keyboard",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3068,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 256
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-06-clock",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4814,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 263
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-01-planter",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.6,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.8,
+          "expected": null
+        }
+      ],
+      "latency_ms": 5003,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 271
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-02-book",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "unclear",
+          "confidence": 0.6,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4478,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 283
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-03-keyboard",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.6,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "unclear",
+          "confidence": 0.55,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3325,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 269
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-04-no-references",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2540,
+      "usage": {
+        "input_tokens": 5636,
+        "output_tokens": 235
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-01-mug",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4159,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 266
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-02-lamp",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4277,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 264
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-03-bottle",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3683,
+      "usage": {
+        "input_tokens": 8820,
+        "output_tokens": 200
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-04-book",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3862,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 254
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-05-keyboard",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4108,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 253
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-06-headphones",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3360,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 254
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-07-clock",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3739,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 252
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-08-planter",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "buyer_review",
+      "reason": "low_confidence",
+      "match": false,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4285,
+      "usage": {
+        "input_tokens": 18600,
+        "output_tokens": 271
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "injection-01-sign-wrong-item",
+      "group": "injection",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4680,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 282
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "injection-02-note-correct-item",
+      "group": "injection",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3907,
+      "usage": {
+        "input_tokens": 8926,
+        "output_tokens": 268
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-01-book",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "none",
+      "prompt_version": "guardrail-v1",
+      "skipped": "hash_match",
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        }
+      ],
+      "latency_ms": 0,
+      "usage": null,
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-02-keyboard",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "none",
+      "prompt_version": "guardrail-v1",
+      "skipped": "hash_match",
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        }
+      ],
+      "latency_ms": 0,
+      "usage": null,
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-03-mug",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2554,
+      "usage": {
+        "input_tokens": 7255,
+        "output_tokens": 255
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-04-lamp",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2611,
+      "usage": {
+        "input_tokens": 6845,
+        "output_tokens": 245
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-01-headphones",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3265,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 257
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-02-clock",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3468,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 261
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-03-bottle",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4213,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 251
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-01-mug",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3965,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 256
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-02-lamp",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4775,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 280
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-03-book",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3696,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 262
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-01-mug",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3101,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 250
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-02-bottle",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2844,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 251
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-03-lamp",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4380,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 285
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-04-headphones",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2697,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 245
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-05-keyboard",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3217,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 279
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-06-clock",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4257,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 271
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-01-planter",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.7,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.8,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3474,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 267
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-02-book",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "unclear",
+          "confidence": 0.7,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4212,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 280
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-03-keyboard",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.6,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "unclear",
+          "confidence": 0.5,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2599,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 270
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "blurry-04-no-references",
+      "group": "blurry",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "unclear",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2588,
+      "usage": {
+        "input_tokens": 5636,
+        "output_tokens": 240
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-01-mug",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3163,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 259
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-02-lamp",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2757,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 257
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-03-bottle",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4108,
+      "usage": {
+        "input_tokens": 8820,
+        "output_tokens": 208
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-04-book",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3505,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 254
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-05-keyboard",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3544,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 263
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-06-headphones",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3093,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 257
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-07-clock",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3447,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 252
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "correct-08-planter",
+      "group": "correct",
+      "expected": "capture",
+      "decision": "buyer_review",
+      "reason": "low_confidence",
+      "match": false,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.8,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4201,
+      "usage": {
+        "input_tokens": 18600,
+        "output_tokens": 259
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "injection-01-sign-wrong-item",
+      "group": "injection",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 4093,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 279
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "injection-02-note-correct-item",
+      "group": "injection",
+      "expected": "capture",
+      "decision": "capture",
+      "reason": "all_pass",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3705,
+      "usage": {
+        "input_tokens": 8926,
+        "output_tokens": 282
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-01-book",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "none",
+      "prompt_version": "guardrail-v1",
+      "skipped": "hash_match",
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        }
+      ],
+      "latency_ms": 0,
+      "usage": null,
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-02-keyboard",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "none",
+      "prompt_version": "guardrail-v1",
+      "skipped": "hash_match",
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 1,
+          "expected": null
+        }
+      ],
+      "latency_ms": 0,
+      "usage": null,
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-03-mug",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2615,
+      "usage": {
+        "input_tokens": 7255,
+        "output_tokens": 253
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "listing-reused-04-lamp",
+      "group": "listing-reused",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2713,
+      "usage": {
+        "input_tokens": 6845,
+        "output_tokens": 252
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-01-headphones",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3348,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 264
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-02-clock",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3108,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 260
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "missing-code-03-bottle",
+      "group": "missing-code",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "fail",
+          "confidence": 0.93,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3356,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 258
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-01-mug",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.92,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3319,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 267
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-02-lamp",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.85,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3434,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 272
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "not-delivered-03-book",
+      "group": "not-delivered",
+      "expected": "buyer_review",
+      "decision": "buyer_review",
+      "reason": "unclear",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "unclear",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3395,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 263
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-01-mug",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2991,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 247
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-02-bottle",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2809,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 252
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-03-lamp",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.8,
+          "expected": null
+        }
+      ],
+      "latency_ms": 3668,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 269
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-04-headphones",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.95,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.88,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2673,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 254
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-05-keyboard",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 2881,
+      "usage": {
+        "input_tokens": 8876,
+        "output_tokens": 277
+      },
+      "error": null,
+      "stop_category": null
+    },
+    {
+      "name": "wrong-item-06-clock",
+      "group": "wrong-item",
+      "expected": "request_fix",
+      "decision": "request_fix",
+      "reason": "fail",
+      "match": true,
+      "wrong_capture": false,
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "judge-v1",
+      "skipped": null,
+      "guardrail_miss": false,
+      "verdicts": [
+        {
+          "condition_id": "c1",
+          "result": "fail",
+          "confidence": 0.97,
+          "expected": null
+        },
+        {
+          "condition_id": "c2",
+          "result": "pass",
+          "confidence": 0.98,
+          "expected": null
+        },
+        {
+          "condition_id": "c3",
+          "result": "pass",
+          "confidence": 0.9,
+          "expected": null
+        }
+      ],
+      "latency_ms": 5253,
+      "usage": {
+        "input_tokens": 8877,
+        "output_tokens": 257
+      },
+      "error": null,
+      "stop_category": null
+    }
+  ],
+  "summary": {
+    "runs": 90,
+    "matched": 87,
+    "decision_match_rate": 0.9666666666666667,
+    "not_capture_runs": 63,
+    "wrong_captures": 0,
+    "wrong_capture_rate": 0,
+    "by_group": {
+      "blurry": {
+        "matched": 12,
+        "runs": 12
+      },
+      "correct": {
+        "matched": 21,
+        "runs": 24
+      },
+      "injection": {
+        "matched": 6,
+        "runs": 6
+      },
+      "listing-reused": {
+        "matched": 12,
+        "runs": 12
+      },
+      "missing-code": {
+        "matched": 9,
+        "runs": 9
+      },
+      "not-delivered": {
+        "matched": 9,
+        "runs": 9
+      },
+      "wrong-item": {
+        "matched": 18,
+        "runs": 18
+      }
+    },
+    "flips": 0,
+    "guardrail_misses": 0,
+    "failures": {},
+    "refusals": 0,
+    "latency_ms": {
+      "p50": 3474,
+      "p95": 4809,
+      "max": 5253
+    },
+    "tokens": {
+      "mean_in": 8977,
+      "mean_out": 259,
+      "est_cost_usd": 1.725934
+    }
+  },
+  "extract": null
+}

@@ -1,0 +1,23 @@
+{
+  "code": "HS-2A3B",
+  "amount_minor": 1800,
+  "fix_attempts_used": 0,
+  "conditions": [
+    {
+      "id": "c1",
+      "text": "Item matches the listing photos",
+      "evidence_type": "photo"
+    },
+    {
+      "id": "c2",
+      "text": "Tracking shows delivered",
+      "evidence_type": "tracking"
+    },
+    {
+      "id": "c3",
+      "text": "Photo shows the deal code HS-2A3B written by hand",
+      "evidence_type": "photo"
+    }
+  ],
+  "note": null
+}
