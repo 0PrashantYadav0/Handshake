@@ -867,7 +867,7 @@ Obtaining the font without adding a dependency: `cd /tmp && npm pack @fontsource
 
 ### 12.2 `presets.json`
 
-The paths below are the target JPEGs; as built every photo path in `presets.json` ends in `.png`, because `public/demo/` still holds generated placeholder gradients (`npm run demo:placeholders`; `public/demo/README.md`) until the user's photographs replace them, at which point the paths switch to `.jpg`.
+The photos are path-traced renders from `scripts/demo/photo-studio/`; see `public/demo/README.md`.
 
 ```json
 {

@@ -2,7 +2,7 @@
 import { DealError } from "@/lib/deal/errors";
 import {
   EXTRACT_PROMPT_VERSION, JUDGE_PROMPT_VERSION,
-  type AiDep, type AiFailure, type ExtractInput, type ExtractOutput, type JudgeInput, type JudgeOutput, type RawResponse, type Verdict,
+  type AiDep, type AiFailure, type ExtractInput, type ExtractOutput, type JudgeInput, type JudgeOutput, type NegotiateInput, type NegotiateOutput, type RawResponse, type Verdict,
 } from "./types";
 
 export type Extract = Omit<ExtractOutput, "model" | "prompt_version" | "raw_response">;
@@ -14,6 +14,7 @@ export interface FakeAi extends AiDep {
   calls: Array<{ job: "extract" | "judge"; input: unknown }>;
   extractWith(result: Extract | "timeout" | "refusal" | "invalid"): void;
   judgeWith(result: JudgeMode): void;
+  negotiateWith(next: (input: NegotiateInput) => NegotiateOutput): void;
 }
 
 export const DEFAULT_EXTRACT: Extract = {
@@ -52,12 +53,18 @@ const unclear = (condition_id: string, reason: string): Verdict => ({ condition_
 export function fakeAi(): FakeAi {
   let extractMode: Extract | "timeout" | "refusal" | "invalid" = DEFAULT_EXTRACT;
   let judgeMode: JudgeMode = [];
+  let negotiateNext: (input: NegotiateInput) => NegotiateOutput = (input) => ({ say: "Deal.", offer_minor: input.limit_minor, accept: true });
   const calls: FakeAi["calls"] = [];
 
   return {
     calls,
     extractWith: (r) => void (extractMode = r),
     judgeWith: (r) => void (judgeMode = r),
+    negotiateWith: (next) => void (negotiateNext = next),
+
+    async negotiate(input: NegotiateInput): Promise<NegotiateOutput> {
+      return negotiateNext(input);
+    },
 
     async extract(input: ExtractInput): Promise<ExtractOutput> {
       calls.push({ job: "extract", input });

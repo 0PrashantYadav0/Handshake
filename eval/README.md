@@ -2,6 +2,8 @@
 
 Thirty verdict cases and ten extraction sentences (05-ai-spec section 9, D12). `npm run eval` prints the decision-match rate and the wrong-capture rate; the second must be 0 or the runner exits 1.
 
+The photos are path-traced renders of eight original items, made by `scripts/demo/photo-studio/` (`node scripts/demo/photo-studio/eval-cases.mjs`), in place of the eight photographed household items of 05 section 9.1. Each item has marks that tell it apart, and the wrong-item cases change colour, model or the whole item.
+
 ## Run
 
 ```

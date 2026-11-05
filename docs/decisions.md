@@ -209,3 +209,12 @@ Choices made while fixing review findings, each the simplest option consistent w
 2. `order_attempts` and `capture_attempts` live on `payments` (I3), not `deals`, because they describe PayPal calls and `payments` is one row per deal.
 3. `payouts.paypal_item_id` is the PayPal payout item id, stored so an `UNCLAIMED` item can be cancelled before a retry (E7).
 4. A late `fact:authorization_voided` in `proof_submitted` or `in_review` with `capture_id` null voids the deal in place (C2); it is not deferred to `tick`, because a void that PayPal reports has already happened and no capture can follow it.
+
+## L. Agents (2026-11-05, docs/agents.md)
+
+- **L1.** Agents are first-class but can't move money. No tool approves a hold or decides a buyer review. Money moves only on a person's PayPal approval and on `decide()`.
+- **L2.** An agent key is a hashed bearer token, a per-deal ceiling and a sealed P-256 signing key, bound to one user. Making one needs a full session and step-up. Its signatures pass `verifyContract` like a device key's.
+- **L3.** The negotiation model proposes; `lib/agents/desk.ts` enforces each agent's private limit in code. An accept outside a limit is refused, an offer past it is cut to the limit.
+- **L4.** The MCP endpoint is stateless Streamable HTTP with JSON responses (`/api/mcp`): `initialize`, `ping`, `tools/list`, `tools/call`.
+- **L5.** Demo and eval photos are path-traced renders from `scripts/demo/photo-studio/` instead of photographs (amends D12, T-23). Disclosed in the README.
+- **L6.** The seed runs in the pre-deploy step; it is idempotent. `job_runs` records the tick for `GET /api/status`.

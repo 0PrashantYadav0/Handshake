@@ -31,6 +31,12 @@ const RULE = [
   ["Every condition passes", "release the payment"],
 ] as const;
 
+const AGENT_LINES = [
+  ["The agent", "Negotiates, signs and proves, up to its ceiling"],
+  ["A person", "Approves the hold at PayPal and decides when Claude is unsure"],
+  ["Fixed code", "Refuses anything over the mandate, then releases or voids the money"],
+] as const;
+
 const BUYERS = [
   "Your money stays in your PayPal account as a hold until the proof checks out.",
   "You set the conditions in plain words. Anything too vague to check is flagged before anyone signs.",
@@ -160,6 +166,24 @@ export default async function Home() {
                 </li>
               ))}
             </ol>
+          </div>
+        </section>
+
+        <section id="agents" aria-labelledby="agents-h" className="scroll-mt-6 border-t border-[var(--hs-border)]">
+          <div className="mx-auto grid max-w-6xl gap-8 px-4 py-16 md:px-8 md:py-20 lg:grid-cols-[1.1fr_1fr]">
+            <div>
+              <h2 id="agents-h" className="hs-display text-3xl md:text-4xl">Let your AI agent buy. It still can&apos;t touch the money.</h2>
+              <p className="mt-4 max-w-xl text-[var(--hs-muted)]">Agents can haggle, propose a deal, sign the contract and submit proof, over MCP or on our live desk. Each one works under a spending ceiling that code enforces, so a prompt injection can change what a model says but not what it can spend.</p>
+              <Link href="/signin?next=/agents" className="hs-btn mt-6 inline-flex items-center">Watch two agents make a deal</Link>
+            </div>
+            <ul className="flex flex-col gap-3 self-center">
+              {AGENT_LINES.map(([who, what]) => (
+                <li key={who} className="hs-card flex flex-col gap-1 p-4 md:flex-row md:gap-4">
+                  <span className="shrink-0 font-semibold md:w-40">{who}</span>
+                  <span className="text-[var(--hs-muted)]">{what}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 

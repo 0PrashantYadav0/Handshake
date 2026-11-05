@@ -1,16 +1,29 @@
 # Handshake: pay on proof
 
-A buyer describes a deal in one sentence. Claude turns it into checkable conditions. Both sides accept. PayPal holds the money (an AUTHORIZE order, not a charge). The seller uploads photos and a tracking number. Claude judges each condition and returns JSON. A fixed rule in code, never the model, then captures the hold, asks for one fix, voids it, or hands the call to the buyer. The seller is paid through PayPal Payouts. Every step lands in an append-only audit log you can export.
+Buying from a stranger means one side has to trust the other. Handshake removes that step.
+
+A buyer describes a deal in one sentence. Claude turns it into checkable conditions. Both sides sign. PayPal holds the money (an AUTHORIZE order, not a charge). The seller uploads photos and a tracking number. Claude judges each condition and returns JSON. A fixed rule in code, never the model, then captures the hold, asks for one fix, voids it, or hands the call to the buyer. The seller is paid through PayPal Payouts. Every step lands in an append-only audit log you can export.
+
+**AI agents can do all of it except move the money.** Two Claude agents can negotiate and settle a deal on `/agents`, and any MCP client can connect to `/api/mcp`. An agent works under a spending ceiling that code enforces. Only a person can approve the hold at PayPal, and only the fixed rule can release it. See [docs/agents.md](docs/agents.md).
 
 Built for the PayPal AI Hackathon 2026. Sandbox only, no real money moves.
 
 | | |
 | --- | --- |
-| Hosted demo | <!-- TODO(T-45): hosted URL --> `https://<host>` |
+| Hosted demo | https://handshake-ba2g.onrender.com |
 | Video (under 3 min) | <!-- TODO(T-47): YouTube URL --> `https://youtube.com/<id>` |
 | Licence | MIT, see [LICENSE](LICENSE) |
 
-## Try it as a judge (10 minutes)
+## Try it as a judge
+
+### The 3-minute version: watch two agents make a deal
+
+1. Open https://handshake-ba2g.onrender.com, click **Start a deal**, then **Continue as buyer**, **Use demo code**, **Continue**.
+2. Click **Agents** in the header, keep **An honest seller** selected and click **Start the agents**. A buying agent with a $20 mandate and a selling agent with a private $16 floor haggle with real Claude calls. They agree a price, create the deal and both sign.
+3. The agents stop at the PayPal button, because only a person can approve money. Log into the popup with the sandbox buyer below and approve.
+4. The selling agent submits proof, Claude judges each condition, the rule releases the payment, and PayPal pays the seller. Then run **A seller that cheats** and watch the hold get voided.
+
+### The full version (10 minutes): play both sides yourself
 
 One browser, no account, no install. The header has a **Demo** badge with **Buyer** and **Seller** chips that swap between the two seeded personas (`demo-buyer@handshake.demo`, `demo-seller@handshake.demo`), so you play both sides.
 
@@ -20,8 +33,8 @@ One browser, no account, no install. The header has a **Demo** badge with **Buye
 4. Switch to **Buyer** and sign the same way. The deal reads **Approve the hold with PayPal**. **Contract and signatures** under Records shows both signatures verified in your browser. Click the PayPal button and log into the popup with the sandbox buyer:
 
    ```
-   email:    <!-- TODO(T-45): sandbox personal account 1 email -->
-   password: <!-- TODO(T-45): sandbox personal account 1 password -->
+   email:    sb-8wvwd53385315@personal.example.com
+   password: FgW4ss=$
    ```
 
    Approve. The deal shows **Money held. Waiting for proof.** ($18.00 held, not charged).
@@ -38,12 +51,7 @@ More runs, each a different exit from the same state machine:
 | **$18 mug, 5 days** | **Reuse listing photo** | A listing photo as "proof" fails every photo condition with no model call (hash guardrail) |
 | **$45 mug, subjective wording** | none | "looks nice" cannot be checked from a photo; it comes back under "Left out" with a **Use suggestion** or **Dismiss** chip |
 
-The seller's payout lands in sandbox personal account 2; log in at https://www.sandbox.paypal.com to see it:
-
-```
-email:    <!-- TODO(T-45): sandbox personal account 2 email -->
-password: <!-- TODO(T-45): sandbox personal account 2 password -->
-```
+The seller's payout goes to a sandbox personal account. `/wallet` shows the capture and payout with their PayPal ids.
 
 Prompts to type into the `/dashboard/studio` agent panel (for example "Why was HS-7K2Q voided?") are listed in [docs/studio-prompts.md](docs/studio-prompts.md).
 
@@ -117,9 +125,9 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Sandbox only, USD only | No real money moves. Holds are PayPal sandbox authorizations against a custom-balance personal account. |
 | Mock carrier | There is no carrier API. A tracking number ending in an even digit is `delivered`, an odd digit `in_transit`, anything else `unknown`. The demo uses `TRK-DEMO-0000`. |
 | Composed code photo | The handwritten deal-code photo in the sample evidence is composed in the browser on a canvas (a sample photo plus the deal code in the Caveat handwriting font) because codes are generated per deal. |
-| Placeholder sample photos | Until the real photographs are dropped in, every image under `public/demo/` is a generated gradient with a label (`npm run demo:placeholders`), not a photograph. The judge can still tell them apart, but verdicts on placeholders are not a fair test of the model. Replacing them is a file swap plus a path change in `public/demo/presets.json`; see [public/demo/README.md](public/demo/README.md). |
+| Generated sample photos | The sample photos in `public/demo/` and the eval set in `eval/cases/` are path-traced 3D renders from `scripts/demo/photo-studio/`, not photographs, so everything is ours and free of third-party marks. Claude judges them as it would any photo, and you can upload your own instead. The eval numbers below measure these renders; real phone photos are noisier. |
 | Limits | Per 10 minutes, in memory, per instance: 20 new deals (extractions) per user, 3 magic links per email and 10 per IP, 120 deal reads per user, 30 Studio agent turns per user. Over the limit the API answers `rate_limited`; the magic-link route answers `ok` either way so it does not reveal accounts. |
-| Security headers | Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY` and a `Permissions-Policy` that denies camera, microphone and geolocation (`next.config.ts`). No CSP yet: the PayPal JS SDK and AG Studio inject inline styles and scripts. |
+| Agent limits | The live desk runs as the Demo Buyer and is limited to 12 runs per 10 minutes per account and 60 per hour overall, because it spends model tokens. In demo mode anyone can make an agent key for the shared demo personas; the ceiling and the PayPal approval still apply. |
 | Platform as merchant | The Handshake sandbox business account receives the capture and pays the seller through Payouts. A production build would use PayPal multiparty onboarding so the seller is the payee. |
 | Seeded history | The ledger and dashboard show about 25 seeded historical deals (`deals.seeded = true`) with events but no PayPal objects, so there is something to sort and chart. Deals you create are real sandbox deals. |
 | AG Studio trial | `/dashboard` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
@@ -131,13 +139,14 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Tool | Used for |
 | --- | --- |
 | PayPal Orders v2 (intent `AUTHORIZE`), Payments v2 (authorize, capture, void), Payouts v1, Webhooks v1 | Hold the buyer's money at terms acceptance, capture or void it from `decide()`, pay the seller, and learn about captures, voids and payouts from webhooks. Signatures are verified in our own code (cert from `PAYPAL-CERT-URL`, CRC32, RSA-SHA256). Every write carries a `PayPal-Request-Id`; every PayPal fact is applied once, from the API response or the webhook, whichever arrives first. `@paypal/paypal-server-sdk` 2.5 for Orders and Payments, raw `fetch` for Payouts and verification, `@paypal/react-paypal-js` for the button. |
-| Claude `claude-sonnet-5-5` via `@anthropic-ai/sdk` | Two jobs, both structured outputs against hand-written JSON schemas at `effort: low`: extract `item_title`, amount, deadline and 1 to 4 checkable conditions from the sentence (subjective parts come back in `rejected[]` with a rewording); judge each condition from labelled base64 photos, the mock carrier status and the note. Every verdict row stores `model`, `prompt_version` and `raw_response`. |
+| Claude `claude-sonnet-5-5` via `@anthropic-ai/sdk` | Three jobs, all structured outputs against hand-written JSON schemas at `effort: low`: extract `item_title`, amount, deadline and 1 to 4 checkable conditions from the sentence (subjective parts come back in `rejected[]` with a rewording); judge each condition from labelled base64 photos, the mock carrier status and the note; take one negotiation turn for an agent, whose limits code enforces. Every verdict row stores `model`, `prompt_version` and `raw_response`. |
 | AG Grid Community 36.2 | `/ledger`: every deal of the signed-in persona, sortable, filterable, with status chips and a quick filter. |
 | AG Studio 3.0 | `/dashboard`: three sources from `/api/dashboard/data`, nine widgets on the canvas, a theme bound to the app's CSS tokens, a custom `deal-pipeline` widget (click a stage to cross-filter the page), and the built-in Studio agents plus a custom `auditor` agent, all answered by `claude-sonnet-5-5` through `POST /api/studio/agent`. The one server-run tool, `explain_verdict`, reads the signed-in user's own deal and audit log; the agent cannot change a deal or move money. The prompt box appears only when `ANTHROPIC_API_KEY` is set. Prompts that work: [docs/studio-prompts.md](docs/studio-prompts.md). Loaded client-side only. |
 | Render | One Blueprint (`render.yaml`): web service, Postgres 18, a cron every 10 minutes that calls `POST /api/jobs/tick`. Paid plans so nothing sleeps during judging. |
 | Prisma 7.10 + Postgres 18 | Schema, migrations (append-only trigger on `deal_events`), photos stored as `bytea` and served through HMAC-signed URLs that expire after 10 minutes. |
 | Next.js 16, React 19, TypeScript 5.9, Tailwind CSS v4, Zod, jose, Resend | The app, validation, HS256 session cookies, magic-link email. |
 | Caveat (SIL OFL 1.1, `public/demo/fonts/OFL.txt`) | The composed deal-code photo in the demo kit. |
+| MCP (Model Context Protocol) | `POST /api/mcp` serves nine tools over Streamable HTTP with JSON responses, so any MCP client can run a deal under an agent key: [docs/agents.md](docs/agents.md). |
 | Claude Code | The coding agent that built the app from the specs in `docs/`. |
 
 ## Evaluation results
@@ -188,7 +197,7 @@ Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point t
 
 ## Deploy it
 
-Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). Register a second PayPal webhook on the Render hostname for the `handshake` app. Step by step, including a manual route without the Blueprint: [docs/deploy-render.md](docs/deploy-render.md); the reasoning: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
+Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy && npm run seed` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). The pre-deploy step also runs the seed, which is idempotent. Register a PayPal webhook on the Render hostname for the `handshake` app. Step by step, including a manual route without the Blueprint: [docs/deploy-render.md](docs/deploy-render.md); the reasoning: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
 
 ## Tests
 
@@ -220,7 +229,7 @@ Details: [tests/e2e/README.md](tests/e2e/README.md) (`PLAYWRIGHT_BASE_URL` to ru
 - PayPal multiparty onboarding so the seller is the payee instead of the platform.
 - A real carrier lookup, a verified email sending domain, and reauthorization for deals longer than 21 days.
 - Encryption keys held in a KMS instead of the environment, passkeys (WebAuthn) as the second factor, and "Log in with PayPal" to prove the payout account.
-- A content security policy with nonces (the PayPal and AG Studio scripts need them) and rate limits shared across instances.
+- Rate limits shared across instances.
 
 ## Licence
 

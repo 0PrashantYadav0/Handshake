@@ -10,5 +10,9 @@ export const POST = route(async (req: Request) => {
   const want = Buffer.from(process.env.CRON_SECRET ?? "");
   if (want.length === 0 || given.length !== want.length || !timingSafeEqual(given, want)) throw new DealError("not_signed_in");
   const deps = getDeps();
-  return json(await tick(deps.clock.now(), deps));
+  const now = deps.clock.now();
+  const report = await tick(now, deps);
+  const run = { last_run_at: now, errors: report.errors.length };
+  await deps.db.jobRun.upsert({ where: { name: "tick" }, create: { name: "tick", ...run }, update: run }); // GET /api/status
+  return json(report);
 });

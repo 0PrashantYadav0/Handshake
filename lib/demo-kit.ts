@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 
 export type Box = { x: number; y: number; w: number; h: number; angle: number };
-export type SampleSet = { label: string; purpose: string; photos: string[]; skip_listing_check?: true };
-export type Preset = { id: string; label: string; sentence: string; reference: string[]; code_photo: { base: string; box: Box }; sets: Record<string, SampleSet> };
+export type CodePhoto = { base: string; box: Box };
+export type SampleSet = { label: string; purpose: string; photos: string[]; skip_listing_check?: true; code_photo?: CodePhoto }; // code_photo: this set's item beside the card, when it is not the preset's
+export type Preset = { id: string; label: string; sentence: string; reference: string[]; code_photo: CodePhoto; sets: Record<string, SampleSet> };
 export type Extra = { id: string; label: string; sentence: string; preset: string };
 export type Presets = { tracking_number: string; font: string; presets: Preset[]; extras: Extra[] };
 export type Chip = { id: string; label: string; sentence: string };
@@ -14,11 +15,12 @@ export const PRESETS_URL = "/demo/presets.json";
 /** The /new chips: the three presets then the two extras (08 section 6.1). */
 export const chips = (kit: Presets): Chip[] => [...kit.presets, ...kit.extras].map(({ id, label, sentence }) => ({ id, label, sentence }));
 
-/** 12.4: the preset whose sentence (or whose extra's sentence) equals the deal's source text after trimming; else the first preset. */
+/** 12.4: the preset whose sentence (or whose extra's sentence) equals the deal's source text after trimming; else the preset named in the text; else the first. */
 export function findPreset(kit: Presets, sourceText: string): Preset {
   const text = sourceText.trim();
   const extra = kit.extras.find((e) => e.sentence.trim() === text);
-  return kit.presets.find((p) => p.id === extra?.preset || p.sentence.trim() === text) ?? kit.presets[0];
+  const exact = kit.presets.find((p) => p.id === extra?.preset || p.sentence.trim() === text);
+  return exact ?? kit.presets.find((p) => text.toLowerCase().includes(p.id)) ?? kit.presets[0]; // a negotiated price changes the sentence, not the item
 }
 
 let cached: Promise<Presets> | null = null;
