@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-11-06T13:24:47.475Z",
+  "event_type": "PAYMENT.AUTHORIZATION.CREATED",
+  "webhook_id": "0L053046NP863452P",
+  "headers": {
+    "paypal-transmission-id": "6e496dd6-d9e5-11f1-bdb3-311cd7bc62bc",
+    "paypal-transmission-time": "2026-11-06T13:24:44Z",
+    "paypal-transmission-sig": "r8Pzphlrri9M5pNolNomBRa/T6doMmFNisi4/dMLQXMHru0xQoa678+uiSrA7ysBugpWsaRAHBxUm/E+GF2Si/+Onlu6XqXrCi8AyeuGLhRZ7UJDYT+BgCjKLsMxgO5HtAB5zjVr3rrVjSiCkValAPY+bqkDZYTLzPthPh2MLxtl4pDqDLJNZRohrcjF+wN2z/z4tBgUBp5XcvLaxEsC3jafo2GQG8+uQl2IMJQ6y+RvxXrL6kJoPaRHRESFczddxdEUuPDZVB/WS0+CFh0Jc6K9YNdUt5H0PqUEMG6PR39lpvVP8BN3V4X44fwjh6bwhgAklayBUzk49mWoi5BPgQ==",
+    "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-9eaebfdf",
+    "paypal-auth-algo": "SHA256withRSA"
+  },
+  "raw_body": "{\"id\":\"WH-8VR349238K826144V-19G185825J920441T\",\"event_version\":\"1.0\",\"create_time\":\"2026-11-06T13:24:33.943Z\",\"resource_type\":\"authorization\",\"resource_version\":\"2.0\",\"event_type\":\"PAYMENT.AUTHORIZATION.CREATED\",\"summary\":\"A successful payment authorization was created for $ 18.0 USD\",\"resource\":{\"id\":\"1XR644779E139164C\",\"status\":\"CAPTURED\",\"amount\":{\"currency_code\":\"USD\",\"value\":\"18.00\"},\"custom_id\":\"HS-RNUK\",\"seller_protection\":{\"status\":\"ELIGIBLE\",\"dispute_categories\":[\"ITEM_NOT_RECEIVED\",\"UNAUTHORIZED_TRANSACTION\"]},\"supplementary_data\":{\"related_ids\":{\"order_id\":\"0T936647NE467901V\"}},\"payee\":{\"email_address\":\"sb-lkrhh53338083@business.example.com\",\"merchant_id\":\"ZCAJM7FNQY3AL\"},\"expiration_time\":\"2026-12-05T13:24:30Z\",\"create_time\":\"2026-11-06T13:24:30Z\",\"update_time\":\"2026-11-06T13:24:40Z\",\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/1XR644779E139164C\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/1XR644779E139164C/capture\",\"rel\":\"capture\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/1XR644779E139164C/void\",\"rel\":\"void\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/1XR644779E139164C/reauthorize\",\"rel\":\"reauthorize\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/checkout/orders/0T936647NE467901V\",\"rel\":\"up\",\"method\":\"GET\"}]},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-8VR349238K826144V-19G185825J920441T\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-8VR349238K826144V-19G185825J920441T/resend\",\"rel\":\"resend\",\"method\":\"POST\"}]}"
+}

@@ -77,6 +77,8 @@ From the hosted app on 2026-11-06. PayPal sandbox only.
 | ![Release payment and reject proof buttons on a blurry deal](docs/screenshots/14-buyer-decides.jpg) | ![AG Studio dashboard with the agent explaining why a deal was voided](docs/screenshots/2x-studio-agent.jpg) |
 | **Two agents haggle, sign and stop at PayPal** | **A prompt injection: code refuses the $95 purchase** |
 | ![Agent desk transcript ending at the PayPal approval step](docs/screenshots/16-agents-stop-at-paypal.jpg) | ![Agent desk transcript where the mandate refuses the purchase](docs/screenshots/18-agents-hijack-refused.jpg) |
+| **The honest deal ends paid** | |
+| ![Agent desk with Claude's three passing verdicts and the deal marked Paid](docs/screenshots/17-agents-deal-done.jpg) | |
 
 ## How it works
 

@@ -160,7 +160,8 @@ describe.skipIf(!existsSync(RECORDED) || !existsSync(CERT))("recorded PAYMENT.CA
       verifyPaypalSignature({ headers: rec.headers, rawBody, webhookId, fetchCert: fromDisk });
     await expect(run()).resolves.toEqual({ result: "verified", webhook_id: rec.webhook_id });
     await expect(run(rec.raw_body.replace("COMPLETED", "COMPLETEX"))).resolves.toMatchObject({ result: "unverified" });
-    await expect(run(JSON.stringify(JSON.parse(rec.raw_body)))).resolves.toMatchObject({ result: "unverified" });
+    // PayPal's body is already compact JSON, so a plain JSON.stringify round trip is byte-identical; indenting makes it a real re-serialisation.
+    await expect(run(JSON.stringify(JSON.parse(rec.raw_body), null, 2))).resolves.toMatchObject({ result: "unverified" });
     await expect(run(rec.raw_body, "WH-OTHER")).resolves.toMatchObject({ result: "unverified" });
     expect(fromDisk).toHaveBeenCalledTimes(1);
   });

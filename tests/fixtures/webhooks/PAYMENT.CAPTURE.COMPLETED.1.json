@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-11-06T13:01:46.188Z",
+  "event_type": "PAYMENT.CAPTURE.COMPLETED",
+  "webhook_id": "0L053046NP863452P",
+  "headers": {
+    "paypal-transmission-id": "37345a6f-d9e2-11f1-84a3-0b7f0e968bc9",
+    "paypal-transmission-time": "2026-11-06T13:01:43Z",
+    "paypal-transmission-sig": "KQruDSFhf1jmtp1KV7Cm40YhHC5mxDqV81+V5b+m5gXzI4rwHGtYky3GtYxX8Yv03JV4eGKm9T+g6xqDkioA+xwGjniAqQP8dcOiAr5xKr13Xuwuj02bV2qTbQV9rCxetkTLW900NUPbsXima0G0/4Ofw2pI//CIQWZNQoR6vFKrTfciD0LWL/uGX2T+ms9iwt9R+HPvmCglGc8Gi/7Xp1fy6GoKraz/IGgJY0PwQwNEm1irrlNabDcDT0M3ssCQCcXa0Iq/Rm30PPgSA3Vg4Vtzi53RIT2ZC9X7M3cXxlOWRUC2XpRkHv8U/pCR+w/jqMbeuxhA/B4yT0uY7jXHNQ==",
+    "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-9eaebfdf",
+    "paypal-auth-algo": "SHA256withRSA"
+  },
+  "raw_body": "{\"id\":\"WH-8AK224707G4297211-46R14865PE101690D\",\"event_version\":\"1.0\",\"create_time\":\"2026-11-06T13:01:33.964Z\",\"resource_type\":\"capture\",\"resource_version\":\"2.0\",\"event_type\":\"PAYMENT.CAPTURE.COMPLETED\",\"summary\":\"Payment completed for $ 18.0 USD\",\"resource\":{\"id\":\"16718769UR420444V\",\"amount\":{\"currency_code\":\"USD\",\"value\":\"18.00\"},\"final_capture\":true,\"seller_protection\":{\"status\":\"ELIGIBLE\",\"dispute_categories\":[\"ITEM_NOT_RECEIVED\",\"UNAUTHORIZED_TRANSACTION\"]},\"disbursement_mode\":\"INSTANT\",\"seller_receivable_breakdown\":{\"gross_amount\":{\"currency_code\":\"USD\",\"value\":\"18.00\"},\"paypal_fee\":{\"currency_code\":\"USD\",\"value\":\"1.12\"},\"net_amount\":{\"currency_code\":\"USD\",\"value\":\"16.88\"}},\"custom_id\":\"HS-KCMM\",\"status\":\"COMPLETED\",\"supplementary_data\":{\"related_ids\":{\"order_id\":\"8MP06777HC1462808\",\"authorization_id\":\"5EL1403505463520J\"}},\"payee\":{\"email_address\":\"sb-lkrhh53338083@business.example.com\",\"merchant_id\":\"ZCAJM7FNQY3AL\"},\"create_time\":\"2026-11-06T13:01:29Z\",\"update_time\":\"2026-11-06T13:01:29Z\",\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v2/payments/captures/16718769UR420444V\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/captures/16718769UR420444V/refund\",\"rel\":\"refund\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/5EL1403505463520J\",\"rel\":\"up\",\"method\":\"GET\"}]},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-8AK224707G4297211-46R14865PE101690D\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-8AK224707G4297211-46R14865PE101690D/resend\",\"rel\":\"resend\",\"method\":\"POST\"}]}"
+}

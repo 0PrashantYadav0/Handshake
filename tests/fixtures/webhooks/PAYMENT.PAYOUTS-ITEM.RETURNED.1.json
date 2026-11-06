@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-11-06T13:26:37.457Z",
+  "event_type": "PAYMENT.PAYOUTS-ITEM.RETURNED",
+  "webhook_id": "0L053046NP863452P",
+  "headers": {
+    "paypal-transmission-id": "afe16be1-d9e5-11f1-bdb3-5f35c555f80a",
+    "paypal-transmission-time": "2026-11-06T13:26:34Z",
+    "paypal-transmission-sig": "Ul+gthl24Z9XlIT4wZVKTZ0Pv5V6MPFfm8Z+7XkeLRvRdqwHzvltK+7+CJ0Ost8a+hZVUv8m8j4Ba5E+OjQlP6l1/4GHRFq7Uz+RaGi1gtMh3aslq0yZny4bJqP+OC5+CsQYsIUqGfTSywH6MxFavxYa9EK0l5Kyql2wBaaHGXR4m1RjaNSRvsjCddZkp3ocM/SajDj0KI2DSoUvhTbBujZxwhQalGSrygiffURNqGCnLJBXbH42WskemEgYy7pui9MmlXix4rgN0Ac5T2WzfzZtvPuW4iUfBvoS1LdmA5dPPgGBBAdTWFHSuTowooQlh2IN+pxn6+UDHQfE7KDRZg==",
+    "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-9eaebfdf",
+    "paypal-auth-algo": "SHA256withRSA"
+  },
+  "raw_body": "{\"id\":\"WH-2LL2345620425902D-0XT48715TA644022C\",\"event_version\":\"1.0\",\"create_time\":\"2026-11-06T13:26:28.385Z\",\"resource_type\":\"payouts_item\",\"event_type\":\"PAYMENT.PAYOUTS-ITEM.RETURNED\",\"summary\":\"A payout item is returned\",\"resource\":{\"transaction_id\":\"1V009301TV269791C\",\"payout_item_fee\":{\"currency\":\"USD\",\"value\":\"0.25\"},\"transaction_status\":\"RETURNED\",\"sender_batch_id\":\"payout-spike-mw4zso8k\",\"time_processed\":\"2026-11-06T13:10:51Z\",\"activity_id\":\"9VY12143UY6545627\",\"payout_item\":{\"recipient_type\":\"EMAIL\",\"amount\":{\"currency\":\"USD\",\"value\":\"1.00\"},\"note\":\"Handshake spike\",\"receiver\":\"nobody-1793970631@example.com\",\"sender_item_id\":\"payout-spike-mw4zso8k\",\"recipient_wallet\":\"PAYPAL\"},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/payments/payouts-item/WW5B3KUF3YLVY\",\"rel\":\"self\",\"method\":\"GET\",\"encType\":\"application/json\"},{\"href\":\"https://api.sandbox.paypal.com/v1/payments/payouts/5WA5QW7RF5J8L\",\"rel\":\"batch\",\"method\":\"GET\",\"encType\":\"application/json\"}],\"payout_item_id\":\"WW5B3KUF3YLVY\",\"payout_batch_id\":\"5WA5QW7RF5J8L\",\"errors\":{\"name\":\"RECEIVER_UNREGISTERED\",\"message\":\"The recipient for this payout does not have an account. A link to sign up for an account was sent to the recipient. However, if the recipient does not claim this payout within 30 days, the funds will be returned to your account.\",\"information_link\":\"https://developer.paypal.com/docs/api/payments.payouts-batch/#errors\",\"details\":[],\"links\":[]}},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-2LL2345620425902D-0XT48715TA644022C\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-2LL2345620425902D-0XT48715TA644022C/resend\",\"rel\":\"resend\",\"method\":\"POST\"}]}"
+}
