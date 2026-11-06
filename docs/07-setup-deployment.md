@@ -92,10 +92,10 @@ These twenty names (J3) are the whole configuration; `.env.example` lists each w
 | `SESSION_SECRET` | Signs the `hs_session` HS256 JWT (F1) | 44-character base64 | `openssl rand -base64 32` | `generateValue: true` |
 | `FILE_URL_SECRET` | HMAC key for signed `GET /api/files/{id}` URLs (B6) | 44-character base64 | `openssl rand -base64 32` | `generateValue: true` |
 | `DATA_KEYS` | Field encryption keyring (`lib/crypto/seal.ts`): the first key encrypts, any listed key decrypts. Never change a key in place: prepend a new one, deploy, run `npm run reseal` | one secret of at least 32 characters, or `k2:<secret>,k1:<secret>` | `openssl rand -base64 32` | `generateValue: true` |
-| `PAYPAL_CLIENT_ID` | Sandbox REST app client id, server side | long alphanumeric | app `handshake-local` (section 3.1) | `sync: false`; app `handshake` |
-| `PAYPAL_CLIENT_SECRET` | Sandbox REST app secret | long alphanumeric | app `handshake-local` | `sync: false`; app `handshake` |
+| `PAYPAL_CLIENT_ID` | Sandbox REST app client id, server side | long alphanumeric | app `handshake` (section 3.1) | `sync: false`; same app |
+| `PAYPAL_CLIENT_SECRET` | Sandbox REST app secret | long alphanumeric | app `handshake` | `sync: false`; same app |
 | `PAYPAL_API_BASE` | REST base URL [paypal: 11] | `https://api-m.sandbox.paypal.com` | that value | `value:` |
-| `PAYPAL_WEBHOOK_ID` | Webhook id used in signature verification (E6) | alphanumeric id from the dashboard | the tunnel webhook on `handshake-local` | the Render webhook on `handshake`; entered in the dashboard after the first deploy |
+| `PAYPAL_WEBHOOK_ID` | Webhook id used in signature verification (E6) | alphanumeric id from the dashboard | the tunnel webhook | the Render webhook; entered in the dashboard after the first deploy |
 | `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | Same client id, inlined into the browser bundle for `PayPalScriptProvider` (E9) | same as `PAYPAL_CLIENT_ID` | same as `PAYPAL_CLIENT_ID` | `sync: false`; a change needs a rebuild, not a restart |
 | `ANTHROPIC_API_KEY` | Claude API key read by `@anthropic-ai/sdk` [claude: 2] | `sk-ant-…` | key `handshake-local` (section 3.2) | `sync: false`; key `handshake-prod` |
 | `AI_MODEL` | Model id for both jobs (D1) | `claude-sonnet-5-5` | `claude-sonnet-5-5` | `value:` |
@@ -116,7 +116,7 @@ Five accounts plus a tunnel that needs none; four accounts are created on day on
 
 | When | Account | Produces |
 | --- | --- | --- |
-| 2026-10-10 | PayPal Developer (sandbox) | 2 REST apps, 3 sandbox accounts, 2 webhooks, the buyer login for the README |
+| 2026-10-10 | PayPal Developer (sandbox) | 1 REST app, 3 sandbox accounts, 2 webhooks, the buyer login for the README |
 | 2026-10-10 | Anthropic Console | `ANTHROPIC_API_KEY` x2, a spend limit |
 | 2026-10-10 | Resend | `RESEND_API_KEY` |
 | 2026-10-10 | Render (Hobby workspace) | the $50 credit, three services from `render.yaml` |
@@ -161,7 +161,7 @@ Source: [paypal: 9 "Sandbox setup"], [paypal: 5 "Sandbox requirements"], [paypal
    ```
 
    Save, then copy the **Webhook ID** into `PAYPAL_WEBHOOK_ID` on Render. The listener must be HTTPS on port 443; PayPal retries a non-2xx answer up to 25 times over 3 days [paypal: 6 "Delivery and retries"].
-7. Webhook for local work: open app `handshake-local` and add the same eleven events with the tunnel URL from section 3.6. Copy its Webhook ID into `.env`. The tunnel URL changes every session, so this webhook's URL is edited each time (section 4 step 11).
+7. Webhook for local work: open the app from step 4 and add a second webhook with the same eleven events and the tunnel URL from section 3.6. Copy its Webhook ID into `.env`. The tunnel URL changes every session, so this webhook's URL is edited each time (section 4 step 11).
 8. Simulator: mock events cannot be verified by postback and are signed with the literal webhook id `WEBHOOK_ID`; outside production the receiver accepts that id (E6). Fire one from the shell to prove the signature path and the `200`:
 
    ```bash
@@ -201,7 +201,7 @@ Source: [stack: 5 "Render"], [stack: "Implications for Handshake"], [hackathon.m
 1. Sign up at render.com with the GitHub account that owns `0PrashantYadav0/Handshake`. Stay on the Hobby workspace ($0). Do not upgrade to Pro ($25/mo).
 2. Claim the $50 hackathon credit through the Render claim link on the Devpost resources page. The next day, open **Billing** and confirm the credit shows; whether it applies to every line item is UNVERIFIED [stack: 5(c)].
 3. **Blueprints > New Blueprint Instance**, connect the repository, branch `main`. Render reads `render.yaml` (section 5) and prompts once for every `sync: false` value. Enter them from section 2; for `PAYPAL_WEBHOOK_ID` enter `pending` and for `AG_GRID_LICENSE_KEY` enter nothing. Click **Apply**. This creates the web service `handshake`, the database `handshake-db` and the cron job `handshake-tick`.
-4. Wait for build, then pre-deploy (`npx prisma migrate deploy && npm run seed`), then live. Open `https://<host>/api/health` and expect `200`. Then open **handshake-tick > Environment** and confirm `APP_HOST` equals the web service's host: the research documents `fromService: { envVarKey }` [stack: 5(a)] but not that it resolves a built-in variable such as `RENDER_EXTERNAL_HOSTNAME` across services. The hosted cron does reach the app (issue 20), but nothing records whether Render filled `APP_HOST` or it was typed by hand. If `APP_HOST` is empty, change the cron's `APP_HOST` in `render.yaml` to `sync: false`, re-apply the Blueprint and paste the host; without it `tick` never runs and no deadline is ever voided.
+4. Wait for build, then pre-deploy (`npx prisma migrate deploy && npm run seed`), then live. Open `https://<host>/api/health` and expect `200`. Then open **handshake-tick > Environment** and confirm `APP_HOST` equals the web service's host: the research documents `fromService: { envVarKey }` [stack: 5(a)] but not that it resolves a built-in variable such as `RENDER_EXTERNAL_HOSTNAME` across services. The hosted cron appears to reach the app (inferred, Assumption 8), but nothing records whether Render filled `APP_HOST` or it was typed by hand. If `APP_HOST` is empty, change the cron's `APP_HOST` in `render.yaml` to `sync: false`, re-apply the Blueprint and paste the host; without it `tick` never runs and no deadline is ever voided.
 5. Create the webhook (section 3.1 step 6) with that host, then in **handshake > Environment** set `PAYPAL_WEBHOOK_ID` and correct `APP_URL` if the host differs from `https://handshake.onrender.com`. Saving triggers a deploy.
 6. The seed needs no step of its own: `preDeployCommand` runs `npm run seed` before each deploy, and re-running is harmless (section 1, `prisma/seed.ts`).
 7. Later secrets never go in `render.yaml`; `sync: false` values are prompted only at first creation and are edited in the dashboard afterwards.
@@ -223,7 +223,7 @@ Source: [ag-grid: 2 "Licensing"], [ag-grid: "Recommendation for Handshake", "Lic
 Source: [stack: 11 "Webhook tunnel"].
 
 1. `brew install cloudflared` (formula 2026.10.0). No account, no domain.
-2. `cloudflared tunnel --url http://localhost:3000` prints `https://<words>.trycloudflare.com`. That host goes in the `handshake-local` webhook URL.
+2. `cloudflared tunnel --url http://localhost:3000` prints `https://<words>.trycloudflare.com`. That host goes in the tunnel webhook's URL (section 3.1 step 7).
 3. Limits: 200 in-flight requests, no server-sent events, and the URL dies when the process stops. Nothing in Handshake needs more.
 4. Most local work needs no tunnel: the PayPal popup and every API call work on `http://localhost:3000`; only webhook delivery needs it. For a day without webhooks, `confirm_approval` still moves the deal to `held` (C2) and the capture response still triggers the payout (C4); only `payout_succeeded` (deal → `paid`) depends on a webhook.
 
@@ -271,10 +271,10 @@ A fresh clone runs in under ten minutes with these steps in this order.
    SESSION_SECRET=            # openssl rand -base64 32
    FILE_URL_SECRET=           # openssl rand -base64 32
    DATA_KEYS=                 # openssl rand -base64 32
-   PAYPAL_CLIENT_ID=          # app handshake-local, section 3.1 step 4
-   PAYPAL_CLIENT_SECRET=      # app handshake-local
+   PAYPAL_CLIENT_ID=          # the app from section 3.1 step 4
+   PAYPAL_CLIENT_SECRET=      # same app
    PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
-   PAYPAL_WEBHOOK_ID=         # handshake-local webhook, section 3.1 step 7
+   PAYPAL_WEBHOOK_ID=         # the tunnel webhook, section 3.1 step 7
    NEXT_PUBLIC_PAYPAL_CLIENT_ID=   # same value as PAYPAL_CLIENT_ID
    ANTHROPIC_API_KEY=         # key handshake-local, section 3.2
    AI_MODEL=claude-sonnet-5-5
@@ -317,7 +317,7 @@ A fresh clone runs in under ten minutes with these steps in this order.
    ```
 9. Lint and types: `npm run lint` (eslint; `next lint` no longer exists) and `npm run typecheck`.
 10. Eval: `npm run eval` runs the 30 cases in `eval/cases/` and prints the decision-match rate and the wrong-capture rate (D12). It calls the real API: about $2.40 on Sonnet. Challengers: `AI_MODEL=claude-opus-5-5 npm run eval` and `AI_MODEL=claude-haiku-5-5 npm run eval` (D1).
-11. Webhooks locally: in a second terminal `cloudflared tunnel --url http://localhost:3000`, copy the printed host, then in the PayPal dashboard edit the `handshake-local` webhook's URL to `https://<words>.trycloudflare.com/api/webhooks/paypal`. If a new webhook is created instead of edited, copy its new Webhook ID into `.env` and restart `npm run dev`. Repeat each session.
+11. Webhooks locally: in a second terminal `cloudflared tunnel --url http://localhost:3000`, copy the printed host, then in the PayPal dashboard edit the tunnel webhook's URL to `https://<words>.trycloudflare.com/api/webhooks/paypal`. If a new webhook is created instead of edited, copy its new Webhook ID into `.env` and restart `npm run dev`. Repeat each session.
 12. Run the job by hand: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
 
 The `package.json` scripts those steps rely on:
@@ -413,7 +413,7 @@ services:
       -H "Authorization: Bearer $CRON_SECRET"
       "https://$APP_HOST/api/jobs/tick"
     envVars:
-      - key: APP_HOST                      # cross-service envVarKey to a built-in variable. The hosted cron reaches the app; who filled this value is not recorded (07 section 3.4 step 4)
+      - key: APP_HOST                      # cross-service envVarKey to a built-in variable. The hosted cron appears to reach the app (inferred, 07 Assumption 8); who filled this value is not recorded (07 section 3.4 step 4)
         fromService:
           name: handshake
           type: web
@@ -602,7 +602,7 @@ The last three days, in order, so the README's video link and the final deploy n
 
 | Date | Do | Done when |
 | --- | --- | --- |
-| 2026-11-09 | Final deploy of the feature-frozen build (A1: freeze 2026-11-08). Run SB-0 to SB-11 from [06-test-plan.md](06-test-plan.md) against the hosted URL | Every script's output is in the release issue; the hosted deal reaches `paid` |
+| 2026-11-09 | Final deploy of the feature-frozen build (A1: freeze 2026-11-08). Run SB-0 to SB-11 from [06-test-plan.md](06-test-plan.md) against the hosted URL | Every run's output is in the release issue; the hosted deal reaches `paid` |
 | 2026-11-10 | Record the video on the hosted demo at that build; upload it to YouTube as public | The YouTube URL exists and plays |
 | 2026-11-11 | Commit the README with the video URL and the eval numbers. This commit is the submission commit and the last deploy. Run `npm run test:e2e` with `PLAYWRIGHT_BASE_URL=https://<host>` against the hosted URL. Submit the Devpost form. The freeze starts | CI green on that commit; Render shows it "Live"; the form shows "submitted" |
 
@@ -709,13 +709,13 @@ The angle-bracket values in the outline are filled from sections 3.1 and 5 at su
 Choices this document makes that [decisions.md](decisions.md) does not fix. Each is the simplest option consistent with it.
 
 1. The Prisma client is generated into `generated/prisma/` at the repo root (git-ignored, imported as `@/generated/prisma/client`, as in [dependencies.md](dependencies.md) and [02-system-design.md](02-system-design.md) section 4); the singleton lives in `lib/db.ts`. Neither is a module named in B2, so `lib/db.ts` is a single file beside the modules.
-2. One sandbox REST app serves local and hosted (issue 1, 2026-10-15), not the planned `handshake` and `handshake-local` pair. PayPal delivers webhooks per app, so local webhook testing can reach the hosted app and the reverse; a second app is needed only if that must never happen. Where this document still names either app, read the one app.
+2. One sandbox REST app serves local and hosted (issue 1, 2026-10-15), not the planned `handshake` and `handshake-local` pair. PayPal delivers webhooks per app, so local webhook testing can reach the hosted app and the reverse; a second app is needed only if that must never happen.
 3. A verified webhook event that matches no deal (simulator mocks, or events for another environment) is stored in `webhook_events`, marked processed and answered `200`, not `500`, so PayPal does not retry it for three days.
 4. The Anthropic monthly spend limit is $75, set in the Console; the research confirms the Start-tier $500 cap but not the name of the Console page where a lower limit is set.
 5. `TEST_DATABASE_URL` is a test-runner variable (default `postgresql://postgres:postgres@localhost:5432/handshake_test`), not in J3 or `.env.example`; [06-test-plan.md](06-test-plan.md) owns the Vitest config and global-setup.
 6. Render's auto-deploy on push to `main` is left at its default; the deploy freeze is enforced by not pushing, not by a dashboard setting.
 7. `PAYPAL_WEBHOOK_ID` is entered as `pending` at Blueprint creation and replaced in the dashboard after the first deploy, because the webhook URL needs the Render host first.
-8. The cron service has one extra variable of its own, `APP_HOST`, filled from the web service's `RENDER_EXTERNAL_HOSTNAME`; it is not an app variable and is not in `.env.example`. The hosted cron reaches the app (issue 20, from `/api/status` on 2026-11-06), so `APP_HOST` works in practice. Nothing records whether the cross-service `envVarKey` filled it or it was typed by hand; the check is section 3.4 step 4, with `sync: false` as the fallback.
+8. The cron service has one extra variable of its own, `APP_HOST`, filled from the web service's `RENDER_EXTERNAL_HOSTNAME`; it is not an app variable and is not in `.env.example`. `/api/status` `last_run_at` read 10:20:28.899Z, then 10:30:32.337Z on 2026-11-06, with `errors_last_run` 0. The tick route writes that value for any valid bearer, so this does not name the caller; that the cron reaches the app, and so that `APP_HOST` works, is inferred from the 10-minute move. Nothing records whether the cross-service `envVarKey` filled it or it was typed by hand; the check is section 3.4 step 4, with `sync: false` as the fallback.
 9. `npm run seed` is idempotent and runs on Render as part of `preDeployCommand`, `npx prisma migrate deploy && npm run seed` (J2).
 10. The AG Studio trial is requested in the window 2026-11-01 to 2026-11-07 so the key is in place before the 2026-11-08 feature freeze and expires on or after 2026-12-16.
 11. `npm run sandbox` runs `scripts/sandbox/scenario.ts`, which takes a scenario id and `--base <url>` as in [06-test-plan.md](06-test-plan.md) "Scripts"; the spikes run through `scripts/sandbox/spike.ts` directly with `tsx`.

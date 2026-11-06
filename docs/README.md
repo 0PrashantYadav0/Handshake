@@ -2,7 +2,7 @@
 
 This folder is the source of truth for Handshake: a developer or coding agent builds the whole product from these documents plus `research/`, and never needs to look anything else up (B9). The original brief under `brief/` is historical; where it differs from a document here, the document here wins.
 
-This index was updated on 2026-11-06; the documents it lists carry their own dates. Every name (state, command, endpoint, table, column, env var) is spelled as in [decisions.md](decisions.md).
+This index was updated on 2026-11-06. Every name (state, command, endpoint, table, column, env var) is spelled as in [decisions.md](decisions.md).
 
 | Document | What it decides | Read it when |
 | --- | --- | --- |

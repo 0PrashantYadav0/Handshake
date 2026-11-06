@@ -63,7 +63,7 @@ services:
       -H "Authorization: Bearer $CRON_SECRET"
       "https://$APP_HOST/api/jobs/tick"
     envVars:
-      - key: APP_HOST                      # cross-service envVarKey to a built-in variable. The hosted cron reaches the app; who filled this value is not recorded (07 section 3.4 step 4)
+      - key: APP_HOST                      # cross-service envVarKey to a built-in variable. The hosted cron appears to reach the app (inferred, 07 Assumption 8); who filled this value is not recorded (07 section 3.4 step 4)
         fromService:
           name: handshake
           type: web

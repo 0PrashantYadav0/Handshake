@@ -23,7 +23,7 @@ Order when tests compete for time:
 | --- | --- | --- | --- | --- |
 | Unit | Vitest 5.0.3 | `decide()`, the transition table, facts-once logic, terms versioning, tick selection, `public_code`, money and date helpers, signed URLs, webhook signature, idempotency keys, Zod schemas, AI output validation, carrier mock, error mapping, config | `npm test` | Every push (CI) and locally before each commit |
 | Integration | Vitest + Postgres 18 `handshake_test` + fake PayPal + fake AI + fake email + fixed clock | Every command, every webhook event, access rules, upload limits, the SB flows, concurrency, the append-only trigger | `npm run test:int` | Every push (CI) and locally before each commit |
-| Sandbox scripts | `tsx scripts/sandbox/*.ts` against the PayPal sandbox and the hosted app | Real authorize, capture, void, Payouts, webhooks (SB-0, SB-0b, SB-1 to SB-8, SB-10, SB-11; SB-9 and SB-12 are cut) | see [Sandbox scenarios](#sandbox-scenarios) | W1 spike, then before each deploy, then 2026-11-30 |
+| Sandbox scenarios | `tsx scripts/sandbox/*.ts` for SB-0, SB-0b, SB-1, SB-6, SB-7, SB-8 and SB-11, and by hand for SB-2 to SB-5 and SB-10, against the PayPal sandbox and the hosted app | Real authorize, capture, void, Payouts, webhooks (SB-9 and SB-12 are cut) | see [Sandbox scenarios](#sandbox-scenarios) | W1 spike, then before each deploy, then 2026-11-30 |
 | AI evaluation | `tsx eval/run.ts` with the real Claude API | Verdict quality and final decisions on 30 cases (D12) | `npm run eval` | Every prompt or model change, and once on the submitted build |
 | End to end | Playwright 1.64.0, Chromium, one test | Buyer and seller completing one deal through the real UI, real sandbox PayPal, real Claude | `npm run test:e2e` | Locally before each deploy, and against the hosted URL on submission day |
 | Outside testers | Three people, their own phones | Whether a stranger can finish the seller side unaided | manual | W5 |
@@ -567,12 +567,12 @@ Insert by hand: a `held`-built deal moved to `proof_submitted` with `updated_at`
 
 ## Sandbox scenarios
 
-Sandbox scenarios prove the real PayPal calls and webhooks; they run from `scripts/sandbox/` with `tsx`, against the sandbox app and the hosted or local Handshake.
+Sandbox scenarios prove the real PayPal calls and webhooks; they run from `scripts/sandbox/` with `tsx` or by hand (table below), against the sandbox app and the hosted or local Handshake.
 
 ### Webhooks locally and simulated
 
 - **Hosted:** sandbox REST app `handshake` (07 §3.1 step 4) has one webhook pointing at `https://<render-host>/api/webhooks/paypal` with the E5 events; its id is Render's `PAYPAL_WEBHOOK_ID`, and Render's `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` and `NEXT_PUBLIC_PAYPAL_CLIENT_ID` are this app's.
-- **Local:** sandbox REST app `handshake-local` on the same business account has one webhook pointing at the tunnel. `cloudflared tunnel --url http://localhost:3000` prints a `*.trycloudflare.com` URL that dies with the process (research/stack.md §11 "Webhook tunnel"); edit the `handshake-local` webhook's URL to it each session (07 §4 step 11) and keep that webhook's id and this app's client id and secret in the local `.env`. Two apps, because "Webhooks are per app. Events from a different REST app on the same account are not delivered" (research/paypal.md §11): local orders never fire events at Render, Render's events never retry against a dead tunnel for three days, and a `public_code` collision between the two databases cannot apply a foreign fact.
+- **Local:** the same app has a second webhook pointing at the tunnel. `cloudflared tunnel --url http://localhost:3000` prints a `*.trycloudflare.com` URL that dies with the process (research/stack.md §11 "Webhook tunnel"); edit that webhook's URL to it each session (07 §4 step 11) and keep its id and the app's client id and secret in the local `.env`. One app (07 Assumption 2) means "Webhooks are per app" (research/paypal.md §11) does not separate the two: local orders' events also reach Render and Render's also go to the tunnel, where a dead tunnel makes PayPal retry for three days and a `public_code` collision between the two databases could apply a foreign fact. A second app is needed only if that must never happen.
 - **Recording:** during the W1 spike the tunnel points at `scripts/sandbox/record-webhook.ts --port 3001 --forward http://localhost:3000/api/webhooks/paypal --out tests/fixtures/webhooks`, a 30-line proxy that writes each request's headers and raw body to `<event_type>.<n>.json` and forwards it unchanged. This is how the signature fixtures are made.
 - **Simulated:** the dashboard simulator or `POST /v1/notifications/simulate-event { webhook_id, event_type }` sends a mock, v1-shaped event signed for webhook id `WEBHOOK_ID` (research/paypal.md §6 "Simulator"). The receiver accepts that id outside production (E6). Simulated events never match a deal, so they test only the receiver path: expect a `webhook_events` row with `verified = true`, `processed_at` set, and 200. They are never used as parsing fixtures.
 
@@ -610,7 +610,7 @@ Browser steps the scenario script cannot do, and pauses for: approving in the Pa
 
 SB-9 (reauthorize) and SB-12 (disputes) are cut (B7, A5); the ids are not reused. Negative testing with `PayPal-Mock-Response` (research/paypal.md §9 "Sandbox setup" item 6) is not part of the pass list; it is a tool for reproducing a `DECLINED` capture by hand if one is ever needed.
 
-Each run is pasted into the release issue as the script's output: scenario id, deal code, final status, event trail, pass or fail.
+Each run goes into the release issue: scenario id, deal code, final status, event trail, pass or fail. A script run pastes its output; a hand run records the same fields.
 
 ## Security checks
 
@@ -710,7 +710,7 @@ The folder format, the flags and the result file are owned by [05-ai-spec.md](05
 
 The code written on the photographed notes is the case's `deal.json` code, so the code condition is real.
 
-`eval/run.ts` flags (05 §9.3): `--cases <dir>` (default `eval/cases`), `--only <prefix>`, `--effort low|medium|high` (default `low`), `--repeats <n>` (default 1; 3 for a comparison run), `--concurrency <n>` (default 3, research/claude-api.md "9 > Rate limits"), `--extract`, `--dry`; the model comes from `AI_MODEL`, then `claude-sonnet-5-5`. It runs the real judge pipeline (guardrail, prompt, Claude, post-processing, carrier mock, `decide`) with no database and no PayPal, and prints one row per run: expected, actual, per-condition results, latency, input and output tokens, cost. Summary: decision-match rate, wrong-capture rate (`expected !== "capture" && actual === "capture"`, over the 22 non-capture cases per repeat), flips across repeats, failures by kind including refusals, p50 and p95 latency. The runner exits 1 when the wrong-capture rate is not 0. Results are written to `eval/results/<YYYYMMDD-HHMM>-<model>-<effort>.json`; the submitted run is committed and its two numbers go in the README (brief tab 5).
+`eval/run.ts` flags (05 §9.3): `--cases <dir>` (default `eval/cases`), `--only <prefix>`, `--effort low|medium|high` (default `low`), `--repeats <n>` (default 1; 3 for a comparison run), `--concurrency <n>` (default 3, research/claude-api.md "9 > Rate limits"), `--extract`, `--dry`; the model comes from `AI_MODEL`, then `claude-sonnet-5-5`. It runs the real judge pipeline (guardrail, prompt, Claude, post-processing, carrier mock, `decide`) with no database and no PayPal, and prints one row per run: expected, actual, latency, input and output tokens. Per-condition results are in the result file and the estimated cost is in the summary. Summary: decision-match rate, wrong-capture rate (`expected !== "capture" && actual === "capture"`, over the 21 non-capture cases per repeat), flips across repeats, failures by kind including refusals, p50 and p95 latency. The runner exits 1 when the wrong-capture rate is not 0. Results are written to `eval/results/<YYYYMMDD-HHMM>-<model>-<effort>.json`; the submitted run is committed and its two numbers go in the README (brief tab 5).
 
 Acceptance for the submitted model and `prompt_version`:
 
@@ -799,7 +799,7 @@ Submission happens on 2026-11-11 only when every line below is true.
 
 - [ ] CI is green on the submission commit: lint, typecheck, unit, integration, build.
 - [ ] `npm run test:e2e` passed against `PLAYWRIGHT_BASE_URL=https://<render-host>` on 2026-11-11.
-- [ ] SB-0, SB-0b, SB-1 to SB-8, SB-10 and SB-11 passed on the hosted URL after the final deploy; each script's output is in the release issue. SB-9 (reauthorize) and SB-12 (disputes) are cut.
+- [ ] SB-0, SB-0b, SB-1 to SB-8, SB-10 and SB-11 passed on the hosted URL after the final deploy; each run's output is in the release issue. SB-9 (reauthorize) and SB-12 (disputes) are cut.
 - [ ] The E11 spike result (SB-0, SB-0b) is recorded in decisions.md and `deadline_days` limits match it.
 - [ ] The eval on the submitted model and `prompt_version` shows 0 wrong captures on 2 consecutive runs, at least 24 of 30 matches and 0 refusals; the results file is committed and the two numbers are in the README.
 - [ ] Every box in [Security checks](#security-checks) is ticked on the submission commit.
@@ -876,8 +876,8 @@ Choices made here because decisions.md does not decide them. Each is the simples
 - `deal_events` is made append-only by a Postgres trigger in a `--create-only` migration.
 - Every command runs inside one transaction holding `SELECT … FOR UPDATE` on the deal row.
 - The e2e test uses the real sandbox and the real Claude API; `data-testid` hooks named in the e2e steps exist in the UI; PayPal popup selectors are recorded with `npx playwright codegen`.
-- Sandbox SB-2 backdates `deadline_at` directly in the database from the scenario script; the app has no time override.
+- Sandbox SB-2 backdates `deadline_at` directly in the database: the operator runs the `UPDATE` by hand, and the app has no time override.
 - `eval/run.ts` flags, the folder format and the result filename are 05 §9.2 and §9.3's; the acceptance numbers (24 of 30, 0 refusals, p95 12 s at `low`) are set here with the latency bar taken from 05 §9.4.
-- Sandbox apps: `handshake` for Render and `handshake-local` for the tunnel, one webhook each (07 §3.1); the SB-7 replay uses the recorded first delivery because a dashboard resend of a successful delivery is UNVERIFIED.
+- Sandbox app: `handshake`, with one webhook for Render and one for the tunnel (07 §3.1); the SB-7 replay uses the recorded first delivery because a dashboard resend of a successful delivery is UNVERIFIED.
 - SB-0b is the day-4/12/21 capture spike (the brief's SB-9 id stays cut and unused).
 - CI uses `actions/checkout@v7` and `actions/setup-node@v7` (research/stack.md pinned versions table).

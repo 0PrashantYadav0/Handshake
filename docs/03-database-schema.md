@@ -6,7 +6,7 @@ Names come from [decisions.md](decisions.md) section I and are spelled here exac
 
 ## Conventions
 
-Ten tables, snake_case names, one spelling shared by the database, the Prisma client and the API JSON.
+This document specifies the ten launch tables. Later migrations added five more (`used_login_tokens`, `signing_keys`, `contract_signatures`, `agent_keys`, `job_runs`), so `prisma/schema.prisma` has 15 models. Snake_case names, one spelling shared by the database, the Prisma client and the API JSON.
 
 | Rule | Detail |
 | --- | --- |
@@ -761,8 +761,8 @@ via `$executeRawUnsafe`, and integration files run serially (`--no-file-parallel
 
 Rules:
 
-- The two users are always upserted by `email`: `demo-buyer@handshake.demo` (display name "Demo Buyer") and `demo-seller@handshake.demo` (display name "Demo Seller", `paypal_email` from `DEMO_SELLER_PAYPAL_EMAIL`, null when the variable is unset). Upserting on every run means that after changing the env var, re-running `npm run seed` from the Render Shell updates the seller's payout address; a redeploy alone does not, because the seed is not in `preDeployCommand` (decisions J2).
-- The historical deals are written only when no `deals.seeded = true` row exists. Re-seeding is therefore `prisma migrate reset` locally; on Render the deals are written by the one hand-run seed (07 section 3.4 step 6) and left alone.
+- The two users are always upserted by `email`: `demo-buyer@handshake.demo` (display name "Demo Buyer") and `demo-seller@handshake.demo` (display name "Demo Seller", `paypal_email` from `DEMO_SELLER_PAYPAL_EMAIL`, null when the variable is unset). Upserting on every run means a changed env var reaches the seller's payout address at the next deploy, because `preDeployCommand` runs the seed (decisions J2), or at the next seller persona sign-in (`signInDemoPersona`).
+- The historical deals are written only when no `deals.seeded = true` row exists. Re-seeding is therefore `prisma migrate reset` locally; on Render the first pre-deploy seed writes the deals (07 section 3.4 step 6) and later seeds leave them alone.
 - Every historical deal has `seeded = true`, `buyer_id` = demo buyer, `seller_id` = demo seller (null on two drafts), a `public_code` from `generatePublicCode()` in `lib/deal/code.ts` (regenerated on collision), 2 to 4 `conditions` rows (the code condition last whenever a photo condition exists), and a `deal_events` row for every step of its path with `created_at` values spread over the 60 days before the seed runs. `updated_at` equals the last event's time. Every `cause` is one of the decisions C6 strings.
 - Deals that reached a verdict also get `verdicts` rows (one per condition per judged submission) with `model = "seed"`, `prompt_version = "judge-v1"`, `evidence_used = []`, `raw_response = { "seeded": true }`, confidences that match the decision (all `>= 0.85` for `capture`, one `unclear` or one `< 0.85` for `buyer_review`, one `fail` for `request_fix` and `void`).
 - No `files`, `evidence`, `payments`, `payouts` or `webhook_events` rows: there are no PayPal objects and no photos (decisions F6). Event payloads for `fact:*` causes carry `{ "seeded": true }` and no PayPal ids, no `source` and no `paypal_request_id` or `paypal_event_id`. The deal page must render a deal with no payment row and no evidence rows.

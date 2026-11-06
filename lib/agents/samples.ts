@@ -1,5 +1,5 @@
 // The demo kit on the server (docs/agents.md): photos read from public/demo and the deal code written on the card, for agents with
-// no browser. Only reachable while DEMO_LOGIN=true. Same glyphs and box as the browser's composeCodePhoto in lib/demo-kit.ts.
+// no browser. Only reachable while DEMO_LOGIN=true. Same font and box as the browser's composeCodePhoto in lib/demo-kit.ts.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -9,6 +9,7 @@ import { DealError } from "@/lib/deal/errors";
 const PUBLIC = join(process.cwd(), "public");
 const read = (url: string) => readFileSync(join(PUBLIC, url));
 const GLYPH_PX = 200; // scripts/demo/photo-studio/glyphs.mjs renders every glyph at this font size
+const GLYPH_PAD = 40; // and with this transparent margin each side, because the ink runs past the advance width
 
 export const kit = (): Presets => JSON.parse(read("/demo/presets.json").toString("utf8")) as Presets;
 export const presetOf = (text: string): Preset => {
@@ -27,17 +28,20 @@ export async function composeCode(baseUrl: string, code: string, box: Box): Prom
       return { buf, width: width!, height: height! };
     }),
   );
-  const natural = glyphs.reduce((sum, g) => sum + g.width, 0);
+  const advance = (g: { width: number }) => g.width - 2 * GLYPH_PAD;
+  const natural = glyphs.reduce((sum, g) => sum + advance(g), 0);
   const scale = Math.min(target / GLYPH_PX, (box.w * 0.9) / natural);
   let x = 0;
+  let width = 0;
   const parts = [];
   for (const g of glyphs) {
     const w = Math.max(1, Math.round(g.width * scale));
     parts.push({ input: await sharp(g.buf).resize(w, Math.max(1, Math.round(g.height * scale))).png().toBuffer(), left: x, top: 0 });
-    x += w;
+    width = Math.max(width, x + w);
+    x += Math.round(advance(g) * scale);
   }
   const height = Math.max(1, Math.round(glyphs[0]!.height * scale));
-  const line = await sharp({ create: { width: x, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(parts).png().toBuffer();
+  const line = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(parts).png().toBuffer();
   const rotated = await sharp(line).rotate((box.angle * 180) / Math.PI, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
   const m = await sharp(rotated).metadata();
   const left = Math.round(box.x + box.w / 2 - m.width! / 2);

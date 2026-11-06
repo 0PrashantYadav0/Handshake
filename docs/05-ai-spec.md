@@ -1363,7 +1363,7 @@ These are measured by the baseline eval run in week 1 or 2, before any UI work d
 | Item | How it is measured | Research section |
 | --- | --- | --- |
 | Verdict latency with 10 images (p50, p95) on Sonnet at low and medium, Opus at low | `correct-08-*` is the 10-image case; the runner's latency summary | "8. Latency and timeouts"; "Open risks" 1 |
-| Schema acceptance of the hand-written schemas: type-array nullables, `enum` on array items, `["string","null"]` on `currency` | The first `npm run eval -- --job extract` call and the first verdict call; a 400 `BadRequestError` names the rejected keyword and is fixed before anything else | "3 > Job 1: extract terms"; "Open risks" 5 |
+| Schema acceptance of the hand-written schemas: type-array nullables, `enum` on array items, `["string","null"]` on `currency` | The first `npm run eval -- --extract` run, which makes both the extraction and the verdict calls; a 400 `BadRequestError` names the rejected keyword and is fixed before anything else | "3 > Job 1: extract terms"; "Open risks" 5 |
 | Cold grammar compile after 24 h idle | Run one verdict case the morning after a day with no calls and compare its latency to the warm p50; also run once with a one-character change to a schema `description` to confirm that does not recompile | "3 > Other caveats"; "Open risks" 2 |
 | Flip rate between repeats | `--repeats 3`; the runner's flip line | "5 > Determinism"; "Open risks" 12 |
 | Refusal rate | the runner's failure counts | "Open risks" 6 |

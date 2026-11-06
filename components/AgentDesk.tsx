@@ -196,7 +196,7 @@ export function AgentDesk({ clientId }: { clientId: string }) {
         </section>
       )}
 
-      {deal && deal.verdicts.length > 0 && (
+      {deal && deal.verdicts.length > 0 && (deal.latest_decision !== "request_fix" || status === "held") && ( // the poll moves status, not deal: once the deal has left held, a request_fix verdict is out of date
         <section className="hs-card p-5" data-testid="desk-verdicts">
           <h2 className="hs-display text-2xl">What Claude saw</h2>
           <ul className="mt-3 flex flex-col gap-2">
