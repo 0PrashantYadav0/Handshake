@@ -1,9 +1,10 @@
 # End-to-end tests
 
-Two Playwright specs:
+Three Playwright specs. `npm run test:e2e` runs all three; name a spec to run one.
 
 - `two-party.spec.ts` needs no external service. It makes a draft with the fake model (`make-draft.ts`), signs in both demo personas through the demo second factor, joins, signs the contract on both sides with browser keys, checks the deal reaches `terms_agreed`, verifies both signatures on the contract page and downloads the signed bundle, and finds the seller's key on `/security`. Run it on every change to sign-in, signing or the deal page.
 - `happy-path.spec.ts` runs the ten steps of the judge happy path from docs/06-test-plan.md "End to end" against the real UI, the real PayPal sandbox and the real Claude API. Each run places one $18 sandbox hold and spends about $0.08 of Claude.
+- `agents.spec.ts` runs the agent desk on the real Claude API and the real PayPal sandbox. The hijack test always runs and calls Claude, but places no hold. The honest and cheating tests need the sandbox buyer and place one sandbox hold each.
 
 Shared steps (demo 2FA, signing) live in `flows.ts`.
 
@@ -29,13 +30,13 @@ The app under test uses its normal `.env`: `DEMO_LOGIN=true`, `DEMO_SELLER_PAYPA
 
 ```sh
 npx playwright install chromium                                  # once
-E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
+E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test happy-path
 ```
 
 Against a deployed host:
 
 ```sh
-PLAYWRIGHT_BASE_URL=https://<host> E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
+PLAYWRIGHT_BASE_URL=https://<host> E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test happy-path
 ```
 
 Traces and videos are kept on failure under `test-results/`; open with `npx playwright show-trace test-results/<run>/trace.zip`.

@@ -1,5 +1,5 @@
 // Agent keys (docs/agents.md): a bearer token for an AI agent, bound to a user and a per-deal spending ceiling, plus the P-256 key
-// the agent signs contracts with. The token is stored as a hash and the private key sealed; a revoked key stops both at once.
+// the agent signs contracts with. The token is stored as a hash and the private key sealed; a revoked token can't sign anything new.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { signingMessage } from "@/lib/contract/canonical";
@@ -8,6 +8,9 @@ import { aad, open, seal } from "@/lib/crypto/seal";
 import { DealError } from "@/lib/deal/errors";
 
 export const MAX_MANDATE_MINOR = 100_000; // $1,000; the rule still sends anything over $200 to a person
+// The live desk's keys on the demo personas: the desk adopts a key by these names and /agents hides them, so POST /api/agents/keys refuses them.
+export const DESK_LABELS = { buyer: "Desk buying agent", seller: "Desk selling agent" } as const;
+export const isDeskLabel = (label: string) => label === DESK_LABELS.buyer || label === DESK_LABELS.seller;
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 const CURVE = { name: "ECDSA", namedCurve: "P-256" } as const;
 

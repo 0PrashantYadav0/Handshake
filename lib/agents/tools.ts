@@ -6,6 +6,7 @@ import { addFile, createDeal, getDeal, handle, listDeals, DealError } from "@/li
 import type { Actor, DealView, Deps } from "@/lib/deal/types";
 import { validateFile } from "@/lib/files/validate";
 import { formatUsd as money } from "@/lib/money";
+import { allow } from "@/lib/rate-limit";
 import { signAsAgent, type AgentKeyRow } from "./keys";
 import { listingPhotos, samplePhotos } from "./samples";
 
@@ -16,6 +17,8 @@ const demoOn = () => process.env.DEMO_LOGIN === "true";
 const Code = z.string().regex(/^HS-[0-9A-Z]{4}$/, "A deal code looks like HS-7KQ2.");
 const Photo = z.string().min(100).describe("A photo as base64: JPEG, PNG or WebP, at most 2 MB");
 const toBytes = (b64: string) => new Uint8Array(Buffer.from(b64, "base64"));
+/** Checks every photo before the first is stored, so one bad photo stores none. */
+const checked = (bytes: Uint8Array[]) => bytes.map((b) => ({ bytes: b, mime: validateFile(b).mime }));
 
 async function party(code: string, c: ToolContext): Promise<DealView> {
   const v = await getDeal(code, actorOf(c), c.deps);
@@ -25,8 +28,10 @@ async function party(code: string, c: ToolContext): Promise<DealView> {
 
 function nextStep(d: DealView): string {
   const mine = d.role === "buyer" ? d.buyer_accepted_version : d.seller_accepted_version;
+  if (d.seeded) return "Historical demo deal: no action is possible.";
   switch (d.status) {
     case "draft":
+      if (d.amount_minor === null || d.deadline_days === null) return "The price or deadline is missing. A person must set it at the url, or cancel and propose again with both in the sentence.";
       if (!d.seller) return "Share the url with the seller; their agent calls join_deal.";
       return mine === d.terms_version ? "Waiting for the other party to sign." : "Call sign_contract.";
     case "terms_agreed":
@@ -38,7 +43,7 @@ function nextStep(d: DealView): string {
     case "in_review":
       return "A person must decide on the deal page. No agent can release this payment.";
     case "captured":
-      return "Released. PayPal is paying the seller.";
+      return d.payouts.at(-1)?.status === "failed" ? "The payout failed. A person must retry it on the deal page." : "Released. PayPal is paying the seller.";
     case "paid":
       return "Done: the seller has been paid.";
     case "voided":
@@ -81,7 +86,7 @@ export const TOOLS: Tool[] = [
     run: async (_, c) => ({
       agent: c.key.label,
       ceiling_per_deal: money(c.key.max_amount_minor),
-      can: ["propose deals up to the ceiling", "join deals as a seller", "sign contracts", "submit proof", "cancel before capture"],
+      can: ["propose deals up to the ceiling", "join deals as a seller", "sign contracts", "submit proof", "cancel until proof is submitted"],
       only_a_person_can: ["approve a hold at PayPal", "decide a buyer review", "raise this ceiling"],
     }),
   }),
@@ -90,6 +95,7 @@ export const TOOLS: Tool[] = [
     description: 'Create a deal as the buyer from one sentence, for example "I\'ll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered". Refused if the price is over your ceiling.',
     schema: z.object({ sentence: z.string().min(1).max(500) }),
     run: async ({ sentence }, c) => {
+      if (!allow(`extract:${c.key.user_id}`, 20, 10 * 60_000)) throw new DealError("rate_limited", "Too many new deals; try again in a few minutes."); // the same bucket as POST /api/deals
       const d = await createDeal(actorOf(c), { text: sentence }, c.deps);
       if (d.amount_minor !== null && d.amount_minor > c.key.max_amount_minor) {
         await handle(d.code, actorOf(c), { type: "cancel" }, c.deps);
@@ -106,7 +112,9 @@ export const TOOLS: Tool[] = [
       const d = await party(code, c);
       const bytes = use_sample ? (demoOn() ? listingPhotos(d.source_text) : []) : (photos ?? []).map(toBytes);
       if (!bytes.length) throw new DealError("invalid_input", "Send photos (use_sample works only in demo mode).");
-      for (const b of bytes) await addFile(code, actorOf(c), { purpose: "reference", mime: validateFile(b).mime, bytes: b }, c.deps);
+      const files = checked(bytes);
+      if (d.reference_files.length + files.length > 4) throw new DealError("too_many_files", "At most 4 reference photos per deal.");
+      for (const f of files) await addFile(code, actorOf(c), { purpose: "reference", ...f }, c.deps);
       return brief(await party(code, c), c.baseUrl);
     },
   }),
@@ -131,16 +139,24 @@ export const TOOLS: Tool[] = [
   tool({
     name: "submit_proof",
     description: "Submit the seller's proof: photos (one must show the item with the deal code handwritten) and a tracking number. Claude judges it and fixed code decides. In demo mode use_sample picks a prepared set (good, wrong-item, blurry).",
-    schema: z.object({ code: Code, photos: z.array(Photo).max(6).optional(), use_sample: z.string().max(20).optional(), tracking_number: z.string().max(60).optional(), note: z.string().max(500).optional() }),
+    schema: z.object({ code: Code, photos: z.array(Photo).max(6).optional(), use_sample: z.string().max(20).optional(), tracking_number: z.string().min(1).max(60).optional(), note: z.string().min(1).max(500).optional() }),
     run: async ({ code, photos, use_sample, tracking_number, note }, c) => {
       const d = await party(code, c);
       if (use_sample && !demoOn()) throw new DealError("invalid_input", "use_sample works only in demo mode.");
       const bytes = use_sample ? await samplePhotos(d.source_text, code, use_sample) : (photos ?? []).map(toBytes);
       if (!bytes.length) throw new DealError("invalid_input", "Send photos.");
+      const files = checked(bytes);
+      const tracking = tracking_number ?? (use_sample ? "TRK-DEMO-0000" : null);
+      if (!tracking && d.conditions.some((x) => x.evidence_type === "tracking")) throw new DealError("invalid_input", "A tracking number is required.");
       const ids: string[] = [];
-      for (const b of bytes) ids.push((await addFile(code, actorOf(c), { purpose: "evidence", mime: validateFile(b).mime, bytes: b }, c.deps)).id);
-      const view = await handle(code, actorOf(c), { type: "submit_evidence", file_ids: ids, tracking_number: tracking_number ?? (use_sample ? "TRK-DEMO-0000" : null), note: note ?? null }, c.deps);
-      return brief(view, c.baseUrl);
+      try {
+        for (const f of files) ids.push((await addFile(code, actorOf(c), { purpose: "evidence", ...f }, c.deps)).id);
+        return brief(await handle(code, actorOf(c), { type: "submit_evidence", file_ids: ids, tracking_number: tracking, note: note ?? null }, c.deps), c.baseUrl);
+      } catch (e) {
+        // Unused files count against addFile's limit and nothing else removes them. Once evidence rows use them (a failure after the commit), they stay.
+        await c.deps.db.file.deleteMany({ where: { id: { in: ids }, evidence: { none: {} } } }).catch(() => {});
+        throw e;
+      }
     },
   }),
   tool({
@@ -151,13 +167,16 @@ export const TOOLS: Tool[] = [
   }),
   tool({
     name: "list_deals",
-    description: "Every deal this agent's user is a party to.",
+    description: "The 50 most recently active deals this agent's user is a party to, and the total. A seeded deal is demo history: no action is possible on it.",
     schema: z.object({}),
-    run: async (_, c) => (await listDeals(actorOf(c), c.deps)).slice(0, 50).map((r) => ({ code: r.code, role: r.role, status: r.status, item: r.item_title, amount: r.amount_minor === null ? null : money(r.amount_minor) })),
+    run: async (_, c) => {
+      const rows = await listDeals(actorOf(c), c.deps);
+      return { deals: rows.slice(0, 50).map((r) => ({ code: r.code, role: r.role, status: r.status, item: r.item_title, amount: r.amount_minor === null ? null : money(r.amount_minor), seeded: r.seeded })), total: rows.length };
+    },
   }),
   tool({
     name: "cancel_deal",
-    description: "Cancel a deal before capture. Any hold is voided, so the buyer is not charged.",
+    description: "Cancel a deal until proof is submitted. Any hold is voided, so the buyer is not charged.",
     schema: z.object({ code: Code }),
     run: async ({ code }, c) => brief(await handle(code, actorOf(c), { type: "cancel" }, c.deps), c.baseUrl),
   }),

@@ -6,7 +6,7 @@ An AI agent that can spend is one bad prompt from spending too much. Handshake l
 
 | Step | Who |
 | --- | --- |
-| Negotiate, propose a deal, attach listing photos, join as seller, sign the contract, submit proof, cancel | An agent, inside its mandate |
+| Negotiate (on the live desk only), propose a deal, attach listing photos, join as seller, sign the contract, submit proof, cancel | An agent, inside its mandate |
 | Approve the hold at PayPal | A person, in PayPal's own window. There is no tool for it |
 | Decide a buyer review when Claude is unsure, or a deal over the auto-release limit | A person. There is no tool for it |
 | Refuse anything outside the mandate, capture or void from the verdicts, re-verify the signatures before each money step | Fixed code (`lib/agents/desk.ts`, `lib/agents/tools.ts`, `lib/deal/decide.ts`, `lib/deal/contract.ts`) |
@@ -15,9 +15,9 @@ An AI agent that can spend is one bad prompt from spending too much. Handshake l
 
 An agent key belongs to one user and carries a per-deal spending ceiling.
 
-- Making a key needs a full session and a fresh authenticator code. Revoking stops the token and the signing key at once.
+- Making a key needs a full session and a fresh authenticator code. Revoking stops the token at once, so the agent can't sign anything new; contracts it already signed stay valid.
 - The bearer token (`hsk_…`) is stored as a SHA-256 hash and shown once.
-- Each key has its own ECDSA P-256 signing key, sealed with AES-256-GCM like every other private field. Its signatures pass the same `verifyContract` gate as a browser's device key. The contract shows the key as `Agent: <name>`.
+- Each key has its own ECDSA P-256 signing key, sealed with AES-256-GCM like every other private field. Its signatures pass the same `verifyContract` gate as a browser's device key.
 - `propose_deal` refuses a price over the ceiling and cancels the draft. `sign_contract` refuses as well, so changed terms cannot slip past it.
 - An agent sees only what its user could see: every tool goes through `lib/deal`'s access checks.
 
@@ -40,7 +40,7 @@ claude mcp add --transport http handshake https://handshake-ba2g.onrender.com/ap
 | `submit_proof` | Upload proof; Claude judges it and the rule decides |
 | `get_deal` | Status, verdicts, PayPal ids and `next_step` |
 | `list_deals` | The user's deals |
-| `cancel_deal` | Cancel before capture; any hold is voided |
+| `cancel_deal` | Cancel until proof is submitted; any hold is voided |
 
 Photos go as base64. In demo mode `use_sample` picks a prepared set, with the deal code drawn on the card by `lib/agents/samples.ts`.
 

@@ -35,7 +35,11 @@ describe("toDashboardDeal: money buckets", () => {
   });
   it("draft with no amount is $0 everywhere; no decision yet", () => {
     const d = toDashboardDeal(row({ status: "draft", amount_minor: null }), view(), []);
-    expect(d).toMatchObject({ amount_usd: 0, held_usd: 0, released_usd: 0, voided_usd: 0, decision: null, fix_attempts_used: 0 });
+    expect(d).toMatchObject({ amount_usd: 0, held_usd: 0, released_usd: 0, voided_usd: 0, decision: null, decision_label: "No verdict", fix_attempts_used: 0 });
+  });
+  it("carries the app's words for the status and the decision next to the raw values", () => {
+    const d = toDashboardDeal(row({ status: "in_review" }), view(), toDecisions("HS-1", 80, [ev("decision:buyer_review", "2026-10-21T10:00:00.000Z")]));
+    expect(d).toMatchObject({ status: "in_review", status_label: "Buyer review", decision: "buyer_review", decision_label: "Buyer review" });
   });
 });
 
@@ -55,7 +59,7 @@ describe("toDecisions", () => {
 });
 
 describe("confidenceBand edges", () => {
-  it.each([[0.69, "< 0.70"], [0.7, "0.70 - 0.84"], [0.84, "0.70 - 0.84"], [0.85, "0.85 - 0.94"], [0.94, "0.85 - 0.94"], [0.95, "0.95 - 1.00"], [1, "0.95 - 1.00"]] as const)(
+  it.each([[0, "0.00 - 0.69"], [0.69, "0.00 - 0.69"], [0.7, "0.70 - 0.84"], [0.84, "0.70 - 0.84"], [0.85, "0.85 - 0.94"], [0.94, "0.85 - 0.94"], [0.95, "0.95 - 1.00"], [1, "0.95 - 1.00"]] as const)(
     "%s -> %s", (c, band) => expect(confidenceBand(c)).toBe(band),
   );
 });
@@ -67,7 +71,7 @@ describe("toDashboardVerdicts", () => {
       { submission_no: 1, verdicts: [v("c2", "pass", 0.9), v("c1", "fail", 0.6)] },
     ]);
     expect(out.map((x) => [x.submission_no, x.condition_text, x.result, x.confidence_band])).toEqual([
-      [1, "Matches photos", "fail", "< 0.70"], [1, "Code photo", "pass", "0.85 - 0.94"], [2, "Matches photos", "pass", "0.95 - 1.00"],
+      [1, "Matches photos", "fail", "0.00 - 0.69"], [1, "Code photo", "pass", "0.85 - 0.94"], [2, "Matches photos", "pass", "0.95 - 1.00"],
     ]);
     expect(out[0]).toMatchObject({ deal_code: "HS-1", confidence: 0.6 });
   });

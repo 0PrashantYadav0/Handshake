@@ -40,7 +40,12 @@ const DEALS: [Kind, string, number, number, number][] = [
   ["draft_joined", "reading lamp", 4500, 5, 1], ["draft", "garden hose", 3100, 5, 1], ["draft", "picture frame", 1900, 3, 0],
 ];
 
-const PASS = "The photos match the listing and the code is legible.";
+const PASS: Record<string, string> = {
+  "Item matches the listing photos": "The photos match the listing.",
+  "Original box is included": "The original box is visible in the photos.",
+  "Tracking shows delivered": "The carrier reports the parcel as delivered.",
+};
+const PASS_CODE = "The deal code is legible in the photo.";
 const FAIL = "The item in the photo does not match the listing.";
 const UNCLEAR = "The photo is too blurry to compare with the listing.";
 
@@ -53,7 +58,7 @@ const conditionsFor = (i: number, code: string): { id: string; position: number;
 };
 
 /** Walks one deal's path; from_status chains from the previous to_status (C2) and time advances per step. */
-function trail(kind: Kind, start: Date, deal: { seller_id: string; amount_minor: number; deadline_days: number; source_text: string; conditionIds: string[] }) {
+function trail(kind: Kind, start: Date, deal: { seller_id: string; amount_minor: number; deadline_days: number; source_text: string; conditions: { id: string; text: string }[] }) {
   const events: Ev[] = [];
   const verdicts: VerdictSpec[] = [];
   let at = start;
@@ -65,11 +70,11 @@ function trail(kind: Kind, start: Date, deal: { seller_id: string; amount_minor:
   const done = () => ({ events, verdicts, deadline_at, status: events.at(-1)!.to_status });
   const judge = (no: 1 | 2, rows: Row[]) => {
     step("submit_evidence", "seller", "proof_submitted", { submission_no: no, file_ids: [], tracking_number: "TRK-DEMO-0000", carrier_status: "delivered" }, 2 * 24 * 60);
-    const vs = deal.conditionIds.map((condition_id, k) => ({ condition_id, result: rows[k].result, confidence: rows[k].confidence }));
+    const vs = deal.conditions.map(({ id: condition_id }, k) => ({ condition_id, result: rows[k].result, confidence: rows[k].confidence }));
     step("verdict", "ai", "proof_submitted", { submission_no: no, model: "seed", prompt_version: "judge-v1", verdicts: vs }, 1);
     verdicts.push({ submission_no: no, rows, created_at: at });
   };
-  const allPass = (seedConf: number) => deal.conditionIds.map((_, k) => ({ result: "pass" as const, confidence: Math.round((0.86 + ((seedConf + k * 3) % 13) / 100) * 100) / 100, reason: PASS }));
+  const allPass = (seedConf: number) => deal.conditions.map((c, k) => ({ result: "pass" as const, confidence: Math.round((0.86 + ((seedConf + k * 3) % 13) / 100) * 100) / 100, reason: PASS[c.text] ?? PASS_CODE }));
   const oneFail = () => allPass(5).map((r, k) => (k === 0 ? { result: "fail" as const, confidence: 0.93, reason: FAIL } : r));
   const oneUnclear = () => allPass(2).map((r, k) => (k === 0 ? { result: "unclear" as const, confidence: 0.55, reason: UNCLEAR } : r));
   const paidTail = () => {
@@ -157,14 +162,15 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
       const conditions = conditionsFor(i, public_code);
       const source_text = `I'll pay $${(amount_minor / 100).toFixed(amount_minor % 100 ? 2 : 0)} for the ${item} if it arrives within ${deadline_days} days, matches the listing photos and tracking shows delivered`;
       const start = new Date(now.getTime() - age * 24 * 60 * 60_000 - 9 * 60 * 60_000);
-      const t = trail(kind, start, { seller_id: seller.id, amount_minor, deadline_days, source_text, conditionIds: conditions.map((c) => c.id) });
+      const t = trail(kind, start, { seller_id: seller.id, amount_minor, deadline_days, source_text, conditions });
+      const item_title = item[0]!.toUpperCase() + item.slice(1);
       const joined = kind !== "draft";
       const agreed = joined && kind !== "draft_joined";
       const id = crypto.randomUUID(); // the AAD needs the deal id before the insert
       await tx.deal.create({
         data: {
           id, public_code, seeded: true, ...rule, buyer_id: buyer.id, seller_id: joined ? seller.id : null,
-          status: t.status, source_text: sealText("deals.source_text", id, source_text), item_title: sealText("deals.item_title", id, item),
+          status: t.status, source_text: sealText("deals.source_text", id, source_text), item_title: sealText("deals.item_title", id, item_title),
           amount_minor, deadline_days, deadline_at: t.deadline_at,
           terms_version: 1, buyer_accepted_version: joined ? 1 : null, seller_accepted_version: agreed ? 1 : null,
           fix_attempts_used: t.verdicts.length === 2 ? 1 : 0,
@@ -174,7 +180,7 @@ export async function seed(db: Db, now = new Date()): Promise<{ users: number; d
       });
       await tx.dealEvent.createMany({ data: t.events.map((e) => ({ deal_id: id, ...e, payload: sealPayload(id, e.payload) })) });
       if (joined) {
-        const doc = contractDocOf({ public_code, terms_version: 1, item_title: item, amount_minor, deadline_days, conditions, buyer, seller, files: [], ...rule })!;
+        const doc = contractDocOf({ public_code, terms_version: 1, item_title, amount_minor, deadline_days, conditions, buyer, seller, files: [], ...rule })!;
         const hash = hashOf(doc);
         for (const e of t.events.filter((x) => x.cause === "accept")) {
           const role = e.actor as "buyer" | "seller";

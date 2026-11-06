@@ -1,7 +1,7 @@
 // 08 sections 2, 7.2, 7.4, 7.9, 7.11 and 7.13 copy and the pure rules behind the deal page.
 import { describe, expect, it } from "vitest";
-import type { DealEvent, DealView, Payout, Submission } from "@/lib/deal/types";
-import { cancellable, canRetryPayout, deadlineLine, decisionLine, evidenceChip, modelLine, paymentLine, payoutCopy, primaryAction, timelineSentence, voidEvent, whatNext } from "@/lib/deal-copy";
+import type { DealEvent, DealView, Payment, Payout, Submission } from "@/lib/deal/types";
+import { cancellable, canRetryPayout, deadlineLine, decisionLine, evidenceChip, holdLive, modelLine, paymentLine, payoutCopy, primaryAction, timelineSentence, voidEvent, whatNext } from "@/lib/deal-copy";
 
 const base: DealView = {
   code: "HS-TEST", role: "buyer", status: "draft", item_title: "mug", source_text: "", amount_minor: 1800, currency: "USD",
@@ -42,7 +42,7 @@ describe("whatNext", () => {
     expect(whatNext(d).heading).toBe("Money held. Waiting for proof.");
     expect(whatNext({ ...d, role: "seller" }).heading).toBe("Ship it, then add your proof");
     expect(whatNext({ ...d, role: "seller", fix_attempts_used: 1 }).heading).toBe("One more try");
-    expect(whatNext({ ...d, fix_attempts_used: 1, submissions: [sub({ verdicts: [verdict("fail"), verdict("pass")] })] }).helper).toMatch(/^1 condition\(s\) failed\./);
+    expect(whatNext({ ...d, fix_attempts_used: 1, submissions: [sub({ verdicts: [verdict("fail"), verdict("pass")] })] }).helper).toMatch(/^1 condition failed\. The seller can fix it once/);
     expect(whatNext({ ...d, status: "proof_submitted" }).heading).toBe("Checking the seller's proof…");
     expect(whatNext({ ...d, status: "proof_submitted", role: "seller" }).heading).toBe("Checking your proof…");
   });
@@ -51,7 +51,7 @@ describe("whatNext", () => {
     const w = (reason: Submission["decision_reason"], verdicts = [verdict("unclear")]) => whatNext({ ...d, submissions: [sub({ decision: "buyer_review", decision_reason: reason, verdicts })] });
     expect(w("unclear")).toMatchObject({ heading: "Your decision: Claude couldn't decide", helper: expect.stringMatching(/^1 of 1 conditions came back unclear\./) });
     expect(w("low_confidence").heading).toBe("Your decision: confidence was too low");
-    expect(w("fail", [verdict("fail", 0.5)]).helper).toMatch(/^1 condition\(s\) failed on the second try/);
+    expect(w("fail", [verdict("fail", 0.5)]).helper).toMatch(/^1 condition failed on the second try/);
     expect(w("amount_over_limit").heading).toBe("Your decision: this deal is over the auto-release limit");
     expect(whatNext({ ...d, payment: { ...payment, status: "declined" } }).heading).toBe("PayPal declined the capture");
     expect(whatNext({ ...d, role: "seller" }).heading).toBe("Waiting for Demo Buyer to decide");
@@ -114,16 +114,20 @@ describe("cancellable / evidenceChip / decisionLine / timelineSentence", () => {
   it("decision line per decision, reason and role; model line", () => {
     const vs = [verdict("fail"), verdict("fail"), verdict("unclear")];
     expect(decisionLine(sub({ decision: "capture", decision_reason: "all_pass", verdicts: [verdict("pass")] }), "buyer")).toMatch(/released the payment\.$/);
-    expect(decisionLine(sub({ decision: "request_fix", decision_reason: "fail", verdicts: vs }), "seller")).toBe("2 condition(s) failed. You can fix and resubmit once.");
-    expect(decisionLine(sub({ decision: "request_fix", decision_reason: "fail", verdicts: vs }), "buyer")).toBe("2 condition(s) failed. The seller has one chance to fix them.");
-    expect(decisionLine(sub({ decision: "void", decision_reason: "fail", verdicts: vs }), "buyer")).toMatch(/^2 condition\(s\) clearly failed on the second attempt/);
-    expect(decisionLine(sub({ decision: "buyer_review", decision_reason: "unclear", verdicts: vs }), "buyer")).toBe("Claude couldn't decide on 1 condition(s), so the buyer decides.");
+    expect(decisionLine(sub({ decision: "request_fix", decision_reason: "fail", verdicts: vs }), "seller")).toBe("2 conditions failed. You can fix and resubmit once.");
+    expect(decisionLine(sub({ decision: "request_fix", decision_reason: "fail", verdicts: vs }), "buyer")).toBe("2 conditions failed. The seller has one chance to fix them.");
+    expect(decisionLine(sub({ decision: "request_fix", decision_reason: "fail", verdicts: [verdict("fail")] }), "buyer")).toBe("1 condition failed. The seller has one chance to fix it.");
+    expect(decisionLine(sub({ decision: "void", decision_reason: "fail", verdicts: vs }), "buyer")).toMatch(/^2 conditions clearly failed on the second attempt/);
+    expect(decisionLine(sub({ decision: "buyer_review", decision_reason: "unclear", verdicts: vs }), "buyer")).toBe("Claude couldn't decide on 1 condition, so the buyer decides.");
     expect(decisionLine(sub({ decision: "buyer_review", decision_reason: "low_confidence" }), "buyer")).toMatch(/^Claude's confidence was below/);
-    expect(decisionLine(sub({ decision: "buyer_review", decision_reason: "fail", verdicts: vs }), "buyer")).toMatch(/^2 condition\(s\) failed on the second attempt, but/);
+    expect(decisionLine(sub({ decision: "buyer_review", decision_reason: "fail", verdicts: vs }), "buyer")).toMatch(/^2 conditions failed on the second attempt, but/);
     expect(decisionLine(sub({ decision: "buyer_review", decision_reason: "amount_over_limit" }), "buyer")).toMatch(/^Every condition passed\./);
     expect(decisionLine(sub({}), "buyer")).toBeNull();
     expect(modelLine(sub({ verdicts: [verdict("pass")] }))).toMatch(/^The result and confidence come from Claude \(claude-x\)\./);
     expect(modelLine(sub({}))).toMatch(/^The result and confidence come from Claude\. /);
+    expect(modelLine(sub({ verdicts: [{ ...verdict("pass"), model: "seed" }] }))).toBe("Sample verdicts, written for the demo.");
+    expect(timelineSentence(ev("verdict", "ai", { submission_no: 1 }))).toBe("Claude judged attempt 1.");
+    expect(timelineSentence(ev("verdict", "ai", { submission_no: 1, seeded: true }))).toBe("Sample verdicts for attempt 1.");
   });
   it("timeline sentences fill the payload and actor; unknown causes show raw", () => {
     expect(timelineSentence(ev("create", "buyer"))).toBe("Buyer created the deal from one sentence.");
@@ -147,6 +151,44 @@ describe("paymentLine / deadlineLine", () => {
     expect(deadlineLine(base)).toBe("Seller has 5 days after the hold is placed");
     expect(deadlineLine({ status: "held", deadline_days: 5, deadline_at: "2026-10-15T00:00:00Z" }, Date.parse("2026-10-10T00:00:00Z"))).toMatch(/^Proof due .* \(in 5 days\)$/);
     expect(deadlineLine({ status: "paid", deadline_days: 5, deadline_at: "2026-10-15T00:00:00Z" })).toBeNull();
+    expect(deadlineLine({ status: "held", deadline_days: 5, deadline_at: "2026-10-15T00:00:00Z", seeded: true })).toBe("Seller has 5 days after the hold is placed");
+  });
+  it("PayPal can capture only while the hold stands", () => {
+    const live = (status: DealView["status"], paymentStatus: Payment["status"]) => holdLive({ status, payment: { ...payment, status: paymentStatus } });
+    expect(live("held", "authorized")).toBe(true);
+    expect(live("in_review", "declined")).toBe(true);
+    expect(live("voided", "authorized")).toBe(false); // the void hasn't landed at PayPal yet
+    expect(live("voided", "voided")).toBe(false);
+    expect(live("captured", "capture_pending")).toBe(false);
+    expect(live("captured", "captured")).toBe(false);
+    expect(live("paid", "captured")).toBe(false);
+    expect(holdLive({ status: "draft", payment: null })).toBe(false);
+  });
+});
+
+describe("seeded deals: the copy agrees with the timeline", () => {
+  const seeded: DealView = { ...base, seeded: true, seller, payment: null, deadline_at: "2026-10-15T00:00:00Z" };
+  it("voided: a hold in the events was released, no hold was never held", () => {
+    const hold = ev("fact:authorization_created", "paypal", {}, "held", "terms_agreed");
+    const cancel = ev("cancel", "buyer", {}, "voided", "terms_agreed");
+    expect(whatNext({ ...seeded, status: "voided" }, { events: [hold, ev("decision:void", "system", {}, "voided", "proof_submitted")] }).helper).toBe("The proof failed twice. The hold of $18.00 was released. Nothing was charged.");
+    expect(whatNext({ ...seeded, status: "voided" }, { events: [cancel] }).helper).toBe("The buyer cancelled the deal. No money was ever held.");
+  });
+  it("captured: a failed payout in the events reads as failed, a later success doesn't", () => {
+    const failed = ev("fact:payout_failed", "paypal", { failure_reason: "RECEIVER_UNREGISTERED" }, "captured", "captured");
+    const d: DealView = { ...seeded, status: "captured" };
+    expect(whatNext(d, { events: [failed] }).heading).toBe("Payment released. Payout to the seller failed.");
+    expect(whatNext({ ...d, role: "seller" }, { events: [failed] }).helper).toMatch(/RECEIVER_UNREGISTERED/);
+    expect(whatNext(d, { events: [failed, ev("fact:payout_succeeded", "paypal", {}, "paid", "captured")] }).heading).toBe("Payment released");
+  });
+  it("in review: no past deadline and no 'if you do nothing', on either side or for any reason", () => {
+    const d: DealView = { ...seeded, status: "in_review", submissions: [sub({ decision: "buyer_review", decision_reason: "unclear", verdicts: [verdict("unclear")] })] };
+    const overLimit: DealView = { ...d, submissions: [sub({ decision: "buyer_review", decision_reason: "amount_over_limit", verdicts: [verdict("pass")] })] };
+    for (const c of [whatNext(d), whatNext(overLimit), whatNext({ ...d, role: "seller" })]) expect(c.helper).not.toMatch(/do nothing|Look at the proof and decide|ago|You'll see/);
+    expect(whatNext(d).helper).toBe("1 of 0 conditions came back unclear. In a live deal you would look at the proof and decide.");
+  });
+  it("held: no past deadline", () => {
+    expect(whatNext({ ...seeded, status: "held" }).helper).toContain("by the deadline");
   });
 });
 

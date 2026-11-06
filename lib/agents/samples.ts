@@ -53,7 +53,7 @@ export function listingPhotos(sourceText: string): Uint8Array[] {
 /** The photos of one sample set plus its composed code photo. */
 export async function samplePhotos(sourceText: string, code: string, setId: string): Promise<Uint8Array[]> {
   const preset = presetOf(sourceText);
-  const set = preset.sets[setId];
+  const set = Object.hasOwn(preset.sets, setId) ? preset.sets[setId] : undefined; // an agent's string: not "constructor" off the prototype
   if (!set) throw new DealError("invalid_input", `This item has these sample sets: ${Object.keys(preset.sets).join(", ")}.`);
   const { base, box } = set.code_photo ?? preset.code_photo;
   return [...set.photos.map((u) => new Uint8Array(read(u))), await composeCode(base, code, box)];

@@ -21,18 +21,16 @@ export function useEvents(code: string, updatedAt: string): DealEvent[] {
 
 export function Timeline({ events }: { events: DealEvent[] }) {
   return (
-    <section className="hs-card text-sm">
+    <section className="hs-card min-w-0 text-sm">
       <h2 className="font-semibold">Timeline</h2>
       {events.length === 0 && <p className="hs-help mt-2">No events yet.</p>}
       <ol className="mt-3 grid gap-3">
         {events.map((e) => (
-          <li key={e.id} className="grid gap-1 border-l-2 border-[var(--hs-border)] pl-3">
+          <li key={e.id} className="grid min-w-0 gap-1 border-l-2 border-[var(--hs-border)] pl-3">
             <p className="hs-help"><time title={e.created_at}>{when(e.created_at)}</time> · <span className="hs-badge">{ACTOR_LABEL[e.actor]}</span></p>
             <p>{timelineSentence(e)}</p>
-            <p className="font-mono text-xs text-[var(--hs-muted)]" title={`${e.from_status ? STATUS_LABEL[e.from_status] : "—"} → ${STATUS_LABEL[e.to_status]}`}>
-              {e.from_status ?? "—"} → {e.to_status}
-            </p>
-            <details>
+            {e.from_status !== e.to_status && <p className="hs-help">{e.from_status ? STATUS_LABEL[e.from_status] : "—"} → {STATUS_LABEL[e.to_status]}</p>}
+            <details className="min-w-0" open={e.actor === "paypal" && !e.payload.seeded}>
               <summary className="hs-help cursor-pointer">Details</summary>
               <pre className="mt-1 overflow-x-auto rounded bg-[var(--hs-bg)] p-2 text-xs">{JSON.stringify(e.payload, null, 2)}</pre>
             </details>

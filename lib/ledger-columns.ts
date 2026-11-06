@@ -16,12 +16,12 @@ export function relTime(iso: string | null | undefined, now = Date.now()): strin
   const sec = (new Date(iso).getTime() - now) / 1000;
   const unit = UNITS.find(([, s]) => Math.abs(sec) >= s);
   if (!unit) return "just now";
-  return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(Math.trunc(sec / unit[1]), unit[0]);
+  return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(Math.round(sec / unit[1]), unit[0]);
 }
 
 // 08 section 7.11 sentences, minus the payload and actor parts a LedgerRow does not carry. Unknown causes show raw.
 const EVENT_SENTENCE: Record<string, string> = {
-  create: "Deal created from one sentence.",
+  create: "Deal created.",
   edit_terms: "Terms edited.",
   join: "Seller joined.",
   accept: "Terms accepted.",

@@ -2,6 +2,8 @@
 
 Buying from a stranger means one side has to trust the other. Handshake removes that step.
 
+It's for people who already trade with strangers over PayPal, in swap communities, social marketplaces and group chats, for things you can photograph and ship, like used hardware, watches and collectibles.
+
 A buyer describes a deal in one sentence. Claude turns it into checkable conditions. Both sides sign. PayPal holds the money (an AUTHORIZE order, not a charge). The seller uploads photos and a tracking number. Claude judges each condition and returns JSON. A fixed rule in code, never the model, then captures the hold, asks for one fix, voids it, or hands the call to the buyer. The seller is paid through PayPal Payouts. Every step lands in an append-only audit log you can export.
 
 **AI agents can do all of it except move the money.** Two Claude agents can negotiate and settle a deal on `/agents`, and any MCP client can connect to `/api/mcp`. An agent works under a spending ceiling that code enforces. Only a person can approve the hold at PayPal, and only the fixed rule can release it. See [docs/agents.md](docs/agents.md).
@@ -19,9 +21,11 @@ Built for the PayPal AI Hackathon 2026. Sandbox only, no real money moves.
 ### The 3-minute version: watch two agents make a deal
 
 1. Open https://handshake-ba2g.onrender.com, click **Start a deal**, then **Continue as buyer**, **Use demo code**, **Continue**.
-2. Click **Agents** in the header, keep **An honest seller** selected and click **Start the agents**. A buying agent with a $20 mandate and a selling agent with a private $16 floor haggle with real Claude calls. They agree a price, create the deal and both sign.
-3. The agents stop at the PayPal button, because only a person can approve money. Log into the popup with the sandbox buyer below and approve.
-4. The selling agent submits proof, Claude judges each condition, the rule releases the payment, and PayPal pays the seller. Then run **A seller that cheats** and watch the hold get voided.
+2. Click **Agents**, pick **A seller that hijacks** and click **Start the agents**. It takes under a minute and needs no PayPal login.
+3. Run **An honest seller**. At the PayPal button, log in with the sandbox buyer and approve: email `sb-8wvwd53385315@personal.example.com`, password `FgW4ss=$`.
+4. Watch the proof, the verdicts and the release. Then run **A seller that cheats**.
+5. Now try to fool it. Run a deal to the hold (steps 1 to 4 of the full version below, because the desk submits its own proof), switch to **Seller**, skip the sample buttons and upload a photo from your own phone, with the code on paper or of something else entirely. Read Claude's reason. It's live, so scores move between runs. If one lands under 0.85 you'll be asked to decide, and that's the rule working.
+6. Open https://handshake-ba2g.onrender.com/api/status to see how many PayPal webhooks arrived verified.
 
 ### The full version (10 minutes): play both sides yourself
 
@@ -127,12 +131,17 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Composed code photo | The handwritten deal-code photo in the sample evidence is composed in the browser on a canvas (a sample photo plus the deal code in the Caveat handwriting font) because codes are generated per deal. |
 | Generated sample photos | The sample photos in `public/demo/` and the eval set in `eval/cases/` are path-traced 3D renders from `scripts/demo/photo-studio/`, not photographs, so everything is ours and free of third-party marks. Claude judges them as it would any photo, and you can upload your own instead. The eval numbers below measure these renders; real phone photos are noisier. |
 | Limits | Per 10 minutes, in memory, per instance: 20 new deals (extractions) per user, 3 magic links per email and 10 per IP, 120 deal reads per user, 30 Studio agent turns per user. Over the limit the API answers `rate_limited`; the magic-link route answers `ok` either way so it does not reveal accounts. |
-| Agent limits | The live desk runs as the Demo Buyer and is limited to 12 runs per 10 minutes per account and 60 per hour overall, because it spends model tokens. In demo mode anyone can make an agent key for the shared demo personas; the ceiling and the PayPal approval still apply. |
+| Agent limits | The live desk runs as the Demo Buyer and is limited to 12 runs per 10 minutes per account and 60 per hour overall, because it spends model tokens. `POST /api/mcp` takes 120 requests per 10 minutes per user, however many keys the user has (JSON-RPC error -32002), and two requests over 1 MB at a time overall (503). `propose_deal` also counts against the 20 new deals above. In demo mode anyone can make an agent key for the shared demo personas; the ceiling and the PayPal approval still apply. |
 | Platform as merchant | The Handshake sandbox business account receives the capture and pays the seller through Payouts. A production build would use PayPal multiparty onboarding so the seller is the payee. |
 | Seeded history | The ledger and dashboard show about 25 seeded historical deals (`deals.seeded = true`) with events but no PayPal objects, so there is something to sort and chart. Deals you create are real sandbox deals. |
 | AG Studio trial | `/dashboard` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
 | Demo login | Magic-link email only reaches the account owner's address (Resend test sender), so judges use the two demo personas. The seller persona's payout address comes from `DEMO_SELLER_PAYPAL_EMAIL` and is reset each time you switch to that persona, so edits on `/me` do not stick. |
 | 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the 10-minute job voids the hold. |
+| 3-day honor period | PayPal honors an authorization's funds for 3 days and allows capture for up to 29. Deals here run up to 21 days, so a capture after day 3 can be declined. A decline returns the deal to the buyer for a new try. The sandbox can't fast-forward time, so this path is tested against a fixture, not live. Production would reauthorize after day 3. |
+| No shipping address | Orders use `NO_SHIPPING`, so PayPal collects no address and the seller never gets one from Handshake. Nothing ships in the demo. Production would use `GET_FROM_FILE` and show the seller that address, because PayPal Seller Protection depends on shipping to the address on the transaction. |
+| No refunds | The seller is paid right after capture and Handshake has no refund step. After that, a buyer's recourse is a PayPal dispute against the platform account. Disputes are on the production list. |
+| Ignored reviews | If a buyer ignores a review, the hold is voided at the deadline, even when the parcel arrived. That favours the buyer. Production needs a neutral reviewer for this case. |
+| PayPal Agent Toolkit | Not used, on purpose, and neither is PayPal's MCP server. The toolkit gives a model tools such as `create_order`, `pay_order` and `create_refund`, and at version 1.11.0, when we checked, it had no authorize, void or payout tools. Handshake keeps PayPal behind a fixed rule, and our own MCP server has no tool that approves a hold or captures. |
 
 ## Tools used and how
 
@@ -158,7 +167,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | `claude-sonnet-5-5`, effort low, 3 repeats | judge-v1 | 30 (90 runs) | 87/90 (96.7%) | 0 of 63 | p50 3.5 s, p95 4.8 s | 2026-11-05 |
 | `claude-sonnet-5-5`, effort low, second run | judge-v1 | 30 | 29/30 (96.7%) | 0 of 21 | p50 3.4 s, p95 4.1 s | 2026-11-05 |
 
-Results: `eval/results/20261105-1819-claude-sonnet-5-5-low.json` and `20261105-1820-claude-sonnet-5-5-low.json`. Every miss is one case Claude passed at 0.80, under the 0.85 threshold, so a person decides: the safe direction. Both prompt-injection cases held in every run, and no case changed decision between repeats. Extraction (extract-v1) matched 10 of 10 sentences. An earlier run with two wrong captures is kept in `eval/results/`; it traced to two bad test photos, as explained in [eval/README.md](eval/README.md).
+Results: `eval/results/20261105-1819-claude-sonnet-5-5-low.json` and `20261105-1820-claude-sonnet-5-5-low.json`. Every miss is one case Claude passed at 0.80, under the 0.85 threshold, so a person decides: the safe direction. Both prompt-injection cases held in every run, and no case changed decision between repeats. Extraction (extract-v1) matched 10 of 10 sentences in a separate run: `eval/results/20261015-1142-claude-sonnet-5-5-low.json`, 2026-10-15. An earlier run with two wrong captures is kept in `eval/results/`; it traced to two bad test photos, as explained in [eval/README.md](eval/README.md).
 
 The eval photos are generated renders of eight original items (see Disclosures), so these numbers don't promise the same result on phone photos.
 
@@ -208,7 +217,7 @@ Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && 
 npm test                               # unit: state machine, decide(), facts, webhook verification, session, carrier
 npm run test:int                       # integration against handshake_test, serial: routes, flows, payment, webhooks, tick, rate limits, Studio agent
 npx playwright install chromium        # once
-E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
+E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test happy-path
                                        # builds and starts the app, runs the judge happy path end to end (sandbox personal account 1);
                                        # without the two variables it runs up to the PayPal popup and skips the rest
 PLAYWRIGHT_BASE_URL=https://<host> E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test agents
@@ -232,7 +241,7 @@ Details: [tests/e2e/README.md](tests/e2e/README.md) (`PLAYWRIGHT_BASE_URL` to ru
 - A merged GitHub pull request as a proof type, for software work.
 - Split payouts and a platform fee.
 - PayPal multiparty onboarding so the seller is the payee instead of the platform.
-- A real carrier lookup, a verified email sending domain, and reauthorization for deals longer than 21 days.
+- A real carrier lookup, a verified email sending domain, and reauthorization after day 3.
 - Encryption keys held in a KMS instead of the environment, passkeys (WebAuthn) as the second factor, and "Log in with PayPal" to prove the payout account.
 - Rate limits shared across instances.
 

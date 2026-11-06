@@ -2,13 +2,13 @@
 import { redirect } from "next/navigation";
 import { AgentDesk } from "@/components/AgentDesk";
 import { AgentKeysPanel, type KeyRow } from "@/components/AgentKeysPanel";
-import { listAgentKeys } from "@/lib/agents/keys";
+import { isDeskLabel, listAgentKeys } from "@/lib/agents/keys";
 import { personaOf } from "@/lib/auth/demo";
 import { currentUser } from "@/lib/auth/current";
 import { getDeps } from "@/lib/deps";
 
 const CAN_CANNOT = [
-  ["An agent can", ["Haggle and propose a deal, up to its ceiling", "Sign the contract with its own key", "Submit proof of delivery", "Cancel before capture"]],
+  ["An agent can", ["Propose a deal up to its ceiling, and haggle on the live desk", "Sign the contract with its own key", "Submit proof of delivery", "Cancel until proof is submitted"]],
   ["Only a person can", ["Approve the hold at PayPal", "Decide when Claude is unsure", "Raise the ceiling or revoke the key"]],
   ["Only fixed code can", ["Refuse an offer outside the mandate", "Release or void the money from Claude's verdicts", "Refuse any step if the signed terms changed"]],
 ] as const;
@@ -18,7 +18,7 @@ export default async function AgentsPage() {
   if (!me) redirect("/signin?next=/agents");
   const demo = process.env.DEMO_LOGIN === "true";
   const keys = await listAgentKeys(me.id, getDeps().db);
-  const rows: KeyRow[] = keys.map((k) => ({ ...k, last_used_at: k.last_used_at?.toISOString() ?? null, revoked_at: k.revoked_at?.toISOString() ?? null })).filter((k) => !k.label.startsWith("Desk "));
+  const rows: KeyRow[] = keys.map((k) => ({ ...k, last_used_at: k.last_used_at?.toISOString() ?? null, revoked_at: k.revoked_at?.toISOString() ?? null })).filter((k) => !(personaOf(me.email) && isDeskLabel(k.label)));
   const isBuyerPersona = demo && personaOf(me.email) === "buyer";
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">

@@ -108,14 +108,15 @@ export async function verifyWithOwnIds(
 }
 
 let own: { ids: string[]; at: number } | null = null;
-async function ownWebhookIds(): Promise<string[]> {
+export async function ownWebhookIds(): Promise<string[]> {
   if (own && Date.now() - own.at < 10 * 60_000) return own.ids;
   try {
     const res = await fetch(`${process.env.PAYPAL_API_BASE}/v1/notifications/webhooks`, { headers: { Authorization: `Bearer ${await getToken()}` }, signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`webhook list ${res.status}`);
     const body = (await res.json()) as { webhooks?: { id: string }[] };
-    own = { ids: res.ok ? (body.webhooks ?? []).map((w) => w.id) : [], at: Date.now() };
+    own = { ids: (body.webhooks ?? []).map((w) => w.id), at: Date.now() };
   } catch {
-    return own?.ids ?? [];
+    own = { ids: own?.ids ?? [], at: Date.now() - 9 * 60_000 }; // keep the last good list and ask PayPal again in about a minute
   }
   return own.ids;
 }

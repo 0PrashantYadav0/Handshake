@@ -49,7 +49,7 @@ export function PayButton({ code, clientId, onHeld, onFail }: Props) {
           onError={() => setBanner((b) => b ?? "PayPal returned an error. Try again in a moment, or reload the page.")}
         />
       </PayPalScriptProvider>
-      <p className="hs-help mt-2">Secure checkout by PayPal. Handshake never sees your PayPal password.</p>
+      <p className="hs-help mt-2">PayPal&apos;s next window says Complete Purchase. On this order that only places a hold. Nothing is captured until the proof passes.</p>
     </div>
   );
 }

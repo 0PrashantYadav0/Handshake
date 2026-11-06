@@ -87,7 +87,7 @@ export function DealPipeline(params: AgWidgetParams<DealPipelineState>) {
           }}
         >
           <span style={{ height: 6, borderRadius: 3, background: `var(--hs-status-${s.status})`, width: `${Math.round((100 * s.deals) / max)}%`, minWidth: 6 }} />
-          <span className="hs-pill" data-status={s.status}>{STATUS_LABEL[s.status]}</span>
+          <span className="hs-pill" data-status={s.status} style={{ whiteSpace: "normal", alignSelf: "flex-start" }}>{STATUS_LABEL[s.status]}</span>
           <strong style={{ fontSize: "1.25rem", lineHeight: 1 }}>{s.deals}</strong>
           <span style={{ fontSize: "0.8rem", color: "var(--hs-muted)" }}>{formatMoney(s.money)}</span>
         </button>

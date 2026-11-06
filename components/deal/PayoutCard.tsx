@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DealView, PayoutStatus } from "@/lib/deal/types";
 import { api } from "@/lib/client-api";
-import { canRetryPayout } from "@/lib/deal-copy";
+import { canRetryPayout, holdLive } from "@/lib/deal-copy";
 import { when } from "@/lib/ledger-columns";
 
 const PAYOUT_LABEL: Record<PayoutStatus, string> = { pending: "pending", success: "paid", failed: "failed" };
@@ -31,7 +31,9 @@ export function PayoutCard({ deal, onDone, fail }: Props) {
     <section className="hs-card grid gap-2 text-sm">
       <h2 className="font-semibold">Payment</h2>
       {p.authorized_at && <p title={p.authorized_at}>Hold placed {when(p.authorized_at)}</p>}
-      {p.auth_expires_at && <p title={p.auth_expires_at}>Hold valid until {when(p.auth_expires_at)}</p>}
+      {p.auth_expires_at && holdLive(deal) && <p title={p.auth_expires_at}>PayPal can capture until {when(p.auth_expires_at)}<span className="hs-help block">PayPal honors the funds for the first 3 days.</span></p>}
+      <p>Order <span className="font-mono">{p.paypal_order_id}</span></p>
+      {p.authorization_id && <p>Authorization <span className="font-mono">{p.authorization_id}</span></p>}
       {p.capture_id && <p>Capture <span className="font-mono">{p.capture_id}</span></p>}
       {latest && (
         <>
@@ -39,6 +41,7 @@ export function PayoutCard({ deal, onDone, fail }: Props) {
             Payout to {to}: {PAYOUT_LABEL[latest.status]}
             {latest.status === "failed" && latest.failure_reason && <> (<span className="font-mono">{latest.failure_reason}</span>)</>}
           </p>
+          {latest.paypal_batch_id && <p>Payout batch <span className="font-mono">{latest.paypal_batch_id}</span></p>}
           {deal.role === "seller" && deal.status === "captured" && canRetryPayout(deal.payouts) && (
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" className="hs-btn" disabled={busy} onClick={retry}>{busy ? "Retrying…" : "Retry payout"}</button>

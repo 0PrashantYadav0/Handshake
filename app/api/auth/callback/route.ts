@@ -5,7 +5,7 @@
 import { safeNext, verifyMagicToken } from "@/lib/auth/magic-link";
 import { issueSession } from "@/lib/auth/session-version";
 import { getDeps } from "@/lib/deps";
-import { route } from "@/lib/http";
+import { MAX_JSON_BYTES, readCapped, route } from "@/lib/http";
 
 const redirect = (status: 302 | 303, location: string, cookie?: string) =>
   new Response(null, { status, headers: cookie ? { location, "set-cookie": cookie } : { location } });
@@ -16,7 +16,7 @@ export const POST = route(async (req: Request) => {
   // Login CSRF: another site must not be able to sign the visitor into an account whose link it holds.
   const origin = req.headers.get("origin");
   if (origin && origin !== new URL(process.env.APP_URL ?? req.url).origin) return redirect(303, "/signin?error=invalid_link");
-  const form = await req.formData().catch(() => null);
+  const form = await (await readCapped(req, MAX_JSON_BYTES))?.formData().catch(() => null);
   const { db } = getDeps();
   const email = await verifyMagicToken(String(form?.get("token") ?? ""), db);
   if (!email) return redirect(303, "/signin?error=invalid_link");

@@ -18,10 +18,10 @@ export function paymentLine(p: Payment | null, updatedAt: string): string | null
   }
 }
 
-/** 08 section 7.2 item 2; null once the deal is closed. */
-export function deadlineLine(d: Pick<DealView, "status" | "deadline_days" | "deadline_at">, now = Date.now()): string | null {
+/** 08 section 7.2 item 2; null once the deal is closed. The deadline tick skips seeded deals, so their dates only ever read as overdue. */
+export function deadlineLine(d: Pick<DealView, "status" | "deadline_days" | "deadline_at"> & { seeded?: boolean }, now = Date.now()): string | null {
   if (["captured", "paid", "voided"].includes(d.status)) return null;
-  if (d.deadline_at) return `Proof due ${when(d.deadline_at)} (${relTime(d.deadline_at, now)})`;
+  if (d.deadline_at && !d.seeded) return `Proof due ${when(d.deadline_at)} (${relTime(d.deadline_at, now)})`;
   return d.deadline_days ? `Seller has ${d.deadline_days} days after the hold is placed` : null;
 }
 
@@ -35,6 +35,12 @@ export function canRetryPayout(payouts: Payout[]): boolean {
   const p = payouts.at(-1);
   return !!p && (p.status === "failed" || (p.status === "pending" && !p.paypal_batch_id));
 }
+
+/** PayPal can still capture: not after a capture or a void. A declined capture leaves the hold in place, and a voided deal's void may still be on its way to PayPal. */
+export const holdLive = (d: Pick<DealView, "status" | "payment">) => d.status !== "voided" && (d.payment?.status === "authorized" || d.payment?.status === "declined");
+
+const conditions = (n: number) => `${n} condition${n === 1 ? "" : "s"}`;
+const itOrThem = (n: number) => (n === 1 ? "it" : "them");
 
 export const VERDICT_LABEL: Record<VerdictResult, string> = { pass: "Pass", fail: "Fail", unclear: "Unclear" };
 export const VERDICT_ICON: Record<VerdictResult, string> = { pass: "✓", fail: "✕", unclear: "?" };
@@ -57,17 +63,18 @@ export function decisionLine(s: Pick<Submission, "verdicts" | "decision" | "deci
   const key = `${s.decision}:${s.decision_reason}`;
   switch (key) {
     case "capture:all_pass": return "All conditions passed with high confidence and the amount is within the auto-release limit, so the rule released the payment.";
-    case "request_fix:fail": return role === "seller" ? `${n("fail")} condition(s) failed. You can fix and resubmit once.` : `${n("fail")} condition(s) failed. The seller has one chance to fix them.`;
-    case "void:fail": return `${n("fail")} condition(s) clearly failed on the second attempt. The deal is voided and the hold released.`;
-    case "buyer_review:unclear": return `Claude couldn't decide on ${n("unclear")} condition(s), so the buyer decides.`;
+    case "request_fix:fail": return role === "seller" ? `${conditions(n("fail"))} failed. You can fix and resubmit once.` : `${conditions(n("fail"))} failed. The seller has one chance to fix ${itOrThem(n("fail"))}.`;
+    case "void:fail": return `${conditions(n("fail"))} clearly failed on the second attempt. The deal is voided and the hold released.`;
+    case "buyer_review:unclear": return `Claude couldn't decide on ${conditions(n("unclear"))}, so the buyer decides.`;
     case "buyer_review:low_confidence": return "Claude's confidence was below the rule's threshold, so the buyer decides.";
-    case "buyer_review:fail": return `${n("fail")} condition(s) failed on the second attempt, but Claude wasn't confident enough to void the deal, so the buyer decides.`;
+    case "buyer_review:fail": return `${conditions(n("fail"))} failed on the second attempt, but Claude wasn't confident enough to void the deal, so the buyer decides.`;
     case "buyer_review:amount_over_limit": return "Every condition passed. Deals above the auto-release limit always go to the buyer.";
     default: return null;
   }
 }
 
 export const modelLine = (s: Pick<Submission, "verdicts">) =>
+  s.verdicts[0]?.model === "seed" ? "Sample verdicts, written for the demo." :
   `The result and confidence come from Claude${s.verdicts[0] ? ` (${s.verdicts[0].model})` : ""}. The decision comes from a fixed rule in code, never from the model.`;
 
 /** The first event that closed the deal (08 section 7.1), not the fact:authorization_voided that follows it. */
@@ -93,7 +100,7 @@ export function timelineSentence(e: Pick<DealEvent, "cause" | "actor" | "payload
     case "accept": return `${actor} signed version ${p.terms_version}.`;
     case "start_payment": return `Buyer started PayPal checkout (order attempt ${p.order_attempt}).`;
     case "submit_evidence": return `Seller submitted proof (attempt ${p.submission_no}).`;
-    case "verdict": return `Claude judged attempt ${p.submission_no}.`;
+    case "verdict": return p.seeded ? `Sample verdicts for attempt ${p.submission_no}.` : `Claude judged attempt ${p.submission_no}.`;
     case "decision:capture": return "Rule: release the payment.";
     case "decision:request_fix": return "Rule: ask the seller for one fix.";
     case "decision:buyer_review": return `Rule: ask the buyer to decide (${p.reason}).`;
@@ -118,10 +125,16 @@ export function timelineSentence(e: Pick<DealEvent, "cause" | "actor" | "payload
 
 export type NextCopy = { heading: string; helper: string };
 
+/** Seeded deals have no payout rows, so a failed payout shows only as their last payout event. */
+function seededPayoutFailure(events: DealEvent[] = []): Pick<Payout, "status" | "failure_reason" | "paypal_batch_id"> | undefined {
+  const e = events.findLast((x) => x.cause.startsWith("fact:payout_"));
+  return e?.cause === "fact:payout_failed" ? { status: "failed", failure_reason: String(e.payload.failure_reason), paypal_batch_id: null } : undefined;
+}
+
 /** The captured-state card (08 section 7.4 "captured"), keyed by role and the latest payout. */
-export function payoutCopy(d: Pick<DealView, "role" | "amount_minor" | "seller" | "payouts">): NextCopy {
+export function payoutCopy(d: Pick<DealView, "role" | "amount_minor" | "seller" | "payouts">, events?: DealEvent[]): NextCopy {
   const amount = money(d.amount_minor);
-  const p = d.payouts.at(-1);
+  const p = d.payouts.at(-1) ?? seededPayoutFailure(events);
   if (d.role === "buyer") {
     return p?.status === "failed"
       ? { heading: "Payment released. Payout to the seller failed.", helper: "The seller has been asked to check their PayPal email and retry. You've already paid." }
@@ -153,7 +166,7 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
   const seller = partyName(d.seller, "the seller");
   const v = d.terms_version;
   const amount = money(d.amount_minor);
-  const deadline = d.deadline_at ? `${when(d.deadline_at)} (${relTime(d.deadline_at, opts.now)})` : "the deadline";
+  const deadline = d.deadline_at && !d.seeded ? `${when(d.deadline_at)} (${relTime(d.deadline_at, opts.now)})` : "the deadline";
   const last = d.submissions.at(-1);
   const count = (r: VerdictResult) => last?.verdicts.filter((x) => x.result === r).length ?? 0;
   const failed = count("fail");
@@ -190,11 +203,11 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
       if (d.role === "buyer") {
         return d.fix_attempts_used === 0
           ? { heading: "Money held. Waiting for proof.", helper: `Nothing has been charged. If the seller's proof doesn't pass by ${deadline}, the hold is released automatically.` }
-          : { heading: "The first proof failed. One more try.", helper: `${failed} condition(s) failed. The seller can fix them once before ${deadline}. If it clearly fails again the hold is released; if Claude is unsure, you decide.` };
+          : { heading: "The first proof failed. One more try.", helper: `${conditions(failed)} failed. The seller can fix ${itOrThem(failed)} once before ${deadline}. If it clearly fails again the hold is released; if Claude is unsure, you decide.` };
       }
       return d.fix_attempts_used === 0
         ? { heading: "Ship it, then add your proof", helper: `Upload photos that show each condition, enter the tracking number, and submit before ${deadline}. Claude checks them against the terms; a fixed rule then releases the money, asks you to fix one thing, or asks the buyer.` }
-        : { heading: "One more try", helper: `Your first proof failed ${failed} condition(s), marked below. Fix them and resubmit before ${deadline}. If it clearly fails again the deal is voided and the hold is released; if Claude is unsure, the buyer decides.` };
+        : { heading: "One more try", helper: `Your first proof failed ${conditions(failed)}, marked below. Fix ${itOrThem(failed)} and resubmit before ${deadline}. If it clearly fails again the deal is voided and the hold is released; if Claude is unsure, the buyer decides.` };
     case "proof_submitted":
       return { heading: d.role === "buyer" ? "Checking the seller's proof…" : "Checking your proof…", helper: CHECKING_HELPER };
     case "in_review": {
@@ -202,19 +215,20 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
       if (d.role === "seller") {
         return declined
           ? { heading: `PayPal declined the capture. Waiting for ${buyer}.`, helper: "The buyer can try the capture again or reject the proof. You'll see the result here." }
-          : { heading: `Waiting for ${buyer} to decide`, helper: "Claude couldn't decide on its own, so the buyer is looking at your proof. You'll see the result here." };
+          : { heading: `Waiting for ${buyer} to decide`, helper: d.seeded ? "This sample stops at the buyer's review, so no result is coming." : "Claude couldn't decide on its own, so the buyer is looking at your proof. You'll see the result here." };
       }
       if (declined) return { heading: "PayPal declined the capture", helper: "The proof passed, but PayPal declined the capture (details in the timeline). Try again, or reject the proof to release the hold." };
-      const tail = `Look at the proof and decide. If you do nothing, the hold is released on ${deadline}.`;
+      const ignored = `If you do nothing, the hold is released on ${deadline}.`;
+      const tail = d.seeded ? "In a live deal you would look at the proof and decide." : `Look at the proof and decide. ${ignored}`;
       switch (last?.decision_reason) {
         case "low_confidence": return { heading: "Your decision: confidence was too low", helper: `Claude's confidence was below what the rule requires. ${tail}` };
-        case "fail": return { heading: "Your decision: the second proof may have failed", helper: `${failed} condition(s) failed on the second try, but Claude wasn't confident enough for the rule to void the deal. ${tail}` };
-        case "amount_over_limit": return { heading: "Your decision: this deal is over the auto-release limit", helper: `Every condition passed. Deals above the auto-release limit always need your confirmation. If you do nothing, the hold is released on ${deadline}.` };
+        case "fail": return { heading: "Your decision: the second proof may have failed", helper: `${conditions(failed)} failed on the second try, but Claude wasn't confident enough for the rule to void the deal. ${tail}` };
+        case "amount_over_limit": return { heading: "Your decision: this deal is over the auto-release limit", helper: `Every condition passed. Deals above the auto-release limit always need your confirmation. ${d.seeded ? tail : ignored}` };
         default: return { heading: "Your decision: Claude couldn't decide", helper: `${count("unclear")} of ${d.conditions.length} conditions came back unclear. ${tail}` };
       }
     }
     case "captured":
-      return payoutCopy(d);
+      return payoutCopy(d, opts.events);
     case "paid":
       return d.role === "buyer"
         ? { heading: "Deal complete", helper: `${seller} was paid ${amount} on ${when(d.updated_at)}. Thanks for using Handshake.` }
@@ -222,7 +236,7 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
     case "voided": {
       const e = voidEvent(opts.events ?? []);
       const why = (e && VOID_REASON[`${e.cause}:${e.actor}`]) ?? "The deal was closed.";
-      const held = d.payment?.authorized_at ? `The hold of ${amount} was released. Nothing was charged.` : "No money was ever held.";
+      const held = d.payment?.authorized_at || opts.events?.some((x) => x.cause === "fact:authorization_created") ? `The hold of ${amount} was released. Nothing was charged.` : "No money was ever held.";
       return { heading: "Deal voided", helper: `${why} ${held}` };
     }
   }

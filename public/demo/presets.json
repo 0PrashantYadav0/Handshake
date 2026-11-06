@@ -23,7 +23,7 @@
       "sets": {
         "good": {
           "label": "Good",
-          "purpose": "Every condition passes; the payment is released.",
+          "purpose": "The right mug, new shots.",
           "photos": [
             "/demo/evidence/good/photo-1.jpg",
             "/demo/evidence/good/photo-2.jpg"
@@ -31,7 +31,7 @@
         },
         "reuse-listing": {
           "label": "Reuse listing photo",
-          "purpose": "A listing photo as proof; fails without a model call.",
+          "purpose": "A listing photo reused as proof.",
           "photos": [
             "/demo/reference/mug/ref-1.jpg"
           ],
@@ -60,7 +60,7 @@
       "sets": {
         "wrong-item": {
           "label": "Wrong item",
-          "purpose": "A different lamp; one fix is requested, a second failure voids.",
+          "purpose": "A different lamp.",
           "photos": [
             "/demo/evidence/wrong-item/photo-1.jpg",
             "/demo/evidence/wrong-item/photo-2.jpg"
@@ -99,7 +99,7 @@
       "sets": {
         "blurry": {
           "label": "Blurry",
-          "purpose": "Unreadable proof; the buyer decides.",
+          "purpose": "Too soft to judge.",
           "photos": [
             "/demo/evidence/blurry/photo-1.jpg"
           ],

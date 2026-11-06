@@ -259,8 +259,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 30px
 
 <!-- STATUS -->
 <section id="status">
-  <h2>What works, what is unverified, what is blocked</h2>
-  <p class="lede">Automated: <b>583 unit tests</b> (1 skipped until a recorded PayPal webhook exists), <b>271 integration tests</b> against Postgres, and a two-party browser test with a CSP watcher. All of them use fakes for PayPal and Claude. Nothing has run against the real services yet, because the accounts don't exist.</p>
+  <h2>What works and what is unverified</h2>
+  <p class="lede">Automated: <b>599 unit tests</b> (plus 1 skipped until a recorded PayPal webhook exists) and <b>317 integration tests</b> against Postgres, with fakes for PayPal and Claude, and a two-party browser test with a CSP watcher. The happy-path and agent browser specs and the hosted demo run on the real PayPal sandbox and real Claude. The eval runs on real Claude.</p>
   <div class="chips" id="stFilter"></div>
   <div class="card"><table id="stTable"><thead><tr><th>Item</th><th>State</th><th>Why / what it needs</th><th>Issue</th></tr></thead><tbody></tbody></table></div>
 </section>
@@ -303,7 +303,7 @@ document.documentElement.dataset.theme = localStorage.getItem("hs-theme") || (pr
 $("#theme").onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; localStorage.setItem("hs-theme", t); };
 
 /* ---------- overview ---------- */
-[["13","Postgres models"],["14","pages"],["37","API handlers (34 route files)"],["583 + 271","unit + integration tests"],["8","deal statuses"],["9","commands"],["2","Claude jobs (extract, judge)"],["4","ports: db, paypal, ai, email"]]
+[["15","Postgres models"],["15","pages"],["44","API handlers (39 route files)"],["599 + 317","unit + integration tests"],["8","deal statuses"],["9","commands"],["3","Claude jobs (extract, judge, negotiate)"],["4","ports: db, paypal, ai, email"]]
   .forEach(([b, s]) => $("#stats").append(el("div", { class: "card stat" }, `<b>${b}</b><span>${s}</span>`)));
 [["1 · Describe","The buyer types one sentence. Claude extracts the item, amount, deadline and 1 to 4 conditions, each with its evidence type. When a condition needs a photo, the server adds a 'deal code visible' condition itself (5 at most)."],
  ["2 · Join & sign","The seller opens the link and joins. Both sides confirm with TOTP and sign the canonical contract with a P-256 key kept in their browser."],
@@ -358,7 +358,7 @@ const NODES = [
     info: { files: ["proxy.ts","lib/csp.ts"], does: ["Builds a strict Content-Security-Policy: 'nonce' + 'strict-dynamic', PayPal hosts only","Next.js adds the nonce to its own scripts","Skips api/, _next/, demo/ and prefetches"] } },
   { id: "pages", x: 240, y: 140, w: 220, h: 62, t: "Server pages", s: "App Router · 14 routes",
     info: { files: ["app/page.tsx (landing)","app/dashboard, app/deal/[code], app/new, app/ledger, app/wallet, app/security, app/signin"], does: ["Server components read the session cookie and render with real data","/deal/[code] is role-aware: buyer, seller or preview","Never writes data: every change goes through /api"] } },
-  { id: "api", x: 500, y: 140, w: 260, h: 62, t: "API routes  /api/*", s: "37 handlers · Zod-validated · error map",
+  { id: "api", x: 500, y: 140, w: 260, h: 62, t: "API routes  /api/*", s: "44 handlers · Zod-validated · error map",
     info: { files: ["app/api/**/route.ts","lib/http.ts","lib/http-schemas.ts","lib/rate-limit.ts"], does: ["Thin: parse, check the session and 2FA, call lib/deal, map errors to HTTP","Step-up TOTP on accept, payout email change, key revoke","Webhook route: 64 KB Content-Length cap, our own signature check, then lib/deal/webhooks","Rate limits per user, email and IP (in memory)"] } },
   { id: "auth", x: 20, y: 260, w: 190, h: 80, t: "lib/auth", s: "JWT session · magic link · TOTP 2FA · demo personas",
     info: { files: ["lib/auth/session.ts","lib/auth/magic-link.ts","lib/auth/totp.ts","lib/auth/mfa.ts","lib/auth/demo.ts"], does: ["HS256 cookie. A partial session lasts 15 min until 2FA passes; a full one lasts 30 days","Sign-in links work once (used_login_tokens) behind a Continue page","TOTP: replay floor, recovery codes, lockout after 5 failures","Sign out everywhere bumps session_version"] } },
@@ -632,21 +632,21 @@ const F = [
   ["AI","One-sentence terms","Claude extracts the item, amount, deadline and 1 to 4 conditions as schema-validated JSON. The server, not the model, adds the deal-code condition when a photo is needed.","lib/ai/extract.ts, lib/deal/terms.ts","fake"],
   ["AI","Evidence judge","Per-condition pass, fail or unclear with a confidence, citing evidence ids. It never throws: a timeout or bad output makes every condition unclear. A pass with no cited evidence becomes unclear.","lib/ai/judge.ts, lib/deal/verdict.ts","fake"],
   ["AI","Reuse guardrail","SHA-256 hash check of evidence against the listing photos before any model call.","lib/deal/verdict.ts (hashCheck)","local"],
-  ["AI","Eval harness","eval/run.ts reports the decision-match rate, the wrong-capture rate (must be 0) and latency. The cases need the real photos.","eval/run.ts, eval/README.md","blocked"],
+  ["AI","Eval harness","eval/run.ts reports the decision-match rate, the wrong-capture rate (must be 0) and latency, over 30 cases of rendered photos.","eval/run.ts, eval/README.md","local"],
   ["Trust & identity","Passwordless sign-in","Email magic link, single use (used_login_tokens), behind a Continue page so mail scanners can't spend it, with a same-origin check against login CSRF.","lib/auth/magic-link.ts, app/signin/link","local"],
   ["Trust & identity","Mandatory 2FA","TOTP (RFC 6238) with a replay floor, 10 recovery codes, lockout after 5 failures, and a step-up for signing, a payout email change or a key revoke.","lib/auth/totp.ts, lib/auth/mfa.ts","local"],
   ["Trust & identity","Device-key signatures","ECDSA P-256 keys that cannot be extracted, kept in IndexedDB. Each signs the canonical contract. Signatures are verified on the server and again in the browser, and the signed bundle can be downloaded.","lib/contract/*, app/deal/[code]/contract","local"],
   ["Trust & identity","Encryption at rest","AES-256-GCM field sealing with a rotatable keyring, AAD bound to table, column and deal.","lib/crypto/seal.ts, scripts/reseal.ts","local"],
   ["Trust & identity","Verified payout address","The seller confirms their PayPal email with a code before they can sign. Demo personas are verified by configuration.","app/api/me/paypal-email/*","local"],
   ["Dashboards","Dashboard home","Held as buyer, held for you, released this month, paid out. A 'Needs you' list, buying and selling, and a security card.","app/dashboard, lib/deal/summary.ts","local"],
-  ["Dashboards","AG Studio analytics","Value tiles, a custom pipeline widget with cross-filter, a status donut, confidence bands and an over-time chart. A Claude-backed Studio agent with an explain_verdict tool.","components/StudioCanvas.tsx, lib/studio-agent.ts","blocked"],
+  ["Dashboards","AG Studio analytics","Value tiles, a custom pipeline widget with cross-filter, a deals-by-status bar chart, confidence bands and an over-time chart. A Claude-backed Studio agent with an explain_verdict tool.","components/StudioCanvas.tsx, lib/studio-agent.ts","blocked"],
   ["Dashboards","Ledger & wallet","An AG Grid ledger of every deal. The wallet shows holds, captures and payouts with their PayPal ids and retry links.","components/Ledger.tsx, app/wallet","local"],
   ["Ops & quality","Strict CSP","A fresh nonce on every request, strict-dynamic, PayPal hosts only. The e2e test fails on any violation.","proxy.ts, lib/csp.ts","local"],
   ["Ops & quality","Boot-time env check","Zod schema for every variable. Production refuses to serve if one is missing (new in #89).","instrumentation.ts, lib/env.ts","local"],
   ["Ops & quality","Secret scanning in CI","Checks the repo and the built client bundle for every server secret's value.","scripts/check-secrets.sh, .github/workflows/ci.yml","local"],
   ["Ops & quality","Demo kit & seed","Two personas with published 2FA (sandbox only), 25 historical deals, sentence chips, Use-sample buttons, and a photo of the code drawn on a card.","prisma/seed.ts, public/demo/presets.json","local"],
 ];
-const FSTATE = { fake: ["wait","Tested with fakes; real sandbox pending"], local: ["ok","Working and tested locally"], blocked: ["no","Needs an external input"] };
+const FSTATE = { fake: ["wait","Tested with fakes; runs on the real sandbox in the hosted demo"], local: ["ok","Working and tested locally"], blocked: ["no","Needs an external input"] };
 let fArea = "All";
 function renderF() {
   $("#fFilter").innerHTML = ""; AREAS.forEach((a) => { const b = el("button", { class: "chip", "aria-pressed": a === fArea }, a); b.onclick = () => { fArea = a; renderF(); }; $("#fFilter").append(b); });
@@ -714,22 +714,23 @@ const ST = [
   ["Full deal lifecycle, state machine, decide(), contract gate, encryption, 2FA, signatures","works","Unit and integration tests against Postgres, with fake PayPal and Claude","—"],
   ["Two parties sign in a real browser; contract verified client-side; no CSP violations","works","tests/e2e/two-party.spec.ts on a production build","—"],
   ["Boot-time env validation","works","Fixed today: lib/env.ts was never imported, so production would have started without RESEND_API_KEY or DEMO_SELLER_PAYPAL_EMAIL","88"],
-  ["Real PayPal sandbox: order, authorize, capture, void, payout","unverified","Never called: no sandbox accounts or REST app yet. The spike scripts are ready","1, 12"],
-  ["PayPal webhook signature against a real recorded event","unverified","1 unit test is skipped until tests/fixtures/webhooks/*.json and cert.pem are recorded","12, 13"],
-  ["PayPal popup in the happy-path e2e","unverified","The selectors must be re-recorded with codegen once there is a sandbox buyer login","42"],
-  ["Claude extraction and judging quality","unverified","No API key yet. Behaviour is tested with the fake model only","2, 27"],
-  ["Eval: decision-match and wrong-capture rates","blocked","eval/cases/ is empty. The 30 verdict cases need real photos. The README numbers are TODO","23, 29, 30"],
-  ["Demo photos","blocked","All 14 images in public/demo are generated placeholders, not photographs","23"],
-  ["Hosted deploy on Render, cron proven, seed on Render","blocked","Needs the Render account and the env vars above. APP_HOST in the cron is UNVERIFIED","20, 34, 35"],
+  ["Real PayPal sandbox: order, authorize, capture, void, payout","works","Runs on the hosted demo, and in tests/e2e/happy-path.spec.ts and agents.spec.ts","—"],
+  ["PayPal webhook signature against a real event","works","GET /api/status on the hosted demo counts verified webhooks. 1 unit test stays skipped until tests/fixtures/webhooks/*.json and cert.pem are recorded","12, 13"],
+  ["PayPal popup in the happy-path e2e","works","tests/e2e/paypal-popup.ts drives the real sandbox popup","—"],
+  ["Claude extraction and judging quality","works","Measured on real Claude by the eval below. Extraction matched 10 of 10 sentences","—"],
+  ["Eval: decision-match and wrong-capture rates","works","30 cases, 3 repeats: 87 of 90 decisions matched, 0 wrong captures. eval/results/20261105-1819-claude-sonnet-5-5-low.json. The photos are renders, so phone photos will be noisier","—"],
+  ["Demo photos","by design","Path-traced 3D renders from scripts/demo/photo-studio, not photographs (decision L5, disclosed in the README)","—"],
+  ["Hosted deploy on Render","works","Live at https://handshake-ba2g.onrender.com from render.yaml. GET /api/status shows when the cron job last ran","—"],
+  ["Agents: mandates, MCP server, live desk","works","/agents and POST /api/mcp (docs/agents.md). tests/int/agents.int.test.ts with fakes, tests/e2e/agents.spec.ts on real Claude and the sandbox","—"],
   ["Emails to anyone but you","limited","onboarding@resend.dev only delivers to the Resend account owner. Judges use the demo personas, or verify a domain","2"],
   ["AG Studio dashboard and its agent","limited","Renders without a key. The full Studio needs the trial key, and the agent needs ANTHROPIC_API_KEY","44"],
   ["Carrier tracking","by design","Mocked: an even last digit means delivered, odd means in transit","—"],
   ["Rate limiting","by design","In memory, so correct for the single Render instance only","—"],
   ["Memory under 6 × 2 MB uploads on the 512 MB plan","unverified","Spike 9 has to run on Render","45"],
-  ["Outside testers, video, submission","blocked","Needs people and the hosted URL","43, 48, 49"],
+  ["Outside testers, video, submission","unverified","The hosted URL exists. These close by the 2026-11-12 deadline","43, 48, 49"],
   ["Local dev rows written before the UTC fix","limited","On this Asia/Kolkata Postgres, older local rows may read 5.5 h off. CI and Render are UTC","—"],
 ];
-const STC = { works: "ok", unverified: "wait", blocked: "no", limited: "info", "by design": "vio" };
+const STC = { works: "ok", unverified: "wait", limited: "info", "by design": "vio" };
 let stF = "all";
 function renderSt() {
   $("#stFilter").innerHTML = ""; ["all", ...Object.keys(STC)].forEach((k) => { const n = k === "all" ? ST.length : ST.filter((s) => s[1] === k).length; const b = el("button", { class: "chip", "aria-pressed": k === stF }, `${k} (${n})`); b.onclick = () => { stF = k; renderSt(); }; $("#stFilter").append(b); });
@@ -738,11 +739,7 @@ function renderSt() {
 renderSt();
 
 /* ---------- roadmap ---------- */
-[["done","Done","Spec, plan, 50 tasks, the full code path, the trust work (2FA, signatures, encryption), hardening (single-use links, CSP, checklist, boot env check)"],
- ["now","Now · you","PayPal sandbox: 3 accounts, 2 REST apps (#1). Anthropic, Resend, Render accounts and the hackathon credit (#2)"],
- ["now","Day 1 after keys","Sandbox spikes SB-0 to SB-8 and recorded webhooks (#12). The fixture test switches on by itself (#13). One real held → captured → paid run (#27)"],
- ["now","Deploy","Apply the Blueprint, env vars, hosted webhook, cron proven, seed (#20, #34, #35). Scenario runs on the hosted URL (#22, #31)"],
- ["now","Proof quality","Real photos (#23), 30 eval cases (#29), baseline plus prompt tuning to zero wrong captures (#30). Fill the README numbers"],
+[["done","Done","Spec, plan, 50 tasks, the full code path, the trust work (2FA, signatures, encryption), hardening (single-use links, CSP, checklist, boot env check), real sandbox runs, the hosted deploy, rendered demo photos, the 30-case eval and its baseline, and agents under a mandate"],
  ["later","2026-11-02 → 11-08","AG Studio key (#44), outside testers (#43), spike 9 memory, freeze on 11-08 (#45)"],
  ["later","2026-11-09 → 11-12","Final deploy and e2e on the hosted URL (#47), README (#46), video (#48), repo public and submit (#49). Monitor until 2026-12-15 (#50)"]]
  .forEach(([c, t, d]) => $("#tl").append(el("div", { class: "tl-item " + c }, `<b>${t}</b><div class="small muted">${d}</div>`)));

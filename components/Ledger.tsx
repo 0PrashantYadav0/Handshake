@@ -1,6 +1,6 @@
 "use client";
 // The /ledger grid on AG Grid Community (08 section 8; 09 section 4.3). Rows come from the server page.
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AllCommunityModule, themeQuartz, type ColDef } from "ag-grid-community";
@@ -21,6 +21,7 @@ const theme = themeQuartz.withParams({
   fontFamily: "var(--hs-font)",
   spacing: 6,
   borderRadius: 6,
+  cellHorizontalPadding: 12,
 });
 
 type P<V> = CustomCellRendererProps<LedgerRow, V>;
@@ -31,29 +32,49 @@ const CodeLink = ({ value }: P<string>) => (
   </Link>
 );
 const StatusCell = ({ value }: P<DealStatus>) => (value ? <StatusPill status={value} /> : null);
-const SampleCell = ({ value }: P<boolean>) => (value ? <span className="hs-badge">Sample</span> : null);
+const ItemCell = ({ value, data }: P<string>) => (
+  <span className="flex items-center gap-1"><span className="truncate">{value}</span>{data?.seeded && <span className="hs-badge shrink-0">Sample</span>}</span>
+);
 const Time = ({ value }: P<string | null>) => <span title={value ?? undefined}>{when(value)}</span>;
 const Rel = ({ value }: P<string | null>) => <span title={value ?? undefined}>{relTime(value)}</span>;
 
+const code: ColDef<LedgerRow> = { field: "code", headerName: "Code", cellRenderer: CodeLink, width: 90, pinned: "left" };
+const item: ColDef<LedgerRow> = {
+  field: "item_title", headerName: "Item", flex: 1, minWidth: 140, cellRenderer: ItemCell,
+  getQuickFilterText: (p) => (p.data?.seeded ? `${p.value} sample` : p.value), // "sample" finds the seeded deals
+};
+const amount: ColDef<LedgerRow> = { field: "amount_minor", headerName: "Amount", width: 100, type: "rightAligned", valueFormatter: (p) => money(p.value), filter: "agNumberColumnFilter" };
+const status: ColDef<LedgerRow> = { field: "status", headerName: "Status", width: 172, cellRenderer: StatusCell, getQuickFilterText: (p) => (p.data ? STATUS_LABEL[p.data.status] : "") };
+const lastActivity: ColDef<LedgerRow> = { field: "last_event_at", headerName: "Last activity", width: 125, cellRenderer: Rel, filter: false, sort: "desc" };
+
 const columnDefs: ColDef<LedgerRow>[] = [
-  { field: "code", headerName: "Code", cellRenderer: CodeLink, width: 110, pinned: "left" },
-  { field: "item_title", headerName: "Item", flex: 1, minWidth: 180 },
-  { field: "role", headerName: "Role", width: 100, valueFormatter: (p) => roleLabel(p.value) },
-  { field: "counterparty", headerName: "Counterparty", minWidth: 140, valueFormatter: (p) => p.value ?? "—" },
-  { field: "amount_minor", headerName: "Amount", width: 120, type: "rightAligned", valueFormatter: (p) => money(p.value), filter: "agNumberColumnFilter" },
-  { field: "status", headerName: "Status", width: 180, cellRenderer: StatusCell, getQuickFilterText: (p) => (p.data ? STATUS_LABEL[p.data.status] : "") },
-  { field: "deadline_at", headerName: "Deadline", width: 180, cellRenderer: Time, filter: false },
-  { field: "last_event_cause", headerName: "Last event", width: 240, valueFormatter: (p) => eventSentence(p.value) },
-  { field: "lowest_confidence", headerName: "Confidence", width: 120, type: "rightAligned", valueFormatter: (p) => pct(p.value), filter: "agNumberColumnFilter" },
-  { field: "last_event_at", headerName: "Last activity", width: 150, cellRenderer: Rel, filter: false, sort: "desc" },
-  { field: "seeded", headerName: "Sample", width: 100, cellRenderer: SampleCell, filter: false, getQuickFilterText: (p) => (p.value ? "sample" : "") },
+  code,
+  item,
+  { field: "role", headerName: "Role", width: 72, valueFormatter: (p) => roleLabel(p.value) },
+  { field: "counterparty", headerName: "Other party", width: 125, valueFormatter: (p) => p.value ?? "—" },
+  amount,
+  status,
+  { field: "deadline_at", headerName: "Deadline", width: 160, cellRenderer: Time, filter: false },
+  { field: "last_event_cause", headerName: "Last event", flex: 1, minWidth: 225, valueFormatter: (p) => eventSentence(p.value) },
+  { field: "lowest_confidence", headerName: "Confidence", width: 120, hide: true, type: "rightAligned", valueFormatter: (p) => pct(p.value), filter: "agNumberColumnFilter" },
+  lastActivity,
 ];
+
+// Phones: Item, Amount and Status fit on screen. Tapping a row opens the deal, which carries the code and the sample badge.
+const phoneColumnDefs: ColDef<LedgerRow>[] = [
+  { ...item, minWidth: 100, cellRenderer: undefined },
+  { ...amount, width: 80, suppressHeaderFilterButton: true },
+  { ...status, suppressHeaderFilterButton: true },
+  { ...lastActivity, hide: true },
+];
+const subscribePhone = (fn: () => void) => { const m = matchMedia("(max-width: 639px)"); m.addEventListener("change", fn); return () => m.removeEventListener("change", fn); };
 
 export function Ledger({ rows }: { rows: LedgerRow[] }) {
   const router = useRouter();
   const grid = useRef<AgGridReact<LedgerRow>>(null);
   const [quick, setQuick] = useState("");
   const [statuses, setStatuses] = useState<Set<DealStatus>>(new Set());
+  const phone = useSyncExternalStore(subscribePhone, () => matchMedia("(max-width: 639px)").matches, () => false);
   const shown = useMemo(() => (statuses.size ? rows.filter((r) => statuses.has(r.status)) : rows), [rows, statuses]);
 
   const toggle = (s: DealStatus) =>
@@ -82,7 +103,7 @@ export function Ledger({ rows }: { rows: LedgerRow[] }) {
           ref={grid}
           theme={theme}
           rowData={shown}
-          columnDefs={columnDefs}
+          columnDefs={phone ? phoneColumnDefs : columnDefs}
           defaultColDef={{ sortable: true, filter: true, resizable: true }}
           quickFilterText={quick}
           getRowId={(p) => p.data.code}

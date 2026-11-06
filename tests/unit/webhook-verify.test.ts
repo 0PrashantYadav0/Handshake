@@ -5,7 +5,8 @@ import { createSign, generateKeyPairSync } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { clearCertCache, crc32Decimal, verifyPaypalSignature, verifyWithOwnIds } from "@/lib/paypal/verify";
+import { resetTokenCache } from "@/lib/paypal/token";
+import { clearCertCache, crc32Decimal, ownWebhookIds, verifyPaypalSignature, verifyWithOwnIds } from "@/lib/paypal/verify";
 
 const FIXTURES = join(__dirname, "..", "fixtures", "webhooks");
 const CERT_URL = "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-TEST";
@@ -37,6 +38,38 @@ afterEach(() => vi.unstubAllEnvs());
 
 test("crc32 from node:zlib is PayPal's unsigned decimal", () => {
   expect(crc32Decimal("hello")).toBe("907060870");
+});
+
+test("a failed webhook list keeps the last good ids and is retried in about a minute, not refetched on every request", async () => {
+  resetTokenCache();
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-20T10:00:00Z") });
+  const MINUTE = 60_000;
+  let answer = (): Response => Response.json({ webhooks: [{ id: "WH-A" }] });
+  const list = vi.fn(async (url: string) => (String(url).endsWith("/oauth2/token") ? Response.json({ access_token: "t", expires_in: 86_400 }) : answer()));
+  vi.stubGlobal("fetch", list);
+  const listCalls = () => list.mock.calls.filter(([u]) => String(u).endsWith("/webhooks")).length;
+  try {
+    await expect(ownWebhookIds()).resolves.toEqual(["WH-A"]);
+
+    vi.advanceTimersByTime(11 * MINUTE);
+    answer = () => Response.json({ name: "AUTHENTICATION_FAILURE" }, { status: 401 });
+    await expect(ownWebhookIds()).resolves.toEqual(["WH-A"]); // a JSON error doesn't wipe the list
+    await expect(ownWebhookIds()).resolves.toEqual(["WH-A"]);
+    expect(listCalls()).toBe(2);
+
+    vi.advanceTimersByTime(11 * MINUTE);
+    answer = () => { throw new Error("network down"); };
+    await expect(ownWebhookIds()).resolves.toEqual(["WH-A"]);
+    await expect(ownWebhookIds()).resolves.toEqual(["WH-A"]); // an outage isn't called again on every forged POST
+    expect(listCalls()).toBe(3);
+
+    vi.advanceTimersByTime(MINUTE + 1000);
+    answer = () => Response.json({ webhooks: [{ id: "WH-B" }] });
+    await expect(ownWebhookIds()).resolves.toEqual(["WH-B"]);
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
 });
 
 test("a stale PAYPAL_WEBHOOK_ID still verifies against a webhook registered on this app, and only then", async () => {

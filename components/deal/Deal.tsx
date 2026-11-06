@@ -14,8 +14,8 @@ import { WhatNext } from "./WhatNext";
 
 type Props = { initial: DealView | DealPreview; demo: boolean; paypalClientId: string };
 
-/** Every 5 s while the tab is visible, 2 minutes at most (08 section 4.2); true once the budget is spent. */
-function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
+/** Every 5 s while the tab is visible, 2 minutes at most (08 section 4.2); true once the budget is spent, until active or fn changes. */
+export function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
   const [expired, setExpired] = useState(false);
   useEffect(() => {
     if (!active) return;
@@ -29,7 +29,10 @@ function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
       }
       void fn();
     }, 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      setExpired(false);
+    };
   }, [active, fn]);
   return expired;
 }
@@ -87,8 +90,8 @@ export function Deal({ initial, demo, paypalClientId }: Props) {
   };
   const canCancel = !!view && !view.seeded && cancellable(view.status);
   const sticky = checking ? null : primaryAction(deal);
-  // Newest first; in in_review the review panel already shows the latest attempt.
-  const proofs = view ? [...view.submissions].reverse().filter((s) => !(view.status === "in_review" && s === view.submissions.at(-1))) : [];
+  // Newest first; in in_review the review panel already shows the latest attempt (a seeded deal has no review panel).
+  const proofs = view ? [...view.submissions].reverse().filter((s) => view.seeded || !(view.status === "in_review" && s === view.submissions.at(-1))) : [];
 
   return (
     <main className={`mx-auto max-w-5xl p-4 md:p-8 ${sticky ? "pb-28 md:pb-8" : ""}`}>
@@ -106,7 +109,7 @@ export function Deal({ initial, demo, paypalClientId }: Props) {
           {view && proofs.map((s) => <ProofCard key={s.submission_no} sub={s} deal={view} demo={demo} />)}
         </div>
         {view && (
-          <aside className="grid content-start gap-4">
+          <aside className="grid min-w-0 content-start gap-4">
             <PayoutCard deal={view} onDone={setDeal} fail={fail} />
             <Timeline events={events} />
             <section className="hs-card grid gap-2 text-sm" aria-labelledby="more-h">
