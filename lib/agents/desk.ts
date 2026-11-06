@@ -5,7 +5,7 @@ import { signInDemoPersona } from "@/lib/auth/demo";
 import { DealError } from "@/lib/deal/errors";
 import type { Deps } from "@/lib/deal/types";
 import { formatUsd as money } from "@/lib/money";
-import { issueAgentKey, type AgentKeyRow } from "./keys";
+import { DESK_LABELS, issueAgentKey, type AgentKeyRow } from "./keys";
 import { brief, callTool, type ToolContext } from "./tools";
 
 export type DeskEvent =
@@ -39,7 +39,7 @@ async function deskKey(userId: string, label: string, max_amount_minor: number, 
 export async function deskContexts(buyerId: string, scenario: ScenarioId, deps: Deps, baseUrl: string): Promise<{ buyer: ToolContext; seller: ToolContext }> {
   const s = SCENARIOS[scenario];
   const sellerId = await signInDemoPersona("seller", deps.db, deps.clock.now());
-  const [b, se] = await Promise.all([deskKey(buyerId, "Desk buying agent", s.budget_minor, deps.db), deskKey(sellerId, "Desk selling agent", 100_000, deps.db)]);
+  const [b, se] = await Promise.all([deskKey(buyerId, DESK_LABELS.buyer, s.budget_minor, deps.db), deskKey(sellerId, DESK_LABELS.seller, 100_000, deps.db)]);
   return { buyer: { key: b, deps, baseUrl }, seller: { key: se, deps, baseUrl } };
 }
 
@@ -79,7 +79,7 @@ export async function negotiate(id: ScenarioId, deps: Pick<Deps, "ai">, emit: Em
       if (agreed !== null) return agreed;
     }
   }
-  return null;
+  return turn("buyer"); // the seller spoke last: its final offer still gets an answer
 }
 
 async function step(agent: "buyer" | "seller", name: string, args: Record<string, unknown>, c: ToolContext, emit: Emit, summarize: (r: ReturnType<typeof brief>) => string) {

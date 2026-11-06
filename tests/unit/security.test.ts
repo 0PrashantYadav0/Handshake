@@ -1,7 +1,7 @@
 // Fixes from the T-45 security review.
 import { describe, expect, it } from "vitest";
 import { safeNext } from "@/lib/auth/magic-link";
-import { allow } from "@/lib/rate-limit";
+import { allow, clientIp } from "@/lib/rate-limit";
 import { buildExtractMessages, buildJudgeMessages } from "@/lib/ai/prompts";
 
 describe("safeNext", () => {
@@ -18,6 +18,23 @@ describe("allow", () => {
     expect(allow("k", 2, 1000, t0 + 1)).toBe(true);
     expect(allow("k", 2, 1000, t0 + 2)).toBe(false);
     expect(allow("k", 2, 1000, t0 + 1001)).toBe(true);
+  });
+
+  it("holds 50,000 buckets: a flood of new keys drops the idlest, not the ones in use", () => {
+    const t0 = 2_000_000;
+    allow("idle", 1, 1000, t0);
+    allow("busy", 1, 1000, t0);
+    for (let i = 0; i < 49_999; i++) {
+      allow(`flood-${i}`, 1, 1000, t0);
+      if (i === 100) expect(allow("busy", 1, 1000, t0)).toBe(false); // used again: moved to the back of the line
+    }
+    expect(allow("idle", 1, 1000, t0)).toBe(true); // forgotten
+    expect(allow("busy", 1, 1000, t0)).toBe(false);
+  });
+
+  it("keeps a hostile X-Forwarded-For value short", () => {
+    const req = new Request("http://x", { headers: { "x-forwarded-for": `${"1".repeat(5000)}, 10.0.0.1` } });
+    expect(clientIp(req)).toHaveLength(64);
   });
 });
 

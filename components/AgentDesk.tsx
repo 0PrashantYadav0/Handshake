@@ -3,6 +3,7 @@
 // then streams the delivery and follows the deal to its end.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePoll } from "@/components/deal/Deal";
 import { PayButton } from "@/components/deal/PayButton";
 import { StatusPill } from "@/components/StatusPill";
 import type { brief } from "@/lib/agents/tools";
@@ -13,7 +14,8 @@ import type { DealStatus } from "@/lib/deal/types";
 
 type Brief = ReturnType<typeof brief>;
 type Line = DeskEvent & { n: number };
-const TERMINAL = ["paid", "voided", "in_review"];
+const TERMINAL = ["paid", "voided"];
+const motion = (): ScrollBehavior => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
 
 const CARDS: { id: ScenarioId; title: string; line: string; budget: string }[] = [
   { id: "honest", title: "An honest seller", line: "The agents haggle over a mug. The real item ships, the proof checks out, the rule releases the money.", budget: "Mandate: at most $20" },
@@ -24,8 +26,11 @@ const CARDS: { id: ScenarioId; title: string; line: string; budget: string }[] =
 const OUTCOME: Record<string, string> = {
   paid: "Paid. Two agents made the deal; PayPal moved the money only after a person approved the hold and the proof passed.",
   voided: "Voided. The wrong item failed twice, so the hold was released. The buyer was never charged and the seller got nothing.",
-  in_review: "A person decides. Claude was not sure enough, so no agent and no model can release this payment.",
+  in_review: "You decide: open the deal to release or reject. Claude was not sure enough, so no agent and no model can release this payment.",
 };
+const VOIDED_OTHERWISE = "Voided. The hold was released, so the buyer was never charged and the seller got nothing.";
+const GATE_PROMPT = "The agents have stopped. Approve the hold at PayPal to go on.";
+const DELIVERING = "The selling agent is submitting proof and Claude is judging it. This can take a minute.";
 
 function Bubble({ line }: { line: Extract<DeskEvent, { t: "say" | "guard" | "tool" }> }) {
   const left = line.agent === "buyer";
@@ -57,12 +62,23 @@ export function AgentDesk({ clientId }: { clientId: string }) {
   const [deal, setDeal] = useState<Brief | null>(null);
   const [status, setStatus] = useState<DealStatus | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
+  const [approving, setApproving] = useState(false); // an approval came back with an error: the hold may still land
+  const delivered = useRef(false);
   const seq = useRef(0);
   const end = useRef<HTMLLIElement>(null);
+  const section = useRef<HTMLElement>(null); // the gate or the result, whichever shows
+  const gateHeading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    void end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    void end.current?.scrollIntoView({ behavior: motion(), block: "nearest" });
   }, [lines.length]);
+
+  useEffect(() => {
+    if (!gate || !status) return;
+    section.current?.scrollIntoView({ behavior: motion(), block: "center" });
+    if (status === "terms_agreed") gateHeading.current?.focus({ preventScroll: true });
+  }, [gate, status]);
 
   const read = useCallback(async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -100,59 +116,83 @@ export function AgentDesk({ clientId }: { clientId: string }) {
     }
   }, []);
 
-  // After the delivery, follow the deal: capture and payout arrive by webhook.
-  useEffect(() => {
-    if (!gate || !status || status === "terms_agreed" || TERMINAL.includes(status)) return;
-    const t = setInterval(async () => {
-      const d = await api<{ status: DealStatus }>(`/api/deals/${gate.code}`).catch(() => null);
-      if (d) setStatus(d.status);
-    }, 3000);
-    return () => clearInterval(t);
-  }, [gate, status]);
-
   const start = () => {
     setLines([]);
     setGate(null);
     setDeal(null);
     setStatus(null);
+    setPollError(null);
+    setApproving(false);
+    delivered.current = false;
     read({ scenario, step: "negotiate" });
   };
-  const onHeld = () => {
+  const onHeld = useCallback(() => {
+    if (delivered.current || !gate) return; // the approval's answer and a poll can both report the hold
+    delivered.current = true;
     setStatus("held");
-    read({ scenario, step: "deliver", code: gate!.code });
+    read({ scenario, step: "deliver", code: gate.code });
+  }, [gate, read, scenario]);
+
+  // Follow the deal: capture and payout arrive by webhook, and so can a hold whose approval answered with an error.
+  const poll = useCallback(async () => {
+    if (!gate) return;
+    try {
+      const d = await api<{ status: DealStatus }>(`/api/deals/${gate.code}`);
+      setPollError(null);
+      if (status === "terms_agreed" && d.status === "held") onHeld();
+      else setStatus(d.status);
+    } catch (e) {
+      setPollError(errorCopy(e));
+    }
+  }, [gate, status, onHeld]);
+  const following = !!gate && !!status && !busy && !TERMINAL.includes(status) && (status !== "terms_agreed" || approving);
+  const expired = usePoll(following, poll);
+  const onFail = (e: unknown) => {
+    setMessage(errorCopy(e));
+    setApproving(true);
+    void poll();
   };
+
   const started = lines.length > 0 || busy;
+  const locked = busy || (!!gate && status === "terms_agreed");
+  const delivering = busy && !!gate && status !== "terms_agreed";
+  const outcome = status === "voided" && deal?.latest_decision !== "void" ? VOIDED_OTHERWISE : status && OUTCOME[status];
+  const announce = message ?? pollError ?? (delivering ? DELIVERING : gate && status === "terms_agreed" ? GATE_PROMPT : outcome) ?? "";
 
   return (
     <div className="flex flex-col gap-5">
+      <div role="status" className="sr-only">{announce}</div>
       <div className="grid gap-3 md:grid-cols-3" role="radiogroup" aria-label="Scenario">
         {CARDS.map((c) => (
-          <button key={c.id} type="button" role="radio" aria-checked={scenario === c.id} disabled={busy} onClick={() => setScenario(c.id)} data-testid={`desk-${c.id}`}
-            className={`hs-card p-4 text-left transition-colors ${scenario === c.id ? "ring-2 ring-[var(--hs-accent)]" : "opacity-80 hover:opacity-100"}`}>
+          <label key={c.id} data-testid={`desk-${c.id}`}
+            className="hs-card block cursor-pointer p-4 text-left transition-colors has-checked:ring-2! has-checked:ring-[var(--hs-accent)] has-disabled:cursor-not-allowed has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-[var(--hs-accent)]">
+            <input type="radio" name="scenario" className="sr-only" checked={scenario === c.id} disabled={locked} onChange={() => setScenario(c.id)} />
             <span className="block font-semibold">{c.title}</span>
             <span className="hs-help mt-1 block">{c.line}</span>
             <span className="mt-2 block font-mono text-xs text-[var(--hs-accent)]">{c.budget}</span>
-          </button>
+          </label>
         ))}
       </div>
       <div>
-        <button type="button" className="hs-btn" onClick={start} disabled={busy || (!!gate && status === "terms_agreed")} data-testid="desk-start">{busy ? "The agents are working…" : started ? "Run it again" : "Start the agents"}</button>
+        <button type="button" className="hs-btn" onClick={start} disabled={locked} data-testid="desk-start">{busy ? "The agents are working…" : started ? "Run it again" : "Start the agents"}</button>
       </div>
       {started && (
         <ol className="hs-card flex flex-col gap-2.5 p-4 md:p-5" aria-live="polite" data-testid="desk-feed">
           {lines.map((l) => <Bubble key={l.n} line={l as Extract<DeskEvent, { t: "say" | "guard" | "tool" }>} />)}
-          {busy && <li className="hs-help text-center" aria-hidden>…</li>}
+          {busy && <li className="hs-help text-center" aria-hidden>{delivering ? DELIVERING : "…"}</li>}
           <li ref={end} />
         </ol>
       )}
 
-      {message && <p className="hs-banner" data-tone="info" role="status" data-testid="desk-message">{message}</p>}
+      {message && <p className="hs-banner" data-tone="info" data-testid="desk-message">{message}</p>}
+      {pollError && <p className="hs-banner" data-tone="info" data-testid="desk-poll-error">{pollError}</p>}
+      {following && expired && <div><button type="button" className="hs-link text-sm" onClick={() => void poll()} data-testid="desk-check">Check again</button></div>}
 
       {gate && status === "terms_agreed" && (
-        <section className="hs-card border-[var(--hs-accent)] p-5" data-testid="desk-gate">
-          <h2 className="hs-display text-2xl">The agents stop here. This part is yours.</h2>
+        <section ref={section} className="hs-card border-[var(--hs-accent)] p-5" data-testid="desk-gate">
+          <h2 ref={gateHeading} tabIndex={-1} className="hs-display text-2xl">The agents stop here. This part is yours.</h2>
           <p className="hs-help mt-1 mb-4 text-[0.95rem]">Only a person can approve money. Approve a hold of {money(gate.amount_minor)} at PayPal: it is held, not charged, and goes back if the proof never checks out.</p>
-          <div className="max-w-sm"><PayButton code={gate.code} clientId={clientId} onHeld={onHeld} onFail={(e) => setMessage(errorCopy(e))} /></div>
+          <div className="max-w-sm"><PayButton code={gate.code} clientId={clientId} onHeld={onHeld} onFail={onFail} /></div>
         </section>
       )}
 
@@ -171,13 +211,14 @@ export function AgentDesk({ clientId }: { clientId: string }) {
       )}
 
       {gate && status && status !== "terms_agreed" && (
-        <section className="hs-card p-5" data-testid="desk-result">
+        <section ref={section} className="hs-card p-5" data-testid="desk-result">
           <div className="flex flex-wrap items-center gap-3">
             <StatusPill status={status} />
             <Link className="hs-link text-sm" href={`/deal/${gate.code}`}>Open deal {gate.code}</Link>
             <a className="hs-link text-sm" href={`/api/deals/${gate.code}/evidence-pack`}>Evidence pack</a>
           </div>
-          {OUTCOME[status] && <p className="mt-3 text-[0.95rem]" data-testid="desk-outcome">{OUTCOME[status]}</p>}
+          {outcome && <p className="mt-3 text-[0.95rem]" data-testid="desk-outcome">{outcome}</p>}
+          {status === "in_review" && <a className="hs-btn mt-3 inline-flex items-center" href={`/deal/${gate.code}`} target="_blank" rel="noreferrer" data-testid="desk-decide">Open the deal to decide</a>}
         </section>
       )}
     </div>

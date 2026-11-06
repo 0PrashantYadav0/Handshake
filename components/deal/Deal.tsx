@@ -14,8 +14,8 @@ import { WhatNext } from "./WhatNext";
 
 type Props = { initial: DealView | DealPreview; demo: boolean; paypalClientId: string };
 
-/** Every 5 s while the tab is visible, 2 minutes at most (08 section 4.2); true once the budget is spent. */
-function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
+/** Every 5 s while the tab is visible, 2 minutes at most (08 section 4.2); true once the budget is spent, until active or fn changes. */
+export function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
   const [expired, setExpired] = useState(false);
   useEffect(() => {
     if (!active) return;
@@ -29,7 +29,10 @@ function usePoll(active: boolean, fn: () => Promise<unknown>): boolean {
       }
       void fn();
     }, 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      setExpired(false);
+    };
   }, [active, fn]);
   return expired;
 }

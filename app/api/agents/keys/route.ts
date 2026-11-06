@@ -1,11 +1,11 @@
 // GET /api/agents/keys -> the caller's agent keys; POST { label, max_usd, totp } -> a new key, its token shown once (docs/agents.md).
 import { z } from "zod";
-import { issueAgentKey, listAgentKeys } from "@/lib/agents/keys";
+import { isDeskLabel, issueAgentKey, listAgentKeys } from "@/lib/agents/keys";
 import { requireStepUp } from "@/lib/auth/mfa";
 import { getDeps } from "@/lib/deps";
 import { json, parseBody, requireSession, route } from "@/lib/http";
 
-const Body = z.object({ label: z.string().max(60), max_usd: z.number().positive().max(1000), totp: z.string().max(12) });
+const Body = z.object({ label: z.string().max(60).refine((l) => !isDeskLabel(l), "That name is reserved for the live desk."), max_usd: z.number().positive().max(1000), totp: z.string().max(12) });
 
 export const GET = route(async (req: Request) => json(await listAgentKeys((await requireSession(req)).user_id, getDeps().db)));
 

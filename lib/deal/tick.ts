@@ -13,6 +13,7 @@ import type { Deps, TickReport } from "./types";
 import { currentSubmissionNo, runVerdict } from "./verdict";
 
 const NOOP: FactResult = { outcome: "noop" };
+const UNVERIFIED_WEBHOOK_TTL_MS = 7 * 86_400_000;
 const inTx = <T>(deps: Deps, fn: (tx: Tx) => Promise<T>) => deps.db.$transaction(fn, TX_OPTIONS);
 
 export async function tick(now: Date, deps: Deps): Promise<TickReport> {
@@ -34,6 +35,11 @@ export async function tick(now: Date, deps: Deps): Promise<TickReport> {
   const r = await reconcile(now, deps);
   report.reconciled = r.reconciled;
   report.errors.push(...r.errors);
+  // Bad-signature rows are only for diagnosing a misconfigured webhook; a real event is stored again when it verifies.
+  await attempt("webhook_events", [], async () => {
+    await deps.db.webhookEvent.deleteMany({ where: { verified: false, created_at: { lt: new Date(now.getTime() - UNVERIFIED_WEBHOOK_TTL_MS) } } });
+    return false;
+  });
   return report;
 }
 

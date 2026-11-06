@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CodeInput, codeError } from "@/components/auth/CodeInput";
+import { confirm } from "@/components/ConfirmDialog";
 import { api, errorCopy } from "@/lib/client-api";
 import { money } from "@/lib/ledger-columns";
 
@@ -13,9 +14,10 @@ export function AgentKeysPanel({ keys, demo, appUrl }: { keys: KeyRow[]; demo: b
   const [label, setLabel] = useState("My shopping agent");
   const [ceiling, setCeiling] = useState("25");
   const [totp, setTotp] = useState("");
-  const [token, setToken] = useState<string | null>(null);
+  const [made, setMade] = useState<{ id: string; token: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
   const live = keys.filter((k) => !k.revoked_at);
 
   const make = async (ev: React.FormEvent) => {
@@ -23,7 +25,7 @@ export function AgentKeysPanel({ keys, demo, appUrl }: { keys: KeyRow[]; demo: b
     setBusy(true);
     setError(null);
     try {
-      setToken((await api<{ token: string }>("/api/agents/keys", { json: { label, max_usd: Number(ceiling), totp } })).token);
+      setMade(await api<{ id: string; token: string }>("/api/agents/keys", { json: { label, max_usd: Number(ceiling), totp } }));
       setTotp("");
       router.refresh();
     } catch (e) {
@@ -40,11 +42,16 @@ export function AgentKeysPanel({ keys, demo, appUrl }: { keys: KeyRow[]; demo: b
       setError(codeError(e));
     }
   };
-  const revoke = async (id: string) => {
+  const revoke = async (k: KeyRow) => {
+    if (!(await confirm({ title: "Revoke this key?", sentence: `${k.label} stops working at once. This can't be undone.`, action: "Revoke", tone: "danger" }))) return;
+    setRevoking(k.id); // stays set until the refresh removes the row: a second click would report a false error
+    setError(null);
     try {
-      await api(`/api/agents/keys/${id}/revoke`, { method: "POST" });
+      await api(`/api/agents/keys/${k.id}/revoke`, { method: "POST" });
+      setMade((m) => (m?.id === k.id ? null : m));
       router.refresh();
     } catch (e) {
+      setRevoking(null);
       setError(errorCopy(e));
     }
   };
@@ -63,10 +70,10 @@ export function AgentKeysPanel({ keys, demo, appUrl }: { keys: KeyRow[]; demo: b
         <button className="hs-btn" disabled={busy || !totp} data-testid="agent-make">Make a key</button>
       </form>
       {error && <p className="hs-banner mt-3" role="alert">{error}</p>}
-      {token && (
+      {made && (
         <div className="mt-4 rounded-lg border border-[var(--hs-accent)] p-3" data-testid="agent-token">
           <p className="text-sm font-semibold">Copy this now. It is shown once and stored only as a hash.</p>
-          <pre className="mt-2 overflow-x-auto font-mono text-xs">{`claude mcp add --transport http handshake ${appUrl}/api/mcp \\\n  --header "Authorization: Bearer ${token}"`}</pre>
+          <pre className="mt-2 overflow-x-auto font-mono text-xs">{`claude mcp add --transport http handshake ${appUrl}/api/mcp \\\n  --header "Authorization: Bearer ${made.token}"`}</pre>
         </div>
       )}
       {live.length > 0 && (
@@ -76,7 +83,7 @@ export function AgentKeysPanel({ keys, demo, appUrl }: { keys: KeyRow[]; demo: b
               <span>{k.label} <span className="font-mono text-xs text-[var(--hs-muted)]">{k.token_hint}…</span></span>
               <span className="flex items-center gap-3">
                 <span className="text-[var(--hs-muted)]">up to {money(k.max_amount_minor)}{k.last_used_at ? " · used" : ""}</span>
-                <button type="button" className="hs-btn-secondary hs-btn-danger min-h-8 rounded border text-xs" onClick={() => revoke(k.id)}>Revoke</button>
+                <button type="button" className="hs-btn-secondary hs-btn-danger min-h-8 rounded border text-xs" disabled={revoking === k.id} onClick={() => revoke(k)}>Revoke</button>
               </span>
             </li>
           ))}

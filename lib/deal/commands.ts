@@ -281,6 +281,8 @@ async function cancel(code: string, actor: Actor, deps: Deps): Promise<void> {
   const { deal, result } = await inTx(deps, async (tx) => {
     const { deal } = await loadLocked(tx, code, actor);
     if (!nextStatus(deal.status, "cancel")) throw new DealError("invalid_state", "This deal can no longer be cancelled.");
+    // auth was read before the lock: a hold placed since then was not voided above, so voiding the deal now would strand it.
+    if (deal.payment?.authorization_id && deal.payment.authorization_id !== auth) throw new DealError("invalid_state", "The hold was just placed; cancel again to void it.");
     await transition(tx, deal, "voided", role, "cancel", { authorization_id: auth, voided: auth !== null });
     const result = auth
       ? await applyFactTx(tx, deps, deal, { type: "authorization_voided", authorization_id: auth }, { source: "api", paypal_request_id: voidKey(code) })

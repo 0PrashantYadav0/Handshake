@@ -1,4 +1,4 @@
-// One negotiation turn for an agent (docs/agents.md). The model proposes; lib/agents/negotiation.ts enforces the limits in code.
+// One negotiation turn for an agent (docs/agents.md). The model proposes; lib/agents/desk.ts enforces the limits in code.
 import { z } from "zod";
 import { DealError } from "@/lib/deal/errors";
 import { AiError, callJson, type MessagesClient } from "./call-json";

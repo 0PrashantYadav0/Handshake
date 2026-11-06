@@ -32,7 +32,7 @@ const RULE = [
 ] as const;
 
 const AGENT_LINES = [
-  ["The agent", "Negotiates, signs and proves, up to its ceiling"],
+  ["The agent", "Proposes, signs and proves, up to its ceiling"],
   ["A person", "Approves the hold at PayPal and decides when Claude is unsure"],
   ["Fixed code", "Refuses anything over the mandate, then releases or voids the money"],
 ] as const;
@@ -173,7 +173,7 @@ export default async function Home() {
           <div className="mx-auto grid max-w-6xl gap-8 px-4 py-16 md:px-8 md:py-20 lg:grid-cols-[1.1fr_1fr]">
             <div>
               <h2 id="agents-h" className="hs-display text-3xl md:text-4xl">Let your AI agent buy. It still can&apos;t touch the money.</h2>
-              <p className="mt-4 max-w-xl text-[var(--hs-muted)]">Agents can haggle, propose a deal, sign the contract and submit proof, over MCP or on our live desk. Each one works under a spending ceiling that code enforces, so a prompt injection can change what a model says but not what it can spend.</p>
+              <p className="mt-4 max-w-xl text-[var(--hs-muted)]">Agents can propose a deal, sign the contract and submit proof, over MCP or on our live desk, where they haggle first. Each one works under a spending ceiling that code enforces, so a prompt injection can change what a model says but not what it can spend.</p>
               <Link href="/signin?next=/agents" className="hs-btn mt-6 inline-flex items-center">Watch two agents make a deal</Link>
             </div>
             <ul className="flex flex-col gap-3 self-center">

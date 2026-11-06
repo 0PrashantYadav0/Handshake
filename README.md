@@ -102,7 +102,7 @@ decide(verdicts, deal):
 
 Void is the one irreversible automated action against the seller, so on the second submission a `fail` voids only when the model is confident; a low-confidence `fail` goes to the buyer. Before any model call, an evidence photo whose SHA-256 matches a listing photo fails every photo condition at confidence 1 (D8). Untrusted text (notes, text inside photos) is delimited in the prompt and treated as evidence, never as instructions.
 
-Interactive tour: open [docs/overview.html](docs/overview.html) in a browser (architecture, money flow, state machine, decision simulator, env vars, status). Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions.md](docs/decisions.md), [docs/02-system-design.md](docs/02-system-design.md).
+Full design: [docs/01-requirements.md](docs/01-requirements.md), [docs/decisions.md](docs/decisions.md), [docs/02-system-design.md](docs/02-system-design.md).
 
 ## Security
 
@@ -127,7 +127,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Composed code photo | The handwritten deal-code photo in the sample evidence is composed in the browser on a canvas (a sample photo plus the deal code in the Caveat handwriting font) because codes are generated per deal. |
 | Generated sample photos | The sample photos in `public/demo/` and the eval set in `eval/cases/` are path-traced 3D renders from `scripts/demo/photo-studio/`, not photographs, so everything is ours and free of third-party marks. Claude judges them as it would any photo, and you can upload your own instead. The eval numbers below measure these renders; real phone photos are noisier. |
 | Limits | Per 10 minutes, in memory, per instance: 20 new deals (extractions) per user, 3 magic links per email and 10 per IP, 120 deal reads per user, 30 Studio agent turns per user. Over the limit the API answers `rate_limited`; the magic-link route answers `ok` either way so it does not reveal accounts. |
-| Agent limits | The live desk runs as the Demo Buyer and is limited to 12 runs per 10 minutes per account and 60 per hour overall, because it spends model tokens. In demo mode anyone can make an agent key for the shared demo personas; the ceiling and the PayPal approval still apply. |
+| Agent limits | The live desk runs as the Demo Buyer and is limited to 12 runs per 10 minutes per account and 60 per hour overall, because it spends model tokens. `POST /api/mcp` takes 120 requests per 10 minutes per user, however many keys the user has (JSON-RPC error -32002), and two requests over 1 MB at a time overall (503). `propose_deal` also counts against the 20 new deals above. In demo mode anyone can make an agent key for the shared demo personas; the ceiling and the PayPal approval still apply. |
 | Platform as merchant | The Handshake sandbox business account receives the capture and pays the seller through Payouts. A production build would use PayPal multiparty onboarding so the seller is the payee. |
 | Seeded history | The ledger and dashboard show about 25 seeded historical deals (`deals.seeded = true`) with events but no PayPal objects, so there is something to sort and chart. Deals you create are real sandbox deals. |
 | AG Studio trial | `/dashboard` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
@@ -158,7 +158,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | `claude-sonnet-5-5`, effort low, 3 repeats | judge-v1 | 30 (90 runs) | 87/90 (96.7%) | 0 of 63 | p50 3.5 s, p95 4.8 s | 2026-11-05 |
 | `claude-sonnet-5-5`, effort low, second run | judge-v1 | 30 | 29/30 (96.7%) | 0 of 21 | p50 3.4 s, p95 4.1 s | 2026-11-05 |
 
-Results: `eval/results/20261105-1819-claude-sonnet-5-5-low.json` and `20261105-1820-claude-sonnet-5-5-low.json`. Every miss is one case Claude passed at 0.80, under the 0.85 threshold, so a person decides: the safe direction. Both prompt-injection cases held in every run, and no case changed decision between repeats. Extraction (extract-v1) matched 10 of 10 sentences. An earlier run with two wrong captures is kept in `eval/results/`; it traced to two bad test photos, as explained in [eval/README.md](eval/README.md).
+Results: `eval/results/20261105-1819-claude-sonnet-5-5-low.json` and `20261105-1820-claude-sonnet-5-5-low.json`. Every miss is one case Claude passed at 0.80, under the 0.85 threshold, so a person decides: the safe direction. Both prompt-injection cases held in every run, and no case changed decision between repeats. Extraction (extract-v1) matched 10 of 10 sentences in a separate run: `eval/results/20261015-1142-claude-sonnet-5-5-low.json`, 2026-10-15. An earlier run with two wrong captures is kept in `eval/results/`; it traced to two bad test photos, as explained in [eval/README.md](eval/README.md).
 
 The eval photos are generated renders of eight original items (see Disclosures), so these numbers don't promise the same result on phone photos.
 
@@ -208,7 +208,7 @@ Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && 
 npm test                               # unit: state machine, decide(), facts, webhook verification, session, carrier
 npm run test:int                       # integration against handshake_test, serial: routes, flows, payment, webhooks, tick, rate limits, Studio agent
 npx playwright install chromium        # once
-E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npm run test:e2e
+E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test happy-path
                                        # builds and starts the app, runs the judge happy path end to end (sandbox personal account 1);
                                        # without the two variables it runs up to the PayPal popup and skips the rest
 PLAYWRIGHT_BASE_URL=https://<host> E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test agents

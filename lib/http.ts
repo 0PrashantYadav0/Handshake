@@ -26,13 +26,34 @@ export async function requireAnySession(req: Request): Promise<Actor & { mfa: bo
   return { user_id: c.sub, mfa: c.mfa };
 }
 
+/** The body as a Response to read once, or null past maxBytes. A chunked request has no Content-Length, so the bytes are counted as they arrive. */
+export async function readCapped(req: Request, maxBytes: number): Promise<Response | null> {
+  if (Number(req.headers.get("content-length")) > maxBytes) return null;
+  const reader = req.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel(); // the rest is never read, let alone buffered
+      return null;
+    }
+    chunks.push(value);
+  }
+  // Handed over as a stream: concatenating here and again in the reader held two more copies of a 17 MB body at once.
+  return new Response(new ReadableStream({ start(c) { chunks.forEach((x) => c.enqueue(x)); c.close(); } }), { headers: req.headers });
+}
+
 /** JSON body -> trimmed strings -> Zod. Throws invalid_input on a bad body. Unknown fields are ignored. */
 export const MAX_JSON_BYTES = 256 * 1024;
 export async function parseBody<T>(schema: z.ZodType<T>, req: Request): Promise<T> {
-  if (Number(req.headers.get("content-length")) > MAX_JSON_BYTES) throw new DealError("invalid_input", "Body too large.");
+  const body = await readCapped(req, MAX_JSON_BYTES);
+  if (!body) throw new DealError("invalid_input", "Body too large.");
   let raw: unknown;
   try {
-    raw = await req.json();
+    raw = await body.json();
   } catch {
     throw new DealError("invalid_input", "Body must be JSON.");
   }
