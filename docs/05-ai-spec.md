@@ -1264,21 +1264,24 @@ An extraction case matches when `amount_minor`, `currency` and `deadline_days` a
 
 ### 9.3 Runner
 
-`npm run eval` is `tsx eval/run.ts`. It refuses to start without `ANTHROPIC_API_KEY`. It never runs under `vitest`.
+`npm run eval` is `tsx eval/run.ts`. It refuses to start without `ANTHROPIC_API_KEY`, unless `--dry`. It never runs under `vitest`.
 
 ```
-npm run eval -- [--job verdict|extract|all] [--model <id>] [--effort low|medium|high]
-                [--repeats <n>] [--case <name>] [--concurrency <n>]
+npm run eval -- [--cases <dir>] [--only <prefix>] [--effort low|medium|high]
+                [--repeats <n>] [--concurrency <n>] [--extract] [--dry]
 ```
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--job` | `all` | which fixture set to run |
-| `--model` | `AI_MODEL` or `claude-sonnet-5-5` | the runner sets `process.env.AI_MODEL` to this value before the first call, so `model()` returns it for both jobs |
+| `--cases` | `eval/cases` | the folder of case folders |
+| `--only` | all | one case name or a group prefix such as `injection-`, matched against the start of the folder name |
 | `--effort` | `low` | passed to `judge()` as its `effort` override; extraction stays at `low` |
 | `--repeats` | 1 | how many times each case runs; 3 for a comparison run |
-| `--case` | all | one case name or a group prefix such as `injection-` |
 | `--concurrency` | 3 | cases in flight at once (research "9 > Rate limits": run evals at about 3 to 5, not 30) |
+| `--extract` | off | also runs `eval/extract/sentences.json` through `extract()`, once each, after the verdict cases; there is no extraction-only mode |
+| `--dry` | off | assembles the inputs, applies the D8 hash check and prints them, with no API call |
+
+The model is not a flag: `model()` reads `AI_MODEL`, default `claude-sonnet-5-5`, for every job, so a challenger run is `AI_MODEL=claude-opus-5-5 npm run eval`.
 
 For each verdict case and repeat the runner: reads the folder, builds a `JudgeInput` exactly as `lib/deal/` would (hashes computed from the file bytes, MIME from the extension, `carrier_status` from `carrierStatus()`), runs `hashCheck(input) ?? await judge(input, client, { effort })` in the same order as `lib/deal/verdict.ts` (so the two byte-identical `listing-reused` cases exercise the D8 path with no model call), calls `decide()` with the case's `amount_minor`, `fix_attempts_used`, conditions and the literal limits `{ passThreshold: 0.85, autoCaptureMaxMinor: 20000 }`, and records `decision` and `reason`, per-condition results and confidences, `raw_response.usage`, `latency_ms`, `error.kind` and `stop_category`. Extraction cases call `extract()` with the sentence and the fixture date.
 
@@ -1316,8 +1319,8 @@ The default is `claude-sonnet-5-5` at `low` (D1, D3). The challengers (D1; resea
 | --- | --- | --- |
 | Baseline | `npm run eval -- --repeats 3` | Does Sonnet at low meet the budget? |
 | Sonnet, more thinking | `npm run eval -- --effort medium --repeats 3` | Does `medium` cut the blurry-group misses, and does p95 stay in budget? |
-| Opus, accuracy challenger | `npm run eval -- --model claude-opus-5-5 --effort low --repeats 3` | Is better vision worth about twice the cost and "Moderate" latency? |
-| Haiku, extraction challenger | `npm run eval -- --job extract --model claude-haiku-5-5 --repeats 3` | Can the cheapest model do job 1? |
+| Opus, accuracy challenger | `AI_MODEL=claude-opus-5-5 npm run eval -- --effort low --repeats 3` | Is better vision worth about twice the cost and "Moderate" latency? |
+| Haiku, extraction challenger | `AI_MODEL=claude-haiku-5-5 npm run eval -- --extract` (runs the verdict cases too) | Can the cheapest model do job 1? |
 
 Selection rule, applied in order to the verdict runs: wrong-capture rate must be 0; then the highest decision-match rate; then the lowest p95 latency. A configuration whose p95 is above 12 s is out regardless (17 s timeout, minus headroom for a cold grammar compile and for the PayPal call that follows in the same request). The winner's model id goes into `AI_MODEL` on Render and its effort into `JUDGE_EFFORT`; a Haiku win for extraction is not usable without a second env var, so Haiku is a cost note in the README unless it also wins job 2. The whole sweep costs about $30 to $35 (research "9 > Cost estimates").
 
@@ -1388,6 +1391,6 @@ Choices made here because [decisions.md](decisions.md) does not decide them. Eac
 12. **Injection eval cases.** D11 fixes two; the buyer-side vector (instructions inside a condition) shares `injection-02` with the seller-side note vector, expected `capture`, instead of adding a third case. The no-references case is `blurry-04-no-references`, inside the blurry group's four, so D12's 30 cases hold.
 13. **Storage of extraction metadata.** `source_text`, `model`, `prompt_version` and `rejected` go into the `payload` of the deal-creation `deal_events` row; the extraction raw response is not stored.
 14. **Effort is a code constant** (`JUDGE_EFFORT = "low"`), overridable only through the eval runner's `--effort` flag; no env var, because J3 lists none.
-15. **Eval additions.** Ten extraction sentences in `eval/extract/sentences.json`; a `--job` flag; result files committed under `eval/results/`; p95 limit of 12 s for a configuration to qualify; `correct-08-*` is the 10-image case.
+15. **Eval additions.** Ten extraction sentences in `eval/extract/sentences.json`; an `--extract` flag; result files committed under `eval/results/`; p95 limit of 12 s for a configuration to qualify; `correct-08-*` is the 10-image case.
 16. **No warm-up call.** The grammar cache lasts 24 h from last use and `tick` may do nothing beyond B7, so cold-compile latency is measured by the eval (10.3) rather than hidden by a warm-up.
 17. **File locations.** `lib/carrier.ts` for the D7 mock, `lib/deal/decide.ts` for the decision function, `lib/deal/verdict.ts` for the hash check and `runVerdict()`, `lib/deal/terms.ts` for the code condition, `lib/deal/errors.ts` for `DealError`, `lib/env.ts` for `LIMITS`, `lib/ai/*` as listed in section 1.

@@ -83,7 +83,7 @@ Nothing under `public/` is git-ignored, so `fonts/OFL.txt` needs no `.gitignore`
 
 ## 2. Environment variables
 
-These nineteen names (J3) are the whole configuration; `.env.example` lists each with an empty value and nothing else.
+These twenty names (J3) are the whole configuration; `.env.example` lists each with an empty value, plus one comment line on `DATA_KEYS`.
 
 | Name | Purpose | Example format | Local (`.env`) | Render (`render.yaml`) |
 | --- | --- | --- | --- | --- |
@@ -91,6 +91,7 @@ These nineteen names (J3) are the whole configuration; `.env.example` lists each
 | `APP_URL` | Public base URL in share links and magic links | `https://handshake.onrender.com` | `http://localhost:3000` | `sync: false`; confirm after the first deploy |
 | `SESSION_SECRET` | Signs the `hs_session` HS256 JWT (F1) | 44-character base64 | `openssl rand -base64 32` | `generateValue: true` |
 | `FILE_URL_SECRET` | HMAC key for signed `GET /api/files/{id}` URLs (B6) | 44-character base64 | `openssl rand -base64 32` | `generateValue: true` |
+| `DATA_KEYS` | Field encryption keyring (`lib/crypto/seal.ts`): the first key encrypts, any listed key decrypts. Never change a key in place: prepend a new one, deploy, run `npm run reseal` | one secret of at least 32 characters, or `k2:<secret>,k1:<secret>` | `openssl rand -base64 32` | `generateValue: true` |
 | `PAYPAL_CLIENT_ID` | Sandbox REST app client id, server side | long alphanumeric | app `handshake-local` (section 3.1) | `sync: false`; app `handshake` |
 | `PAYPAL_CLIENT_SECRET` | Sandbox REST app secret | long alphanumeric | app `handshake-local` | `sync: false`; app `handshake` |
 | `PAYPAL_API_BASE` | REST base URL [paypal: 11] | `https://api-m.sandbox.paypal.com` | that value | `value:` |
@@ -130,7 +131,7 @@ Source: [paypal: 9 "Sandbox setup"], [paypal: 5 "Sandbox requirements"], [paypal
 1. Log in at developer.paypal.com and switch the dashboard to **Sandbox**.
 2. **Testing Tools > Sandbox Accounts.** A business account (`sb-xxxx@business.example.com`) and a personal account (`sb-xxxx@personal.example.com`) already exist; the default balance of a generated account is UNVERIFIED [paypal: 5 "Sandbox requirements"]. Do not use the generated personal account as the buyer. Click **Create account > Create Custom Account** and create a **personal** account with the largest balance the form allows: custom balances are available only there [paypal: 5 "Sandbox requirements"]. Every judge deal authorizes against this balance, and an abandoned deal keeps its hold until `tick` voids it at `deadline_at` (B7), so holds pile up during 2026-12-01 to 12-15. Repeat **Create Custom Account** for a **business** account with the largest balance the form allows: captures land in it net of PayPal's fee and every payout plus its $0.25 item fee leaves it (step 5), so the generated business account's UNVERIFIED default would run dry during judging. Then click **Create account** once more for a second **personal** account (a generated one is fine; it only receives payouts). Country US, currency USD for all three [paypal: 11]. The generated accounts stay unused. Roles from now on: business = Handshake merchant (E10); personal 1 = the custom-balance buyer who logs into the PayPal popup; personal 2 = the seller's payout receiver (`DEMO_SELLER_PAYPAL_EMAIL`).
 3. For each personal account, open **⋮ > View/Edit Account** and record the email and the system-generated password. Personal 1 goes in the README and in the Devpost text description (E9; section 8 recovery row); personal 2's email goes in `DEMO_SELLER_PAYPAL_EMAIL`. Log in once at https://www.sandbox.paypal.com with each to confirm they work, note the business balance (the default amount is UNVERIFIED) and confirm personal 1 shows the custom balance.
-4. **Apps & Credentials > Create App.** Name `handshake`, Type **Merchant**, linked to the custom-balance business account from step 2. Copy **Client ID** and **Secret**. Repeat for a second app named `handshake-local`. Two apps, because webhooks are delivered per app [paypal: 11]: the Render deployment and the local machine each get only their own events.
+4. **Apps & Credentials > Create App.** Name `handshake`, Type **Merchant**, linked to the custom-balance business account from step 2. Copy **Client ID** and **Secret**. One app serves local and hosted (Assumption 2). Webhooks are delivered per app [paypal: 11], so a second app is needed only if local webhook tests must never reach the hosted one.
 5. Day-1 Payouts check (E11). Run the token call and confirm the `scope` string contains `https://uri.paypal.com/payments/payouts` [paypal: 1]:
 
    ```bash
@@ -200,9 +201,9 @@ Source: [stack: 5 "Render"], [stack: "Implications for Handshake"], [hackathon.m
 1. Sign up at render.com with the GitHub account that owns `0PrashantYadav0/Handshake`. Stay on the Hobby workspace ($0). Do not upgrade to Pro ($25/mo).
 2. Claim the $50 hackathon credit through the Render claim link on the Devpost resources page. The next day, open **Billing** and confirm the credit shows; whether it applies to every line item is UNVERIFIED [stack: 5(c)].
 3. **Blueprints > New Blueprint Instance**, connect the repository, branch `main`. Render reads `render.yaml` (section 5) and prompts once for every `sync: false` value. Enter them from section 2; for `PAYPAL_WEBHOOK_ID` enter `pending` and for `AG_GRID_LICENSE_KEY` enter nothing. Click **Apply**. This creates the web service `handshake`, the database `handshake-db` and the cron job `handshake-tick`.
-4. Wait for build, then pre-deploy (`npx prisma migrate deploy`), then live. Open `https://<host>/api/health` and expect `200`. Then open **handshake-tick > Environment** and confirm `APP_HOST` equals the web service's host: the research documents `fromService: { envVarKey }` [stack: 5(a)] but not that it resolves a built-in variable such as `RENDER_EXTERNAL_HOSTNAME` across services, so this is UNVERIFIED. If `APP_HOST` is empty, change the cron's `APP_HOST` in `render.yaml` to `sync: false`, re-apply the Blueprint and paste the host; without it `tick` never runs and no deadline is ever voided.
+4. Wait for build, then pre-deploy (`npx prisma migrate deploy && npm run seed`), then live. Open `https://<host>/api/health` and expect `200`. Then open **handshake-tick > Environment** and confirm `APP_HOST` equals the web service's host: the research documents `fromService: { envVarKey }` [stack: 5(a)] but not that it resolves a built-in variable such as `RENDER_EXTERNAL_HOSTNAME` across services. The hosted cron does reach the app (issue 20), but nothing records whether Render filled `APP_HOST` or it was typed by hand. If `APP_HOST` is empty, change the cron's `APP_HOST` in `render.yaml` to `sync: false`, re-apply the Blueprint and paste the host; without it `tick` never runs and no deadline is ever voided.
 5. Create the webhook (section 3.1 step 6) with that host, then in **handshake > Environment** set `PAYPAL_WEBHOOK_ID` and correct `APP_URL` if the host differs from `https://handshake.onrender.com`. Saving triggers a deploy.
-6. Seed the hosted database once: **handshake > Shell**, run `npm run seed`. Re-running is harmless (section 1, `prisma/seed.ts`).
+6. The seed needs no step of its own: `preDeployCommand` runs `npm run seed` before each deploy, and re-running is harmless (section 1, `prisma/seed.ts`).
 7. Later secrets never go in `render.yaml`; `sync: false` values are prompted only at first creation and are edited in the dashboard afterwards.
 8. Render deploys every push to `main` (section "Assumptions", item 6). Playwright runs locally before each push (J4).
 
@@ -269,6 +270,7 @@ A fresh clone runs in under ten minutes with these steps in this order.
    APP_URL=http://localhost:3000
    SESSION_SECRET=            # openssl rand -base64 32
    FILE_URL_SECRET=           # openssl rand -base64 32
+   DATA_KEYS=                 # openssl rand -base64 32
    PAYPAL_CLIENT_ID=          # app handshake-local, section 3.1 step 4
    PAYPAL_CLIENT_SECRET=      # app handshake-local
    PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
@@ -353,7 +355,7 @@ services:
     runtime: node
     plan: 0.5c-512mb                       # $7/mo; never spins down
     buildCommand: npm ci && npm run build  # build = prisma generate && next build
-    preDeployCommand: npx prisma migrate deploy
+    preDeployCommand: npx prisma migrate deploy && npm run seed  # seed is idempotent: personas upserted, 25 historical deals written once
     startCommand: npm run start            # next start; Render sets PORT=10000
     healthCheckPath: /api/health
     envVars:
@@ -366,6 +368,8 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: FILE_URL_SECRET
+        generateValue: true
+      - key: DATA_KEYS # field encryption; never change it in place, prepend a new kid:secret to rotate
         generateValue: true
       - key: CRON_SECRET
         generateValue: true
@@ -409,7 +413,7 @@ services:
       -H "Authorization: Bearer $CRON_SECRET"
       "https://$APP_HOST/api/jobs/tick"
     envVars:
-      - key: APP_HOST                      # UNVERIFIED: cross-service envVarKey to a built-in variable; see 3.4 step 4
+      - key: APP_HOST                      # cross-service envVarKey to a built-in variable. The hosted cron reaches the app; who filled this value is not recorded (07 section 3.4 step 4)
         fromService:
           name: handshake
           type: web
@@ -442,7 +446,7 @@ Why each line is what it is [stack: 5, "Implications for Handshake"]:
 | `0.1c-256mb` | Free Postgres expires 30 days after creation and is deleted after a 14-day grace period, before judging. |
 | no PgBouncer | `pg` Pool `max: 10` on one instance against 100 allowed connections. |
 
-Deploy flow: push to `main` → `npm ci && npm run build` → `npx prisma migrate deploy` → `next start` → health check → traffic switches. Zero-downtime deploys mean the old build runs against the new schema for a moment, so migrations stay backward compatible with the previous build; there are no migrations at all after 2026-11-11 (section 8).
+Deploy flow: push to `main` → `npm ci && npm run build` → `npx prisma migrate deploy && npm run seed` → `next start` → health check → traffic switches. Zero-downtime deploys mean the old build runs against the new schema for a moment, so migrations stay backward compatible with the previous build; there are no migrations at all after 2026-11-11 (section 8).
 
 ## 6. CI
 
@@ -468,6 +472,7 @@ jobs:
       APP_URL: http://localhost:3000
       SESSION_SECRET: ci-only-session-secret-at-least-32-chars
       FILE_URL_SECRET: ci-only-file-url-secret-at-least-32-chars
+      DATA_KEYS: k1:ci-only-data-key-at-least-32-characters-long
       CRON_SECRET: ci-only-cron-secret-at-least-32-characters
       PAYPAL_CLIENT_ID: ci
       PAYPAL_CLIENT_SECRET: ci
@@ -496,7 +501,7 @@ jobs:
       - run: npm run build
 ```
 
-Every one of the nineteen J3 names is set to a dummy value so `next build` and the adapters' constructors never fail on a missing name; none is used by a test, because the integration tests swap in fakes through `deps` (B3), so no real PayPal, Anthropic or Resend key exists in CI. `TEST_DATABASE_URL` is the test runner's own variable (section 4 step 8), not a J3 name. `npx prisma migrate deploy` is not a workflow step: `tests/int/global-setup.ts` runs it. `actions/checkout@v7` and `actions/setup-node@v7` are the current releases [stack: "Pinned versions"].
+Every one of the twenty J3 names is set to a dummy value so `next build` and the adapters' constructors never fail on a missing name; none is used by a test, because the integration tests swap in fakes through `deps` (B3), so no real PayPal, Anthropic or Resend key exists in CI. `TEST_DATABASE_URL` is the test runner's own variable (section 4 step 8), not a J3 name. `npx prisma migrate deploy` is not a workflow step: `tests/int/global-setup.ts` runs it. `actions/checkout@v7` and `actions/setup-node@v7` are the current releases [stack: "Pinned versions"].
 
 ## 7. Monthly cost
 
@@ -531,7 +536,7 @@ Rules from 2026-11-11 (submission) to 2026-12-15 (end of judging):
 3. Environment variable edits are allowed only to paste a longer AG Studio key or to rotate a leaked secret. Each edit redeploys the same commit.
 4. Spend caps stay on: Anthropic $75/month; Render stays on Hobby with the three services above and nothing else; Resend stays on the free tier; the Postgres disk stays at 5 GB.
 5. No live deals are pre-made (A2). Judges create deals on demand; `tick` voids any `held` or `in_review` deal past `deadline_at` within 10 minutes (B7), so nothing outlives its 29-day PayPal hold.
-6. The sandbox accounts, the two REST apps and the Render webhook are never edited or deleted. The `handshake-local` app may change freely; it delivers nothing to Render.
+6. The sandbox accounts, the REST app and the Render webhook are never edited or deleted. A tunnel webhook on that app may change freely; the Render webhook stays as it is.
 
 Weekly check, every Monday from 2026-11-16 to 2026-12-14, about 15 minutes:
 
@@ -562,7 +567,7 @@ Repository and licence (A3, [hackathon.md](hackathon.md)):
 - [ ] `github.com/0PrashantYadav0/Handshake` is public (it is private as of 2026-10-09).
 - [ ] `LICENSE` at the repo root holds the unmodified MIT text with `Copyright (c) 2026 Prashant Kumar Yadav`, and GitHub's About section shows "MIT license" [stack: 12].
 - [ ] No secret in the repo history, the client bundle or the logs: `.env` is gitignored, `git log -p -S 'sk-ant-'` and `-S 're_'` find nothing, the only `NEXT_PUBLIC_` variable is the PayPal client id.
-- [ ] `.env.example` lists the nineteen names in section 2 with no values.
+- [ ] `.env.example` lists the twenty names in section 2 with no values.
 
 Code and tests (A5, J4, D12):
 
@@ -704,13 +709,13 @@ The angle-bracket values in the outline are filled from sections 3.1 and 5 at su
 Choices this document makes that [decisions.md](decisions.md) does not fix. Each is the simplest option consistent with it.
 
 1. The Prisma client is generated into `generated/prisma/` at the repo root (git-ignored, imported as `@/generated/prisma/client`, as in [dependencies.md](dependencies.md) and [02-system-design.md](02-system-design.md) section 4); the singleton lives in `lib/db.ts`. Neither is a module named in B2, so `lib/db.ts` is a single file beside the modules.
-2. Two sandbox REST apps (`handshake` for Render, `handshake-local` for development), each with one webhook, because PayPal delivers webhooks per app; this keeps local events off the hosted database and vice versa.
+2. One sandbox REST app serves local and hosted (issue 1, 2026-10-15), not the planned `handshake` and `handshake-local` pair. PayPal delivers webhooks per app, so local webhook testing can reach the hosted app and the reverse; a second app is needed only if that must never happen. Where this document still names either app, read the one app.
 3. A verified webhook event that matches no deal (simulator mocks, or events for another environment) is stored in `webhook_events`, marked processed and answered `200`, not `500`, so PayPal does not retry it for three days.
 4. The Anthropic monthly spend limit is $75, set in the Console; the research confirms the Start-tier $500 cap but not the name of the Console page where a lower limit is set.
 5. `TEST_DATABASE_URL` is a test-runner variable (default `postgresql://postgres:postgres@localhost:5432/handshake_test`), not in J3 or `.env.example`; [06-test-plan.md](06-test-plan.md) owns the Vitest config and global-setup.
 6. Render's auto-deploy on push to `main` is left at its default; the deploy freeze is enforced by not pushing, not by a dashboard setting.
 7. `PAYPAL_WEBHOOK_ID` is entered as `pending` at Blueprint creation and replaced in the dashboard after the first deploy, because the webhook URL needs the Render host first.
-8. The cron service has one extra variable of its own, `APP_HOST`, filled from the web service's `RENDER_EXTERNAL_HOSTNAME`; it is not an app variable and is not in `.env.example`. Whether a cross-service `envVarKey` resolves a built-in variable is UNVERIFIED and is checked after the first Blueprint apply (section 3.4 step 4), with `sync: false` as the fallback.
-9. `npm run seed` is idempotent and is run once on Render from the service Shell; it is not part of `preDeployCommand`, which stays exactly `npx prisma migrate deploy` (J2).
+8. The cron service has one extra variable of its own, `APP_HOST`, filled from the web service's `RENDER_EXTERNAL_HOSTNAME`; it is not an app variable and is not in `.env.example`. The hosted cron reaches the app (issue 20, from `/api/status` on 2026-11-06), so `APP_HOST` works in practice. Nothing records whether the cross-service `envVarKey` filled it or it was typed by hand; the check is section 3.4 step 4, with `sync: false` as the fallback.
+9. `npm run seed` is idempotent and runs on Render as part of `preDeployCommand`, `npx prisma migrate deploy && npm run seed` (J2).
 10. The AG Studio trial is requested in the window 2026-11-01 to 2026-11-07 so the key is in place before the 2026-11-08 feature freeze and expires on or after 2026-12-16.
 11. `npm run sandbox` runs `scripts/sandbox/scenario.ts`, which takes a scenario id and `--base <url>` as in [06-test-plan.md](06-test-plan.md) "Scripts"; the spikes run through `scripts/sandbox/spike.ts` directly with `tsx`.

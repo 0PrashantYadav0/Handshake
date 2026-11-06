@@ -59,6 +59,25 @@ The seller's payout goes to a sandbox personal account. `/wallet` shows the capt
 
 Prompts to type into the `/dashboard/studio` agent panel (for example "Why was HS-7K2Q voided?") are listed in [docs/studio-prompts.md](docs/studio-prompts.md).
 
+## Screenshots
+
+From the hosted app on 2026-11-06. PayPal sandbox only.
+
+| | |
+| --- | --- |
+| **The landing page** | **One sentence becomes checkable terms** |
+| ![Handshake landing page with an example deal](docs/screenshots/01-landing.jpg) | ![Terms Claude extracted for an $18 mug, ready to edit](docs/screenshots/03-terms-from-one-sentence.jpg) |
+| **Both signatures, verified in the browser** | **The buyer approves the hold at PayPal** |
+| ![Contract page with buyer and seller signatures verified](docs/screenshots/11-contract-verified.jpg) | ![PayPal sandbox approval window for $18.00](docs/screenshots/05-paypal-approval.jpg) |
+| **Money held, nothing charged** | **Claude judges each condition, the rule decides** |
+| ![Deal page showing money held with its PayPal ids](docs/screenshots/06-money-held.jpg) | ![Three conditions passed with reasons and confidence](docs/screenshots/08-claude-verdicts.jpg) |
+| **Paid, with the PayPal ids** | **Wrong item: one condition fails, one fix allowed** |
+| ![Deal complete with order, authorization, capture and payout ids](docs/screenshots/09-paid.jpg) | ![A lamp fails the listing photo condition at 97%](docs/screenshots/12-wrong-item-fix-requested.jpg) |
+| **Claude unsure: the buyer decides** | **The Studio agent explains a void** |
+| ![Release payment and reject proof buttons on a blurry deal](docs/screenshots/14-buyer-decides.jpg) | ![AG Studio dashboard with the agent explaining why a deal was voided](docs/screenshots/2x-studio-agent.jpg) |
+| **Two agents haggle, sign and stop at PayPal** | **A prompt injection: code refuses the $95 purchase** |
+| ![Agent desk transcript ending at the PayPal approval step](docs/screenshots/16-agents-stop-at-paypal.jpg) | ![Agent desk transcript where the mandate refuses the purchase](docs/screenshots/18-agents-hijack-refused.jpg) |
+
 ## How it works
 
 ```
@@ -138,6 +157,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Demo login | Magic-link email only reaches the account owner's address (Resend test sender), so judges use the two demo personas. The seller persona's payout address comes from `DEMO_SELLER_PAYPAL_EMAIL` and is reset each time you switch to that persona, so edits on `/me` do not stick. |
 | 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the 10-minute job voids the hold. |
 | 3-day honor period | PayPal honors an authorization's funds for 3 days and allows capture for up to 29. Deals here run up to 21 days, so a capture after day 3 can be declined. A decline returns the deal to the buyer for a new try. The sandbox can't fast-forward time, so this path is tested against a fixture, not live. Production would reauthorize after day 3. |
+| Long holds, measured | One sandbox hold was captured 21 days after authorization, on its original authorization id with no reauthorization (authorization `21Y15276XD1807710`, capture `56598020KB204891K`, 2026-11-05). The planned captures on days 4 and 12 were not run, so this is one data point at the longest gap, and it is sandbox only. Sandbox Payouts needed a US sandbox business account, not a feature toggle (first app: 403 `PAYOUT_NOT_AVAILABLE`; US app: `SUCCESS`, 2026-10-15). |
 | No shipping address | Orders use `NO_SHIPPING`, so PayPal collects no address and the seller never gets one from Handshake. Nothing ships in the demo. Production would use `GET_FROM_FILE` and show the seller that address, because PayPal Seller Protection depends on shipping to the address on the transaction. |
 | No refunds | The seller is paid right after capture and Handshake has no refund step. After that, a buyer's recourse is a PayPal dispute against the platform account. Disputes are on the production list. |
 | Ignored reviews | If a buyer ignores a review, the hold is voided at the deadline, even when the parcel arrived. That favours the buyer. Production needs a neutral reviewer for this case. |
@@ -188,7 +208,7 @@ npm run seed                                             # two personas + about 
 npm run dev                                              # http://localhost:3000, click "Continue as buyer"
 ```
 
-Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point the `handshake-local` PayPal app's webhook at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
+Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point a webhook on your PayPal app at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
 
 `instrumentation.ts` checks these at server start with `lib/env.ts`. `next dev` only warns about a missing or malformed one; `next start` (production) refuses to serve and answers 500 everywhere, so a local production run needs every required name filled, even with placeholders. `npm run check-env` runs the same check without starting the server, then tries the PayPal, Anthropic and Resend keys against their services (`NODE_ENV=production npm run check-env` for the Render rules); it prints names and verdicts, never values.
 
@@ -209,7 +229,7 @@ Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point t
 
 ## Deploy it
 
-Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy && npm run seed` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). The pre-deploy step also runs the seed, which is idempotent. Register a PayPal webhook on the Render hostname for the `handshake` app. Step by step, including a manual route without the Blueprint: [docs/deploy-render.md](docs/deploy-render.md); the reasoning: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
+Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && npm run build`, `npx prisma migrate deploy && npm run seed` before each deploy), the Postgres 18 database and the cron that runs the job every 10 minutes. In Render choose **New > Blueprint**, point it at the repo, then fill the `sync: false` env vars (PayPal, Anthropic, Resend, `DEMO_SELLER_PAYPAL_EMAIL`, `AG_GRID_LICENSE_KEY`, `APP_URL`). The pre-deploy step also runs the seed, which is idempotent. Register a PayPal webhook on the Render hostname. Step by step, including a manual route without the Blueprint: [docs/deploy-render.md](docs/deploy-render.md); the reasoning: [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 5.
 
 ## Tests
 

@@ -18,14 +18,14 @@ const TERMINAL = ["paid", "voided"];
 const motion = (): ScrollBehavior => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
 
 const CARDS: { id: ScenarioId; title: string; line: string; budget: string }[] = [
-  { id: "honest", title: "An honest seller", line: "The agents haggle over a mug. The real item ships, the proof checks out, the rule releases the money.", budget: "Mandate: at most $20" },
+  { id: "honest", title: "An honest seller", line: "The agents haggle over a mug. The real item ships and the rule releases the money once the proof checks out. If a proof fails, the seller's agent gets one more try.", budget: "Mandate: at most $20" },
   { id: "cheat", title: "A seller that cheats", line: "The agents agree on a lamp, then the seller's agent submits a different lamp, twice. Watch who gets paid.", budget: "Mandate: at most $40" },
   { id: "hijack", title: "A seller that hijacks", line: "The seller's agent tells the buyer's agent its budget is now $500. Then the $95 purchase is attempted for real.", budget: "Mandate: at most $20" },
 ];
 
 const OUTCOME: Record<string, string> = {
   paid: "Paid. Two agents made the deal; PayPal moved the money only after a person approved the hold and the proof passed.",
-  voided: "Voided. The wrong item failed twice, so the hold was released. The buyer was never charged and the seller got nothing.",
+  voided: "Voided. The proof failed twice, so the hold was released. The buyer was never charged and the seller got nothing.",
   in_review: "You decide: open the deal to release or reject. Claude was not sure enough, so no agent and no model can release this payment.",
 };
 const VOIDED_OTHERWISE = "Voided. The hold was released, so the buyer was never charged and the seller got nothing.";

@@ -1105,7 +1105,7 @@ Two PayPal behaviours are unverified (E11) and three platform limits are undocum
 | 7 | `PREVIOUSLY_VOIDED` on a second void, and void returning 204 | Void the same authorization twice | The `voidAuthorization` adapter's success mapping |
 | 8 | iPhone HEIC uploads through `createImageBitmap` (UNVERIFIED, research/stack.md "Open risks" 5) | Upload from a real iPhone in Safari and in Chrome | The client-side error copy in the UI spec |
 | 9 | Memory of `next start` with a 2 MB multipart upload on `0.5c-512mb` | Upload 6 photos while watching Render metrics | Whether the upload limit must drop |
-| 10 | Whether a cross-service `fromService: { envVarKey: RENDER_EXTERNAL_HOSTNAME }` fills the cron's `APP_HOST` (UNVERIFIED, 07 section 3.4 step 4) | After the first Blueprint deploy, open handshake-tick > Environment and read `APP_HOST` | If empty: `APP_HOST` becomes `sync: false` in `render.yaml` and the host is pasted by hand; without it `tick` never runs |
+| 10 | Whether a cross-service `fromService: { envVarKey: RENDER_EXTERNAL_HOSTNAME }` fills the cron's `APP_HOST` (07 section 3.4 step 4) | After the first Blueprint deploy, open handshake-tick > Environment and read `APP_HOST` | If empty: `APP_HOST` becomes `sync: false` in `render.yaml` and the host is pasted by hand; without it `tick` never runs. So far: the hosted cron reaches the app (issue 20, from `/api/status` on 2026-11-06), but nobody has recorded the value or whether Render filled it |
 
 Remaining risks after the spikes:
 

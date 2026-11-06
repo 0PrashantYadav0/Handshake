@@ -50,7 +50,7 @@ export const PAID_TRAIL = [...HELD_TRAIL, "submit_evidence", "verdict", "decisio
 export function plan(id: Scenario, f: Flags): string[] {
   const toHeld = [
     "sign in buyer and seller (POST /api/auth/demo)",
-    `buyer creates the deal from the demo kit sentence (set ${f.set})`,
+    `buyer creates the deal from the demo kit sentence (set ${f.set}) and uploads its listing photos`,
     "seller has a verified PayPal email (GET /api/me), joins and signs; buyer signs -> terms_agreed",
     "buyer starts payment (POST payment) -> approve link printed",
   ];
@@ -173,6 +173,14 @@ const events = async (base: string, jar: Jar, code: string) => (await must(api(b
 const causes = (evs: DealEvent[]) => evs.map((e) => e.cause);
 const printTrail = (evs: DealEvent[]) => evs.forEach((e, i) => console.log(`  ${String(i + 1).padStart(2)}. ${e.cause.padEnd(28)} ${e.actor.padEnd(7)} ${e.from_status ?? "-"} -> ${e.to_status}`));
 
+async function uploadFile(f: Flags, jar: Jar, code: string, purpose: "reference" | "evidence", url: string): Promise<string> {
+  const blob = await (await fetch(`${f.base}${url}`)).blob();
+  const form = new FormData();
+  form.set("purpose", purpose);
+  form.set("file", blob, url.split("/").pop());
+  return (await must(api(f.base, jar, "POST", `/api/deals/${code}/files`, form), `upload ${url}`)).id as string;
+}
+
 // ---------- the shared half: a new deal to held ----------
 
 async function toHeld(f: Flags, confirm: boolean): Promise<{ buyer: Jar; seller: Jar; code: string; preset: Preset }> {
@@ -186,6 +194,8 @@ async function toHeld(f: Flags, confirm: boolean): Promise<{ buyer: Jar; seller:
   const created = (await must(api(b, buyer, "POST", "/api/deals", { text: preset.sentence }), "POST /api/deals")) as unknown as DealView;
   const code = created.code;
   console.log(`deal ${code}  ${b}/deal/${code}  (${preset.id}, ${created.amount_minor} minor, ${created.conditions.length} conditions)`);
+  // The sentence says "matches the listing photos": with none on the deal, judge() can't let that condition pass.
+  for (const url of preset.reference) await uploadFile(f, buyer, code, "reference", url);
 
   const me = (await must(api(b, seller, "GET", "/api/me"), "GET /api/me")).user as { paypal_email: string | null; paypal_email_verified: boolean };
   // trust spec §8: a payout address is verified by an emailed code; the demo seller's sandbox address is verified by configuration.
@@ -208,13 +218,7 @@ async function toHeld(f: Flags, confirm: boolean): Promise<{ buyer: Jar; seller:
 
 async function uploadEvidence(f: Flags, seller: Jar, code: string, preset: Preset, tracking: string) {
   const file_ids: string[] = [];
-  for (const url of [...preset.sets[f.set].photos, preset.code_photo.base]) {
-    const blob = await (await fetch(`${f.base}${url}`)).blob();
-    const form = new FormData();
-    form.set("purpose", "evidence");
-    form.set("file", blob, url.split("/").pop());
-    file_ids.push((await must(api(f.base, seller, "POST", `/api/deals/${code}/files`, form), `upload ${url}`)).id as string);
-  }
+  for (const url of [...preset.sets[f.set].photos, preset.code_photo.base]) file_ids.push(await uploadFile(f, seller, code, "evidence", url));
   console.log(`uploaded ${file_ids.length} photos (the code photo is the uncomposed base: the hand-written code condition may fail; use the browser's "Use sample" for a composed one)`);
   await must(api(f.base, seller, "POST", `/api/deals/${code}/evidence`, { file_ids, tracking_number: tracking }), "submit evidence");
 }

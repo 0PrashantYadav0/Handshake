@@ -741,8 +741,8 @@ Two migrations exist at launch: `init` (generated from the schema) and `constrai
 | Later schema changes | edit `schema.prisma`, `npx prisma migrate dev --name <change>`; hand-edit with `--create-only` when a CHECK or trigger changes | local |
 | Reset a dev database | `npx prisma migrate reset`, then `npm run seed` | local only |
 | Apply in CI | `npx prisma migrate deploy` against the `postgres:18-alpine` service, before unit, integration and Playwright tests (stack.md section 10) | CI |
-| Apply on Render | `preDeployCommand: npx prisma migrate deploy` (decisions J2), exactly that and nothing else, on the paid web service; runs on a separate instance after build and before start, and a failure aborts the deploy while the old build keeps serving (stack.md section 5g) | Render |
-| Seed on Render | Once, by hand, from **handshake > Shell**: `npm run seed` (07 section 3.4 step 6). Re-run it after changing `DEMO_SELLER_PAYPAL_EMAIL`; a redeploy alone does not re-seed | Render |
+| Apply on Render | `preDeployCommand: npx prisma migrate deploy && npm run seed` (decisions J2), on the paid web service; runs on a separate instance after build and before start, and a failure aborts the deploy while the old build keeps serving (stack.md section 5g) | Render |
+| Seed on Render | Before each deploy, as the second half of `preDeployCommand` (`render.yaml`; 07 section 3.4 step 6). It is idempotent: personas upserted, the historical deals written once. A change to `DEMO_SELLER_PAYPAL_EMAIL` reaches the seller persona at the next deploy or the next persona sign-in | Render |
 
 Rules that follow from zero-downtime deploys (stack.md section 5g): migrations must stay backward compatible with the previous running build (add columns as nullable or with defaults, never rename in one step), and no migration is deployed during judging, 2026-12-01 to 2026-12-15.
 
@@ -929,6 +929,6 @@ Choices not fixed by decisions.md, taken here because the schema needs them.
 11. `webhook_events.last_error` stores the processing failure message; there is no foreign key from `webhook_events` to `deals`.
 12. `users.email` is lower-cased and trimmed by the app before insert; the CHECK makes a forgotten lower-case an error, not a duplicate account.
 13. `confidence` is `double precision`, not `numeric(3,2)`.
-14. The seed is not part of `preDeployCommand`, which stays exactly `npx prisma migrate deploy` (decisions J2). It is run once by hand from the Render Shell (07 section 3.4 step 6) and again whenever `DEMO_SELLER_PAYPAL_EMAIL` changes; it is idempotent and reads `DATABASE_URL` and `DEMO_SELLER_PAYPAL_EMAIL` from the service environment, falling back to `.env` through `process.loadEnvFile()` locally.
+14. The seed is the second half of `preDeployCommand`, `npx prisma migrate deploy && npm run seed` (decisions J2), so it runs before each deploy (07 section 3.4 step 6); it is idempotent and reads `DATABASE_URL` and `DEMO_SELLER_PAYPAL_EMAIL` from the service environment, falling back to `.env` through `process.loadEnvFile()` locally.
 15. If `tsx prisma/seed.ts` cannot resolve `../generated/prisma/client`, the generator gets `importFileExtension = "ts"`; stack.md section 3 says this "may be needed" and marks nothing stronger, so it is applied only on that failure.
 16. The evidence pack's JSON shape, wrapper keys and filename belong to 04 section 10.2; this document only fixes the eight reads and the column set each may expose. Step 8's rows are exposed there as a `webhook_events` section.
