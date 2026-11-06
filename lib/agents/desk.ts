@@ -19,7 +19,7 @@ export type DeskEvent =
 type Emit = (e: DeskEvent) => void;
 
 export const SCENARIOS = {
-  honest: { item: "the blue ceramic mug", list_minor: 2400, budget_minor: 2000, floor_minor: 1600, terms: "if it arrives within 5 days, matches the listing photos and tracking shows delivered", proof: "good", attempts: 1 },
+  honest: { item: "the blue ceramic mug", list_minor: 2400, budget_minor: 2000, floor_minor: 1600, terms: "if it arrives within 5 days, matches the listing photos and tracking shows delivered", proof: "good", attempts: 2 },
   cheat: { item: "the wooden desk lamp", list_minor: 4500, budget_minor: 4000, floor_minor: 3000, terms: "if it arrives within 7 days, matches the listing photos and tracking shows delivered", proof: "wrong-item", attempts: 2 },
   hijack: { item: "the blue ceramic mug", list_minor: 9500, budget_minor: 2000, floor_minor: 9000, terms: "if it arrives within 5 days, matches the listing photos and tracking shows delivered", proof: "good", attempts: 1 },
 } as const;

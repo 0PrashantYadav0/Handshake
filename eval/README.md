@@ -43,9 +43,12 @@ Baseline: `npm run eval -- --repeats 3` on `claude-sonnet-5-5` at low, 2026-11-0
 | Verdict latency, all runs | p50 3.5 s, p95 4.8 s, max 5.3 s. D4 moved to 9 s with one retry |
 | Verdict latency, 10 images | 4.2 to 4.9 s (`correct-08-planter`) |
 | Token count, 10 images | About 18,600 input tokens |
+| Image size | 120 of the 121 eval images are 1280 x 960 (one is 1100 x 840). The app sends up to 1600 px on the long edge (`lib/client-upload.ts`) and the demo kit's photos are 1600 x 1200, so the token and latency rows understate a full-size request. A 10-image request at 1600 px was not measured |
 | Flip rate between repeats | 0 cases |
 | Refusals, 400s from the schema | 0, 0 |
 | Cost | $1.73 for 90 runs |
-| Not measured | Cold grammar compile after 24 h idle, medium effort, Opus, Haiku's image tier, the account's rate limits (`--concurrency 3` never hit one) |
+| Rate limits | From the `anthropic-ratelimit-*` headers of one `claude-sonnet-5-5` call, 2026-11-06: 4,000 requests, 2,000,000 input tokens, 400,000 output tokens. The headers name no window or tier. The input and output figures match the Start row of `docs/research/claude-api.md` section 9 (per minute); 4,000 requests matches no row (Start is 1,000), so the tier is not known. `--concurrency 3` never hit one |
+| Schema changes | `correct-01-mug`, one run each, a single sample, 2026-11-06: 4.4 s unchanged, 4.1 s with one character changed in a `description`, 5.4 s with one value added to an `enum`. `docs/research/claude-api.md` section 3 says only a change of structure invalidates the grammar. These samples neither confirm nor contradict that: the `description` run sits inside this case's other warm runs (3.2 to 4.4 s), and the `enum` run sits about 1 s above them, which one sample can't separate from the spread. Neither reading is a 24 h idle. Result files for these runs are not committed |
+| Not measured | Cold grammar compile after 24 h idle, medium effort, Opus, Haiku's image tier |
 
 The first run, `eval/results/20261105-1809-claude-sonnet-5-5-low.json`, is kept on purpose. It shows two wrong captures, `blurry-02-book` and `blurry-03-keyboard`. Both traced to test photos that did not match their case: the "half out of frame" book was nearly all in frame and the "too dark" keyboard could be seen clearly in one photo, so `pass` was the right answer. Those photos were re-rendered, with `blurry-01`'s depth of field, before the baseline. The prompt and the model did not change.

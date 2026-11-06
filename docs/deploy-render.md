@@ -7,10 +7,10 @@ You end up with three Render pieces: a web service `handshake` ($7/month), a Pos
 ## 0. Before you start
 
 - [ ] `npm run check-env` passes on your machine.
-- [ ] A **second PayPal app for Render**, separate from the one in your `.env`.
-  - Create it under **Apps & Credentials > Create App**: name `handshake`, type Merchant, linked to the **same US business account** as your local app. Tick **Payouts** under Features.
-  - Copy its Client ID and Secret; Render uses these, not the ones in `.env`.
-  - Why: PayPal sends webhooks to every URL on an app, and events match deals by deal code. If local and Render shared an app, a local deal's event could land on a hosted deal with the same code, and the reverse.
+- [ ] One PayPal app: the one in your `.env`. Local and hosted share it (issue 1, 2026-10-15).
+  - Check it under **Apps & Credentials**: type Merchant, linked to a **US business account**, **Payouts** ticked under Features.
+  - Render uses the same Client ID and Secret.
+  - The cost of sharing: PayPal sends webhooks to every URL on an app, and events match deals by deal code, so a local deal's event could land on a hosted deal with the same code, and the reverse. Create a second app only if local webhook tests must never reach the hosted one.
 - [ ] Optional: a separate Anthropic key named `handshake-prod`, so hosted spend shows on its own line. The local key also works.
 - [ ] Render account signed in with the GitHub account that owns the repo. Workspace **Hobby**. Never pick Pro.
 - [ ] A card is on file under **Billing**. Render requires one for paid services. Indian cards need international or online transactions turned on in the bank app first.
@@ -26,7 +26,7 @@ Pick **one** of the two routes below. They produce the same result.
 ## Route A: Blueprint (fewer clicks)
 
 1. **New > Blueprint**, pick the repo, branch `main`. Render reads `render.yaml`.
-2. It asks once for every secret. For the three PayPal ones, use the `handshake` app from step 0. Take the rest from your `.env`, with these exceptions:
+2. It asks once for every secret. Take them from your `.env`, with these exceptions:
    - `PAYPAL_WEBHOOK_ID`: type `pending`. Step 4 of "After either route" replaces it.
    - `AG_GRID_LICENSE_KEY`: leave it empty.
    - `APP_URL`: type `https://handshake.onrender.com`. Correct it after the first deploy if Render gives a different host.
@@ -65,7 +65,7 @@ When it is ready, copy the **Internal Database URL**.
 | Build command | `npm ci && npm run build` |
 | Start command | `npm run start` |
 | Instance type | Starter, 0.5 CPU / 512 MB ($7/month) |
-| Advanced > Pre-deploy command | `npx prisma migrate deploy` |
+| Advanced > Pre-deploy command | `npx prisma migrate deploy && npm run seed` |
 | Advanced > Health check path | `/api/health` |
 | Advanced > Auto-deploy | On commit |
 
@@ -81,8 +81,8 @@ Never put the migration in the build command. If a deploy fails after its build 
 | `FILE_URL_SECRET` | new `openssl rand -base64 32` |
 | `DATA_KEYS` | new `openssl rand -base64 32`. **Never change it later**: it encrypts stored data. To rotate, prepend a new key (`k2:<new>,k1:<old>`) |
 | `CRON_SECRET` | new `openssl rand -base64 32`. Also used in B3 |
-| `PAYPAL_CLIENT_ID` | Client ID of the `handshake` app from step 0 (not the one in `.env`) |
-| `PAYPAL_CLIENT_SECRET` | Secret of the `handshake` app |
+| `PAYPAL_CLIENT_ID` | Client ID of the app from step 0 |
+| `PAYPAL_CLIENT_SECRET` | Secret of that app |
 | `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | the same as `PAYPAL_CLIENT_ID` |
 | `PAYPAL_API_BASE` | `https://api-m.sandbox.paypal.com` |
 | `PAYPAL_WEBHOOK_ID` | `pending` for now |
@@ -127,7 +127,7 @@ Environment variables:
 2. **APP_URL.** If the host isn't `handshake.onrender.com`, set `APP_URL` on the web service to the real one. If you used Route B, also set the cron's `APP_HOST`. Saving redeploys.
 3. **Cron.** Open **handshake-tick > Trigger Run**, then check its log. It should exit 0 and print a small JSON body.
 4. **Webhook.** In the PayPal developer dashboard:
-   - Open the `handshake` app from step 0 (not your local app), then **Features > Sandbox Webhooks > Add Webhook**.
+   - Open the app from step 0, then **Features > Sandbox Webhooks > Add Webhook**.
    - URL: `https://<host>/api/webhooks/paypal`.
    - Tick these eleven events:
      ```
@@ -144,7 +144,7 @@ Environment variables:
      PAYMENT.PAYOUTS-ITEM.UNCLAIMED
      ```
    - Save, copy the new **Webhook ID**, and set it as `PAYPAL_WEBHOOK_ID` on the web service. Saving redeploys.
-5. **Seed.** Run `npm run seed` once from **handshake > Shell**. Running it again is harmless.
+5. **Seed.** Nothing to run: the pre-deploy command runs `npm run seed` before each deploy, and running it again is harmless. To check it, sign in as Demo Buyer, type `sample` in the `/ledger` quick filter and expect 25 rows.
 6. **Hand back.** Send the host URL in the chat. The agent then runs the scenario scripts and the Playwright happy path against it (issues #22, #31, #35, #47) and records the webhook fixtures (#12, #13).
 
 ## Later

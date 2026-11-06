@@ -1,10 +1,11 @@
 // docs/agents.md: agent keys, the mandate, the MCP surface and the negotiation guard. The money path stays behind a person and the rule.
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { negotiate, runToGate, SCENARIOS, type DeskEvent, type ScenarioId } from "@/lib/agents/desk";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { negotiate, runDelivery, runToGate, SCENARIOS, type DeskEvent, type ScenarioId } from "@/lib/agents/desk";
 import { agentFromToken, issueAgentKey, revokeAgentKey } from "@/lib/agents/keys";
 import { handleRpc } from "@/lib/agents/mcp";
 import { callTool, TOOLS, type ToolContext } from "@/lib/agents/tools";
 import { composeCode, kit } from "@/lib/agents/samples";
+import { DEFAULT_EXTRACT } from "@/lib/ai/fake";
 import { prisma } from "@/lib/db";
 import { getDeal, handle } from "@/lib/deal";
 import type { DealView } from "@/lib/deal/types";
@@ -28,7 +29,10 @@ beforeEach(async () => {
   buyer = { key: b.key, deps, baseUrl: "https://x.test" };
   seller = { key: s.key, deps, baseUrl: "https://x.test" };
 });
-afterEach(assertEventsInC6);
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  await assertEventsInC6();
+});
 
 type Brief = { code: string; status: string; signed: { buyer: boolean; seller: boolean }; latest_decision: string | null; verdicts: unknown[]; next_step: string };
 const run = (name: string, args: unknown, c: ToolContext) => callTool(name, args, c) as Promise<Brief>;
@@ -117,6 +121,24 @@ describe("agents run a deal, and only a person approves money", () => {
     expect(second.latest_decision).toBe("void");
     expect(second.status).toBe("voided");
     expect(deps.paypal.calls.filter((c) => /capture/i.test(c.op))).toEqual([]);
+  }, 30_000);
+
+  test("the honest desk: a misread first proof gets the rule's one fix, so the run doesn't stop at held", async () => {
+    vi.stubEnv("DEMO_SELLER_PAYPAL_EMAIL", "demo-seller-pp@test");
+    deps.ai.extractWith({ ...DEFAULT_EXTRACT, amount_minor: SCENARIOS.honest.budget_minor });
+    let code = "";
+    await runToGate("honest", p.buyer.id, deps, "https://x.test", (e) => void (e.t === "gate" && (code = e.code)));
+    const v = await handle(code, p.asBuyer, { type: "start_payment" }, deps);
+    await handle(code, p.asBuyer, { type: "confirm_approval", order_id: v.payment!.paypal_order_id }, deps);
+
+    deps.ai.judgeWith([{ result: "fail", confidence: 0.8, reason: "The code on the card looks different." }]);
+    const seen: { decision: string | null; status: string }[] = [];
+    await runDelivery("honest", code, p.buyer.id, deps, "https://x.test", (e) => {
+      if (e.t !== "deal") return;
+      seen.push({ decision: e.deal.latest_decision, status: e.deal.status });
+      deps.ai.judgeWith([]); // Claude reads the second proof correctly
+    });
+    expect(seen).toEqual([{ decision: "request_fix", status: "held" }, { decision: "capture", status: "captured" }]);
   }, 30_000);
 
   test("an agent is held to its user's access: a third party's agent sees nothing", async () => {

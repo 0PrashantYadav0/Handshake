@@ -1,6 +1,7 @@
 // Pure parts of lib/demo-kit.ts plus a check that public/demo/presets.json points at files that exist (08 section 12.1).
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { chips, findPreset, type Presets } from "@/lib/demo-kit";
 
@@ -14,6 +15,16 @@ describe("presets.json", () => {
     expect(kit.tracking_number).toBe("TRK-DEMO-0000");
     expect(existsSync(pub(kit.font))).toBe(true);
     expect(existsSync(pub("/demo/fonts/OFL.txt"))).toBe(true);
+  });
+
+  it("keeps every code glyph's ink inside its PNG: a P clipped at its advance width reads as F and fails an honest proof", async () => {
+    const dir = pub("/demo/glyphs");
+    const clipped: string[] = [];
+    for (const f of readdirSync(dir)) {
+      const { data, info } = await sharp(join(dir, f)).ensureAlpha().extractChannel("alpha").raw().toBuffer({ resolveWithObject: true });
+      for (let y = 0; y < info.height; y++) if (data[y * info.width] || data[y * info.width + info.width - 1]) { clipped.push(f); break; }
+    }
+    expect(clipped).toEqual([]);
   });
 
   it("points only at files that exist", () => {
