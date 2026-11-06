@@ -6,7 +6,7 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "generated/**"]),
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "generated/**", "submission/**", "brag-output*/**"]),
   {
     rules: {
       // dependencies.md trap 8: the Studio licence does not cover these outside Studio
