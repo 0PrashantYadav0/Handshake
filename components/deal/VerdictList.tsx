@@ -54,8 +54,8 @@ export function VerdictList({ sub, deal, unclearFirst }: Props) {
               <div className="mt-2 flex flex-wrap items-center gap-1">{v.evidence_used.length ? v.evidence_used.map(chip) : <span className="hs-help">—</span>}</div>
             </div>
             <div aria-label={`Confidence ${Math.round(v.confidence * 100)} percent`}>
-              <span className="tabular-nums">{pct(v.confidence)}</span>
-              <div className="hs-bar"><div style={{ width: `${Math.round(v.confidence * 100)}%` }} /></div>
+              <span className="tabular-nums">{pct(v.confidence)} sure</span>
+              <div className="hs-bar" data-result={v.result}><div style={{ width: `${Math.round(v.confidence * 100)}%` }} /></div>
             </div>
           </li>
         ))}

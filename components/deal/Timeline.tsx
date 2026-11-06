@@ -29,10 +29,8 @@ export function Timeline({ events }: { events: DealEvent[] }) {
           <li key={e.id} className="grid gap-1 border-l-2 border-[var(--hs-border)] pl-3">
             <p className="hs-help"><time title={e.created_at}>{when(e.created_at)}</time> · <span className="hs-badge">{ACTOR_LABEL[e.actor]}</span></p>
             <p>{timelineSentence(e)}</p>
-            <p className="font-mono text-xs text-[var(--hs-muted)]" title={`${e.from_status ? STATUS_LABEL[e.from_status] : "—"} → ${STATUS_LABEL[e.to_status]}`}>
-              {e.from_status ?? "—"} → {e.to_status}
-            </p>
-            <details>
+            {e.from_status !== e.to_status && <p className="hs-help">{e.from_status ? STATUS_LABEL[e.from_status] : "—"} → {STATUS_LABEL[e.to_status]}</p>}
+            <details open={e.actor === "paypal"}>
               <summary className="hs-help cursor-pointer">Details</summary>
               <pre className="mt-1 overflow-x-auto rounded bg-[var(--hs-bg)] p-2 text-xs">{JSON.stringify(e.payload, null, 2)}</pre>
             </details>

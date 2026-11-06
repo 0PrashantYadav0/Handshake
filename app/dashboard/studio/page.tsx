@@ -8,5 +8,10 @@ export default async function DashboardPage() {
   if (!user_id) redirect("/signin?next=/dashboard/studio");
   // The key is validated in the browser (09 section 7); empty locally, watermark only.
   // T-38: the agent is offered only when the server holds an Anthropic key (09 section 6.7 otherwise).
-  return <StudioDashboard licenseKey={process.env.AG_GRID_LICENSE_KEY} dataUrl="/api/dashboard/data" agent={Boolean(process.env.ANTHROPIC_API_KEY)} />;
+  return (
+    <>
+      <p className="hs-help px-4 py-1 md:px-8">Includes sample deals, so totals differ from your Dashboard.</p>
+      <StudioDashboard licenseKey={process.env.AG_GRID_LICENSE_KEY} dataUrl="/api/dashboard/data" agent={Boolean(process.env.ANTHROPIC_API_KEY)} />
+    </>
+  );
 }

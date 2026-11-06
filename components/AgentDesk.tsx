@@ -189,7 +189,7 @@ export function AgentDesk({ clientId }: { clientId: string }) {
       {following && expired && <div><button type="button" className="hs-link text-sm" onClick={() => void poll()} data-testid="desk-check">Check again</button></div>}
 
       {gate && status === "terms_agreed" && (
-        <section ref={section} className="hs-card border-[var(--hs-accent)] p-5" data-testid="desk-gate">
+        <section ref={section} className="hs-card p-5" data-accent data-testid="desk-gate">
           <h2 ref={gateHeading} tabIndex={-1} className="hs-display text-2xl">The agents stop here. This part is yours.</h2>
           <p className="hs-help mt-1 mb-4 text-[0.95rem]">Only a person can approve money. Approve a hold of {money(gate.amount_minor)} at PayPal: it is held, not charged, and goes back if the proof never checks out.</p>
           <div className="max-w-sm"><PayButton code={gate.code} clientId={clientId} onHeld={onHeld} onFail={onFail} /></div>

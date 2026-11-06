@@ -137,7 +137,7 @@ export function TermsForm({ deal, rejected: initialRejected, onSaved }: { deal: 
               <svg viewBox="0 0 16 16" width="16" height="16" className="mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 7V5a3 3 0 0 1 6 0v2M3.5 7h9v6.5h-9z" /></svg>
               <div>
                 <span className="text-[var(--hs-ink)]">{system.text}</span>
-                <p>Added automatically whenever a photo condition exists. It proves the photos were taken for this deal.</p>
+                <p>Added automatically whenever a photo condition exists. It makes old photos harder to reuse. An edited photo could still get through, so deals over $200 always go to the buyer.</p>
               </div>
             </li>
           )}

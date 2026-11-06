@@ -26,6 +26,7 @@ describe("ledger formatters", () => {
     const now = Date.parse("2026-10-10T12:00:00Z");
     expect(relTime("2026-10-10T10:00:00Z", now)).toBe("2 hours ago");
     expect(relTime("2026-10-22T12:00:00Z", now)).toBe("in 12 days");
+    expect(relTime("2026-10-15T11:00:00Z", now)).toBe("in 5 days"); // 4 days 23 hours rounds up
     expect(relTime("2026-10-10T11:59:30Z", now)).toBe("just now");
     expect(relTime(null, now)).toBe("—");
   });

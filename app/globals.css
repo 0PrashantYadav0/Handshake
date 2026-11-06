@@ -116,6 +116,7 @@ h1 { font-family: var(--hs-font-display); font-weight: 500; letter-spacing: -0.0
 /* Cards, banners (08 sections 4.3, 7.2, 7.13) */
 .hs-card { background: var(--hs-surface); border: 1px solid var(--hs-border); border-radius: var(--hs-radius); padding: 1.1rem; box-shadow: var(--hs-shadow); }
 @media (min-width: 768px) { .hs-card { padding: 1.35rem; } }
+.hs-card[data-accent] { border-color: var(--hs-accent); box-shadow: 0 0 0 2px var(--hs-accent); }
 .hs-banner { border-radius: 0.6rem; padding: 0.65rem 0.85rem; font-size: 0.875rem; border: 1px solid var(--hs-status-voided); color: var(--hs-status-voided); background: color-mix(in srgb, var(--hs-status-voided) 7%, white); }
 .hs-banner[data-tone="info"] { border-color: var(--hs-status-in_review); color: var(--hs-status-in_review); background: color-mix(in srgb, var(--hs-status-in_review) 7%, white); }
 
@@ -128,6 +129,8 @@ h1 { font-family: var(--hs-font-display); font-weight: 500; letter-spacing: -0.0
 .hs-verdict-word[data-result="fail"] { color: var(--hs-status-voided); }
 .hs-bar { height: 0.3rem; margin-top: 0.25rem; border-radius: 9999px; background: var(--hs-border); overflow: hidden; }
 .hs-bar > div { height: 100%; background: var(--hs-accent); }
+.hs-bar[data-result="fail"] > div { background: var(--hs-status-voided); }
+.hs-bar[data-result="unclear"] > div { background: var(--hs-status-in_review); }
 .hs-dot { display: inline-block; flex-shrink: 0; width: 0.6rem; height: 0.6rem; margin: 0 0.3rem; border-radius: 9999px; background: var(--hs-border); }
 .hs-dot[data-active="true"] { background: var(--hs-accent); }
 @media (prefers-reduced-motion: no-preference) {
@@ -146,7 +149,7 @@ h1 { font-family: var(--hs-font-display); font-weight: 500; letter-spacing: -0.0
 
 /* T-40: thumbnails are buttons that open the lightbox. */
 .hs-thumb { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 0.6rem; border: 1px solid var(--hs-border); background: var(--hs-bg); padding: 0; cursor: zoom-in; }
-.hs-thumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.hs-thumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; }
 .hs-thumb-label { position: absolute; left: 0.3rem; top: 0.3rem; padding: 0 0.3rem; border-radius: 0.25rem; background: rgb(255 255 255 / 0.92); color: var(--hs-ink); font-family: var(--hs-font-mono); font-size: 0.75rem; }
 
 /* T-40: native dialogs (08 sections 4.5, 11). showModal() gives the focus trap, Escape and focus return. */

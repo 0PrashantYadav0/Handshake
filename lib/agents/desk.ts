@@ -43,7 +43,7 @@ export async function deskContexts(buyerId: string, scenario: ScenarioId, deps: 
   return { buyer: { key: b, deps, baseUrl }, seller: { key: se, deps, baseUrl } };
 }
 
-/** Alternating offers. Returns the agreed price, or null when the limits don't overlap in time. Code, not the model, enforces both limits. */
+/** Alternating offers. Returns the agreed price, or null when the limits don't overlap. Code, not the model, enforces both limits. */
 export async function negotiate(id: ScenarioId, deps: Pick<Deps, "ai">, emit: Emit): Promise<number | null> {
   const s = SCENARIOS[id];
   const history: { role: "buyer" | "seller"; say: string; offer_minor: number }[] = [];
@@ -79,7 +79,14 @@ export async function negotiate(id: ScenarioId, deps: Pick<Deps, "ai">, emit: Em
       if (agreed !== null) return agreed;
     }
   }
-  return turn("buyer"); // the seller spoke last: its final offer still gets an answer
+  const answer = await turn("buyer"); // the seller spoke last: its final offer still gets an answer
+  if (answer !== null || s.budget_minor < s.floor_minor) return answer;
+  // Out of turns with limits that overlap: code closes at the midpoint of the last two offers, in whole dollars, inside both limits.
+  const last = (role: "buyer" | "seller") => history.findLast((h) => h.role === role)!.offer_minor;
+  const midpoint = Math.round((last("buyer") + last("seller")) / 200) * 100;
+  const price = Math.min(s.budget_minor, Math.max(s.floor_minor, midpoint));
+  emit({ t: "guard", agent: "buyer", text: `Out of turns. ${money(price)} is inside both limits, so code closes the deal there.` });
+  return price;
 }
 
 async function step(agent: "buyer" | "seller", name: string, args: Record<string, unknown>, c: ToolContext, emit: Emit, summarize: (r: ReturnType<typeof brief>) => string) {
@@ -105,7 +112,7 @@ export async function runToGate(id: ScenarioId, buyerId: string, deps: Deps, bas
     }
     return emit({ t: "done", outcome: "No deal and no money moved. A prompt injection can change what a model says. It can't change what the code allows." });
   }
-  if (agreed === null) return emit({ t: "done", outcome: "No deal: the agents could not agree within their limits. Nothing was created." });
+  if (agreed === null) return emit({ t: "done", outcome: "No deal: the agents' limits don't overlap. Nothing was created." });
 
   const sentence = `I'll pay $${(agreed / 100).toFixed(agreed % 100 ? 2 : 0)} for ${s.item} ${s.terms}`;
   const d = await step("buyer", "propose_deal", { sentence }, buyer, emit, (r) => `${r.code}: ${r.conditions.length} conditions Claude can check, ${r.amount} held for ${r.deadline_days} days`);

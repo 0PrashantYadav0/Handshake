@@ -185,8 +185,21 @@ describe("negotiation", () => {
   test("a seller can't be talked below its floor", async () => {
     deps.ai.negotiateWith((i) => (i.role === "buyer" ? { say: "A dollar", offer_minor: 100, accept: false } : { say: "No", offer_minor: 100, accept: true }));
     const { price, seen } = await run2();
-    expect(price).toBeNull();
+    expect(price).toBeGreaterThanOrEqual(SCENARIOS.honest.floor_minor);
     expect(seen.some((e) => e.t === "guard" && e.agent === "seller")).toBe(true);
+  });
+
+  // [buyer's last offer, seller's last offer, close]: the midpoint in whole dollars, then clamped to the budget.
+  test.each([[1700, 1850, 1800], [2000, 2400, 2000]])("a model that never accepts still closes inside both limits: %i and %i close at %i", async (bid, ask, close) => {
+    deps.ai.negotiateWith((i) => ({ say: "No", offer_minor: i.role === "buyer" ? bid : ask, accept: false }));
+    const { price, seen } = await run2();
+    expect(price).toBe(close);
+    expect(seen.at(-1)).toMatchObject({ t: "guard", agent: "buyer", text: `Out of turns. $${close / 100}.00 is inside both limits, so code closes the deal there.` });
+  });
+
+  test("limits that don't overlap still end with no deal", async () => {
+    deps.ai.negotiateWith((i) => ({ say: "No", offer_minor: i.role === "buyer" ? 1500 : 9500, accept: false }));
+    expect(await negotiate("hijack", deps, () => {})).toBeNull();
   });
 });
 

@@ -201,6 +201,7 @@ function toSources(d: DashboardData): AgDataSourcesDefinition<Registry> {
 const initialState: AgReportState<Registry> = {
   version: "3.0.0",
   selectedPageId: "overview",
+  panels: { filters: { collapsed: true }, edit: { collapsed: true }, data: { collapsed: true } }, // open, they cover the charts; the AI panel stays open
   pages: [
     {
       id: "overview",
@@ -271,7 +272,7 @@ export function StudioCanvas({ data, licenseKey, agent = false }: { data: Dashbo
         widgets={widgets}
         ai={agent ? ai : undefined}
         mode="edit"
-        style={{ height: "calc(100vh - 64px)", width: "100%" }}
+        style={{ height: "calc(100vh - 92px)", width: "100%" }}
       />
     </AgStudioProvider>
   );

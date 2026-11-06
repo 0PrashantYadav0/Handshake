@@ -36,6 +36,9 @@ export function canRetryPayout(payouts: Payout[]): boolean {
   return !!p && (p.status === "failed" || (p.status === "pending" && !p.paypal_batch_id));
 }
 
+const conditions = (n: number) => `${n} condition${n === 1 ? "" : "s"}`;
+const itOrThem = (n: number) => (n === 1 ? "it" : "them");
+
 export const VERDICT_LABEL: Record<VerdictResult, string> = { pass: "Pass", fail: "Fail", unclear: "Unclear" };
 export const VERDICT_ICON: Record<VerdictResult, string> = { pass: "✓", fail: "✕", unclear: "?" };
 export const ACTOR_LABEL: Record<EventActor, string> = { buyer: "Buyer", seller: "Seller", system: "System", paypal: "PayPal", ai: "AI" };
@@ -57,11 +60,11 @@ export function decisionLine(s: Pick<Submission, "verdicts" | "decision" | "deci
   const key = `${s.decision}:${s.decision_reason}`;
   switch (key) {
     case "capture:all_pass": return "All conditions passed with high confidence and the amount is within the auto-release limit, so the rule released the payment.";
-    case "request_fix:fail": return role === "seller" ? `${n("fail")} condition(s) failed. You can fix and resubmit once.` : `${n("fail")} condition(s) failed. The seller has one chance to fix them.`;
-    case "void:fail": return `${n("fail")} condition(s) clearly failed on the second attempt. The deal is voided and the hold released.`;
-    case "buyer_review:unclear": return `Claude couldn't decide on ${n("unclear")} condition(s), so the buyer decides.`;
+    case "request_fix:fail": return role === "seller" ? `${conditions(n("fail"))} failed. You can fix and resubmit once.` : `${conditions(n("fail"))} failed. The seller has one chance to fix ${itOrThem(n("fail"))}.`;
+    case "void:fail": return `${conditions(n("fail"))} clearly failed on the second attempt. The deal is voided and the hold released.`;
+    case "buyer_review:unclear": return `Claude couldn't decide on ${conditions(n("unclear"))}, so the buyer decides.`;
     case "buyer_review:low_confidence": return "Claude's confidence was below the rule's threshold, so the buyer decides.";
-    case "buyer_review:fail": return `${n("fail")} condition(s) failed on the second attempt, but Claude wasn't confident enough to void the deal, so the buyer decides.`;
+    case "buyer_review:fail": return `${conditions(n("fail"))} failed on the second attempt, but Claude wasn't confident enough to void the deal, so the buyer decides.`;
     case "buyer_review:amount_over_limit": return "Every condition passed. Deals above the auto-release limit always go to the buyer.";
     default: return null;
   }
@@ -190,11 +193,11 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
       if (d.role === "buyer") {
         return d.fix_attempts_used === 0
           ? { heading: "Money held. Waiting for proof.", helper: `Nothing has been charged. If the seller's proof doesn't pass by ${deadline}, the hold is released automatically.` }
-          : { heading: "The first proof failed. One more try.", helper: `${failed} condition(s) failed. The seller can fix them once before ${deadline}. If it clearly fails again the hold is released; if Claude is unsure, you decide.` };
+          : { heading: "The first proof failed. One more try.", helper: `${conditions(failed)} failed. The seller can fix ${itOrThem(failed)} once before ${deadline}. If it clearly fails again the hold is released; if Claude is unsure, you decide.` };
       }
       return d.fix_attempts_used === 0
         ? { heading: "Ship it, then add your proof", helper: `Upload photos that show each condition, enter the tracking number, and submit before ${deadline}. Claude checks them against the terms; a fixed rule then releases the money, asks you to fix one thing, or asks the buyer.` }
-        : { heading: "One more try", helper: `Your first proof failed ${failed} condition(s), marked below. Fix them and resubmit before ${deadline}. If it clearly fails again the deal is voided and the hold is released; if Claude is unsure, the buyer decides.` };
+        : { heading: "One more try", helper: `Your first proof failed ${conditions(failed)}, marked below. Fix ${itOrThem(failed)} and resubmit before ${deadline}. If it clearly fails again the deal is voided and the hold is released; if Claude is unsure, the buyer decides.` };
     case "proof_submitted":
       return { heading: d.role === "buyer" ? "Checking the seller's proof…" : "Checking your proof…", helper: CHECKING_HELPER };
     case "in_review": {
@@ -208,7 +211,7 @@ export function whatNext(d: DealView | DealPreview, opts: { holdFailed?: boolean
       const tail = `Look at the proof and decide. If you do nothing, the hold is released on ${deadline}.`;
       switch (last?.decision_reason) {
         case "low_confidence": return { heading: "Your decision: confidence was too low", helper: `Claude's confidence was below what the rule requires. ${tail}` };
-        case "fail": return { heading: "Your decision: the second proof may have failed", helper: `${failed} condition(s) failed on the second try, but Claude wasn't confident enough for the rule to void the deal. ${tail}` };
+        case "fail": return { heading: "Your decision: the second proof may have failed", helper: `${conditions(failed)} failed on the second try, but Claude wasn't confident enough for the rule to void the deal. ${tail}` };
         case "amount_over_limit": return { heading: "Your decision: this deal is over the auto-release limit", helper: `Every condition passed. Deals above the auto-release limit always need your confirmation. If you do nothing, the hold is released on ${deadline}.` };
         default: return { heading: "Your decision: Claude couldn't decide", helper: `${count("unclear")} of ${d.conditions.length} conditions came back unclear. ${tail}` };
       }

@@ -45,7 +45,7 @@ const BUYERS = [
 ];
 
 const SELLERS = [
-  "The buyer's money is held before you ship, so you know it is there.",
+  "The buyer's money is held before you ship. PayPal honors a hold in full for 3 days, so ship promptly.",
   "Prove delivery with photos and a tracking number instead of waiting for a reply.",
   "If a photo misses a condition, you get one chance to fix the submission.",
   "Paid through PayPal Payouts to the PayPal email you confirmed with a code.",
@@ -56,6 +56,7 @@ const FAQ = [
   ["What if the AI is unsure?", "An unclear verdict, or any confidence below 0.85, never releases money on its own. The deal goes to the buyer, who sees the photos, the conditions and Claude's reasons, then releases the payment or rejects the proof. Deals over $200 always go to the buyer."],
   ["When is my money actually taken?", "Only when the payment is released: either the rule captures the hold after every condition passes, or you release it yourself in review. Until then your PayPal account shows an authorization hold, not a charge."],
   ["What if the item is wrong?", "The first failed check asks the seller for one fix. On the second try, a confident failure voids the hold and the money goes back to the buyer; a less certain one goes to the buyer to decide."],
+  ["What if the buyer ignores a review after I've shipped?", "In this build the hold is voided at the deadline and you aren't paid, so clear photos matter. Production needs a neutral reviewer for this case."],
   ["How do sellers get paid?", "After the payment is captured, Handshake sends the amount to the seller through PayPal Payouts, only to a payout email the seller has confirmed with a code. In this sandbox build Handshake is the merchant of record; a production build would use PayPal's multiparty onboarding so the seller is paid directly."],
   ["Is this real money?", "No. Handshake runs on the PayPal sandbox only. Accounts, holds, captures and payouts are test objects, and no real money moves."],
   ["What data is stored, and how is it protected?", "Your email, name and payout email, and for each deal the sentence, conditions, photos, tracking number, verdicts and an event log. The contract text, photos, tracking notes, verdict reasons and your authenticator secret are encrypted at rest with AES-256-GCM. Amounts, statuses, dates, emails and PayPal ids stay readable because the ledger and PayPal need them."],
@@ -63,12 +64,12 @@ const FAQ = [
 ] as const;
 
 const CONDITIONS = [
-  ["Mug is blue ceramic and matches the listing photos", "0.96"],
-  ["Tracking shows delivered", "1.00"],
-  ["Photo shows the deal code HS-7Q2K written by hand", "0.93"],
+  ["Mug is blue ceramic and matches the listing photos", "88%"],
+  ["Tracking shows delivered", "97%"],
+  ["Photo shows the deal code HS-7Q2K written by hand", "90%"],
 ] as const;
 
-function Actions({ signedIn, anchor }: { signedIn: boolean; anchor: boolean }) {
+function Actions({ signedIn, secondary }: { signedIn: boolean; secondary: boolean }) {
   return (
     <div className="flex flex-wrap gap-3">
       {signedIn ? (
@@ -79,7 +80,7 @@ function Actions({ signedIn, anchor }: { signedIn: boolean; anchor: boolean }) {
       ) : (
         <>
           <Link href="/signin?next=/new" className="hs-btn">Start a deal</Link>
-          {anchor && <a href="#how" className="hs-btn-secondary">See how it works</a>}
+          {secondary && <Link href="/signin?next=/agents" className="hs-btn-secondary">Watch two agents make a deal</Link>}
         </>
       )}
     </div>
@@ -99,7 +100,7 @@ function DealSlip() {
   return (
     <figure className="hs-card relative overflow-hidden p-0 md:p-0">
       <div className="flex items-center justify-between gap-3 border-b border-[var(--hs-border)] px-5 py-3 text-sm">
-        <span className="font-mono text-[var(--hs-muted)]">HS-7Q2K</span>
+        <span className="flex items-center gap-2"><span className="font-mono text-[var(--hs-muted)]">HS-7Q2K</span><span className="hs-badge">Example</span></span>
         <StatusPill status="captured" />
       </div>
       <div className="px-5 py-5">
@@ -138,12 +139,13 @@ export default async function Home() {
           <div>
             <h1 id="hero-h" className="text-6xl md:text-8xl">Pay on proof.</h1>
             <p className="mt-6 max-w-[34rem] text-lg leading-relaxed text-[var(--hs-muted)] md:text-xl">
-              Describe the deal in one sentence. PayPal holds the buyer&rsquo;s money, Claude checks the seller&rsquo;s photos and tracking against what you both signed, and a fixed rule in code releases the payment or sends it back.
+              For deals between strangers on swap forums, social marketplaces and group chats. Describe the deal in one sentence. PayPal holds the buyer&rsquo;s money, Claude checks the seller&rsquo;s photos and tracking against what you both signed, and a fixed rule in code releases the payment or sends it back.
             </p>
             <div className="mt-8">
-              <Actions signedIn={signedIn} anchor />
+              <Actions signedIn={signedIn} secondary />
             </div>
-            <p className="hs-help mt-4">
+            <p className="hs-help mt-4">AI agents can make the deal. They can&rsquo;t move the money.</p>
+            <p className="hs-help mt-1">
               {signedIn ? `Signed in as ${me.display_name ?? me.email}.` : "PayPal sandbox only: no real money moves."}
             </p>
           </div>
@@ -218,7 +220,7 @@ export default async function Home() {
         </section>
 
         <section aria-labelledby="sides-h" className="mx-auto max-w-6xl px-4 py-16 md:px-8 md:py-20">
-          <h2 id="sides-h" className="hs-display text-3xl md:text-4xl">Fair to both sides</h2>
+          <h2 id="sides-h" className="hs-display text-3xl md:text-4xl">What each side gets</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             {([["buyers-h", "For buyers", BUYERS], ["sellers-h", "For sellers", SELLERS]] as const).map(([id, title, items]) => (
               <section key={id} aria-labelledby={id} className="hs-card md:p-8">
@@ -258,7 +260,7 @@ export default async function Home() {
               <h2 id="cta-h" className="hs-display text-3xl">{signedIn ? "Pick up where you left off." : "Try a deal in the sandbox."}</h2>
               <p className="mt-2 text-[var(--hs-muted)]">Sign-in takes an email link and a code from your authenticator app.</p>
             </div>
-            <Actions signedIn={signedIn} anchor={false} />
+            <Actions signedIn={signedIn} secondary={false} />
           </div>
         </section>
       </main>
