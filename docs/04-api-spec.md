@@ -1086,6 +1086,7 @@ export type DashboardDeal = {
   item_title: string;
   role: 'buyer' | 'seller';
   status: DealStatus;
+  status_label: string;          // STATUS_LABEL[status]
   amount_usd: number;            // amount_minor / 100
   held_usd: number;              // amount_usd if status in held, proof_submitted, in_review; else 0
   released_usd: number;          // amount_usd if status in captured, paid; else 0
@@ -1093,6 +1094,7 @@ export type DashboardDeal = {
   created_at: string;            // ISO 8601
   deadline_at: string | null;
   decision: Decision | null;     // newest decision, see below
+  decision_label: string;        // the decision in plain words, or 'No verdict'
   lowest_confidence: number | null;
   fix_attempts_used: 0 | 1;
   seeded: boolean;
@@ -1104,7 +1106,7 @@ export type DashboardVerdict = {
   submission_no: 1 | 2;
   result: 'pass' | 'fail' | 'unclear';
   confidence: number;            // 0..1
-  confidence_band: '< 0.70' | '0.70 - 0.84' | '0.85 - 0.94' | '0.95 - 1.00';
+  confidence_band: '0.00 - 0.69' | '0.70 - 0.84' | '0.85 - 0.94' | '0.95 - 1.00';
 };
 
 export type DashboardDecision = {

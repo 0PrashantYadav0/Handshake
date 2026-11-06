@@ -1,6 +1,6 @@
 // docs/agents.md: agent keys, the mandate, the MCP surface and the negotiation guard. The money path stays behind a person and the rule.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { negotiate, runToGate, SCENARIOS, type DeskEvent } from "@/lib/agents/desk";
+import { negotiate, runToGate, SCENARIOS, type DeskEvent, type ScenarioId } from "@/lib/agents/desk";
 import { agentFromToken, issueAgentKey, revokeAgentKey } from "@/lib/agents/keys";
 import { handleRpc } from "@/lib/agents/mcp";
 import { callTool, TOOLS, type ToolContext } from "@/lib/agents/tools";
@@ -149,9 +149,9 @@ describe("the MCP surface", () => {
 });
 
 describe("negotiation", () => {
-  const run2 = async () => {
+  const run2 = async (id: ScenarioId = "honest") => {
     const seen: DeskEvent[] = [];
-    const price = await negotiate("honest", deps, (e) => seen.push(e));
+    const price = await negotiate(id, deps, (e) => seen.push(e));
     return { price, seen };
   };
 
@@ -168,11 +168,11 @@ describe("negotiation", () => {
     expect(price).toBe(SCENARIOS.honest.budget_minor);
   });
 
-  test("the injected opening reaches the buyer's model as an offer, and the real purchase stops at the mandate", async () => {
+  test.each([false, true])("the injected opening reaches the buyer's model as an offer, and the real purchase stops at the mandate (a fooled model accepting: %s)", async (accept) => {
     const seen: string[] = [];
     deps.ai.negotiateWith((i) => {
       seen.push(i.history[0]!.say);
-      return i.role === "buyer" ? { say: "No.", offer_minor: 1500, accept: false } : { say: "No.", offer_minor: 9500, accept: false };
+      return i.role === "buyer" ? { say: "No.", offer_minor: 1500, accept } : { say: "No.", offer_minor: 9500, accept };
     });
     const out: DeskEvent[] = [];
     await runToGate("hijack", p.buyer.id, deps, "https://x.test", (e) => out.push(e));
@@ -197,9 +197,31 @@ describe("negotiation", () => {
     expect(seen.at(-1)).toMatchObject({ t: "guard", agent: "buyer", text: `Out of turns. $${close / 100}.00 is inside both limits, so code closes the deal there.` });
   });
 
-  test("limits that don't overlap still end with no deal", async () => {
-    deps.ai.negotiateWith((i) => ({ say: "No", offer_minor: i.role === "buyer" ? 1500 : 9500, accept: false }));
-    expect(await negotiate("hijack", deps, () => {})).toBeNull();
+  test.each(["honest", "cheat"] as const)("%s: whatever the offers, a model that never accepts closes at or inside both limits", async (id) => {
+    const { budget_minor, floor_minor } = SCENARIOS[id];
+    for (const [bid, ask] of [[100, 999_900], [budget_minor, floor_minor], [floor_minor, budget_minor]]) {
+      deps.ai.negotiateWith((i) => ({ say: "No", offer_minor: i.role === "buyer" ? bid! : ask!, accept: false }));
+      const { price, seen } = await run2(id);
+      expect(price).toBeGreaterThanOrEqual(floor_minor);
+      expect(price).toBeLessThanOrEqual(budget_minor);
+      expect(seen.at(-1)).toMatchObject({ t: "guard", agent: "buyer", text: expect.stringContaining("Out of turns.") });
+    }
+  });
+
+  test("the buyer's extra turn answers the seller's last offer, and code doesn't step in", async () => {
+    let turn = 0;
+    deps.ai.negotiateWith((i) => ({ say: "Deal", offer_minor: i.role === "buyer" ? 1700 : 1900, accept: ++turn === 9 })); // 4 rounds of 2, then the buyer
+    const { price, seen } = await run2();
+    expect(turn).toBe(9);
+    expect(price).toBe(1900); // the seller's offer, not the 1800 midpoint
+    expect(seen.some((e) => e.t === "guard")).toBe(false);
+  });
+
+  test.each([false, true])("limits that don't overlap end with no deal (a fooled model accepting: %s)", async (accept) => {
+    deps.ai.negotiateWith((i) => ({ say: "OK", offer_minor: i.role === "buyer" ? 9500 : 9500, accept }));
+    const { price, seen } = await run2("hijack");
+    expect(price).toBeNull();
+    expect(seen.some((e) => e.t === "guard" && e.text.startsWith("Mandate refused"))).toBe(accept);
   });
 });
 

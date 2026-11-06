@@ -35,7 +35,7 @@ describe("GET /api/dashboard/data", () => {
     const cap = body.deals.find((d) => d.code === captured)!;
     expect(cap).toMatchObject({ role: "buyer", status: "captured", amount_usd: 80, released_usd: 80, held_usd: 0, voided_usd: 0, decision: "capture", fix_attempts_used: 0, seeded: false });
     expect(Object.keys(cap).sort()).toEqual(
-      ["amount_usd", "code", "created_at", "deadline_at", "decision", "fix_attempts_used", "held_usd", "item_title", "lowest_confidence", "released_usd", "role", "seeded", "status", "voided_usd"],
+      ["amount_usd", "code", "created_at", "deadline_at", "decision", "decision_label", "fix_attempts_used", "held_usd", "item_title", "lowest_confidence", "released_usd", "role", "seeded", "status", "status_label", "voided_usd"],
     );
     expect(body.verdicts.length).toBeGreaterThan(0);
     expect(body.verdicts.every((v) => v.deal_code === captured && v.submission_no === 1 && v.result === "pass")).toBe(true);

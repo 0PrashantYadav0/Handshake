@@ -779,16 +779,17 @@ Columns, from `GET /api/deals` rows (`LedgerRow` in 09 section 4.1, plus `seeded
 | Column | Field | Rendering |
 | --- | --- | --- |
 | Code | `code` | Link cell renderer to `/deal/{code}` (keyboard-accessible); pinned left |
-| Item | `item_title` | Text, `flex: 1` |
+| Item | `item_title` | Text, `flex: 1`; "Sample" badge when `seeded`, and the search box finds "sample" |
 | Role | `role` | "Buyer" / "Seller" |
-| Counterparty | `counterparty` | Display name or "—" |
+| Other party | `counterparty` | Display name or "—" |
 | Amount | `amount_minor` | Money formatter; right-aligned; number filter |
 | Status | `status` | `StatusPill` cell renderer; set filter via the chips |
 | Deadline | `deadline_at` | Local date-time or "—" |
 | Last event | `last_event_cause` | Timeline sentence from 7.11, else raw |
-| Confidence | `lowest_confidence` | "92%" or "—" (lowest confidence of the latest attempt) |
+| Confidence | `lowest_confidence` | "92%" or "—" (lowest confidence of the latest attempt); hidden by default so the rest fit |
 | Last activity | `last_event_at` | Relative time with ISO in `title` |
-| Sample | `seeded` | "Sample" badge or blank |
+
+Below 640 px the grid shows Item, Amount and Status only; a tap on the row opens the deal.
 
 Empty state (no rows): the grid is replaced by "No deals yet." and a "New deal" button. Loading: a skeleton of six rows. The row data is fetched on the server for first paint and refetched with "Refresh" (no polling).
 

@@ -1,14 +1,16 @@
 // Pure builders for GET /api/dashboard/data (04 section 14; 09 section 5.2). No I/O; unit-tested with hand-built fixtures.
 import type { DealEvent, DealStatus, DealView, LedgerRow, Submission } from "@/lib/deal/types";
+import { STATUS_LABEL } from "@/lib/status-labels";
 
 export type Decision = "capture" | "request_fix" | "buyer_review" | "void";
-export type ConfidenceBand = "< 0.70" | "0.70 - 0.84" | "0.85 - 0.94" | "0.95 - 1.00";
+export type ConfidenceBand = "0.00 - 0.69" | "0.70 - 0.84" | "0.85 - 0.94" | "0.95 - 1.00";
 
 export type DashboardDeal = {
   code: string;
   item_title: string;
   role: "buyer" | "seller";
   status: DealStatus;
+  status_label: string;
   amount_usd: number;
   held_usd: number;
   released_usd: number;
@@ -16,6 +18,7 @@ export type DashboardDeal = {
   created_at: string;
   deadline_at: string | null;
   decision: Decision | null;
+  decision_label: string;
   lowest_confidence: number | null;
   fix_attempts_used: 0 | 1;
   seeded: boolean;
@@ -52,12 +55,13 @@ export type DashboardData = {
 const HELD: DealStatus[] = ["held", "proof_submitted", "in_review"];
 const RELEASED: DealStatus[] = ["captured", "paid"];
 const DECISIONS: Decision[] = ["capture", "request_fix", "buyer_review", "void"];
+const DECISION_LABEL: Record<Decision, string> = { capture: "Release", request_fix: "Fix requested", buyer_review: "Buyer review", void: "Void" };
 
 export const usd = (minor: number | null): number => (minor ?? 0) / 100;
 
-/** Band edges: 0.85 is PASS_THRESHOLD and lands in the passing band (D9). */
+/** Band edges: 0.85 is PASS_THRESHOLD and lands in the passing band (D9). Labels sort in confidence order as text. */
 export function confidenceBand(c: number): ConfidenceBand {
-  if (c < 0.7) return "< 0.70";
+  if (c < 0.7) return "0.00 - 0.69";
   if (c < 0.85) return "0.70 - 0.84";
   if (c < 0.95) return "0.85 - 0.94";
   return "0.95 - 1.00";
@@ -66,18 +70,21 @@ export function confidenceBand(c: number): ConfidenceBand {
 /** `decisions` must already be in decided_at order; the newest one is the deal's decision. */
 export function toDashboardDeal(row: LedgerRow, view: Pick<DealView, "fix_attempts_used" | "created_at">, decisions: DashboardDecision[]): DashboardDeal {
   const amount_usd = usd(row.amount_minor);
+  const decision = decisions.at(-1)?.decision ?? null;
   return {
     code: row.code,
     item_title: row.item_title,
     role: row.role,
     status: row.status,
+    status_label: STATUS_LABEL[row.status],
     amount_usd,
     held_usd: HELD.includes(row.status) ? amount_usd : 0,
     released_usd: RELEASED.includes(row.status) ? amount_usd : 0,
     voided_usd: row.status === "voided" ? amount_usd : 0,
     created_at: view.created_at,
     deadline_at: row.deadline_at,
-    decision: decisions.at(-1)?.decision ?? null,
+    decision,
+    decision_label: decision ? DECISION_LABEL[decision] : "No verdict",
     lowest_confidence: row.lowest_confidence,
     fix_attempts_used: view.fix_attempts_used,
     seeded: row.seeded,

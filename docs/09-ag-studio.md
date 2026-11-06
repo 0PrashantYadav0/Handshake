@@ -316,6 +316,7 @@ export type DashboardDeal = {
   item_title: string;
   role: 'buyer' | 'seller';
   status: DealStatus;
+  status_label: string;          // STATUS_LABEL[status]
   amount_usd: number;            // amount_minor / 100
   held_usd: number;              // amount_usd if status in held, proof_submitted, in_review; else 0
   released_usd: number;          // amount_usd if status in captured, paid; else 0
@@ -323,6 +324,7 @@ export type DashboardDeal = {
   created_at: string;            // ISO 8601
   deadline_at: string | null;
   decision: Decision | null;     // newest decision, see below
+  decision_label: string;        // the decision in plain words, or 'No verdict'
   lowest_confidence: number | null; // LedgerRow.lowest_confidence, unchanged
   fix_attempts_used: 0 | 1;
   seeded: boolean;
@@ -334,7 +336,7 @@ export type DashboardVerdict = {
   submission_no: 1 | 2;
   result: 'pass' | 'fail' | 'unclear';
   confidence: number;            // 0..1
-  confidence_band: '< 0.70' | '0.70 - 0.84' | '0.85 - 0.94' | '0.95 - 1.00';
+  confidence_band: '0.00 - 0.69' | '0.70 - 0.84' | '0.85 - 0.94' | '0.95 - 1.00';
 };
 
 export type DashboardDecision = {
@@ -362,7 +364,7 @@ How the route builds it, using only the module's public queries (B2):
 1. `listDeals(actor, deps)` gives the `LedgerRow[]` (section 4.1).
 2. For each deal, `getDeal(code, actor, deps)` gives `conditions[]` and `verdicts[]`, and `getEvents(code, actor, deps)` gives the `deal_events` rows.
 3. A decision is any event whose `cause` starts with `decision:` (C6, section 4.5); the part after the colon is the `Decision` (`capture`, `request_fix`, `buyer_review`, `void`). `DashboardDeal.decision` is the newest one. Buyer reviews (`review:approve`, `review:reject`) are not decisions.
-4. `confidence_band` is fixed: `< 0.70`, `0.70 - 0.84`, `0.85 - 0.94` (below and at `PASS_THRESHOLD`; exactly 0.85 passes, D9), `0.95 - 1.00`.
+4. `confidence_band` is fixed: `0.00 - 0.69`, `0.70 - 0.84`, `0.85 - 0.94` (below and at `PASS_THRESHOLD`; exactly 0.85 passes, D9), `0.95 - 1.00`.
 
 ```ts
 // ponytail: 2N+1 module calls for ~30 deals is a few milliseconds on local Postgres;
@@ -493,15 +495,15 @@ Widget `type` values are from the widget catalogue list in [research/ag-grid.md]
 
 | Id | Type | Title | Data mapping | x | y | w | h |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `held` | `value` | Money held | `value: deals.held_usd`, `sum` | 0 | 0 | 6 | 8 |
-| `released` | `value` | Released to sellers | `value: deals.released_usd`, `sum` | 6 | 0 | 6 | 8 |
-| `voided` | `value` | Returned to buyers | `value: deals.voided_usd`, `sum` | 12 | 0 | 6 | 8 |
-| `statusFilter` | `button-filter` | Status | `value: deals.status` | 18 | 0 | 6 | 8 |
+| `held` | `value` | Money held | `value: deals.held_usd`, `sum` | 0 | 0 | 8 | 8 |
+| `released` | `value` | Released to sellers | `value: deals.released_usd`, `sum` | 8 | 0 | 8 | 8 |
+| `voided` | `value` | Returned to buyers | `value: deals.voided_usd`, `sum` | 16 | 0 | 8 | 8 |
 | `pipeline` | `deal-pipeline` (custom) | Deal pipeline | `status: deals.status`; `deals: deals.code`, `count`; `money: deals.amount_usd`, `sum` | 0 | 8 | 24 | 14 |
-| `byStatus` | `donut-chart` | Deals by status | `categoryKey: deals.status`; `valueKey: deals.code`, `count` | 0 | 22 | 8 | 18 |
-| `confidence` | `column-chart-grouped` | Verdict confidence | `categoryKey: verdicts.confidence_band`; `valueKey: verdicts.deal_code`, `count` | 8 | 22 | 8 | 18 |
-| `overTime` | `column-chart-stacked` | Decisions over time | `categoryKey: decisions.decided_on`; `valueKey: is_capture, is_request_fix, is_buyer_review, is_void`, each `sum` | 16 | 22 | 8 | 18 |
-| `dealsGrid` | `grid` | Deals | columns `code, item_title, status, amount_usd, decision, lowest_confidence, deadline_at` | 0 | 40 | 24 | 22 |
+| `byStatus` | `bar-chart-grouped` | Deals by status | `categoryKey: deals.status_label`; `valueKey: deals.code`, `count` | 0 | 22 | 9 | 18 |
+| `confidence` | `column-chart-grouped` | Verdict confidence | `categoryKey: verdicts.confidence_band`; `valueKey: verdicts.deal_code`, `count` | 9 | 22 | 6 | 18 |
+| `overTime` | `column-chart-stacked` | Decisions over time | `categoryKey: decisions.decided_on`; `valueKey: is_capture, is_request_fix, is_buyer_review, is_void`, each `sum` | 15 | 22 | 9 | 18 |
+| `statusFilter` | `button-filter` | Status | `value: deals.status_label` | 0 | 40 | 24 | 8 |
+| `dealsGrid` | `grid` | Deals | columns `code, item_title, status_label, amount_usd, decision_label, lowest_confidence, deadline_at` | 0 | 48 | 24 | 22 |
 
 ```ts
 // components/StudioCanvas.tsx, initialState (one widget per kind shown; the rest follow the table)
@@ -518,9 +520,9 @@ export const initialState: AgReportState = {
         dataMapping: { value: [{ id: 'deals.held_usd', aggregation: 'sum' }] },
       },
       byStatus: {
-        type: 'donut-chart',
+        type: 'bar-chart-grouped',
         format: { title: { enabled: true, text: 'Deals by status' } },
-        dataMapping: { categoryKey: [{ id: 'deals.status' }], valueKey: [{ id: 'deals.code', aggregation: 'count' }] },
+        dataMapping: { categoryKey: [{ id: 'deals.status_label' }], valueKey: [{ id: 'deals.code', aggregation: 'count' }] },
       },
       overTime: {
         type: 'column-chart-stacked',
@@ -546,9 +548,9 @@ export const initialState: AgReportState = {
 };
 ```
 
-As built: the `grid` widget maps `cols: [{ id }]`, charts map `categoryKey` / `valueKey`, and `sort` is `[{ field: { id }, direction }]` (`components/StudioCanvas.tsx`, against the 3.0.0 types). The `button-filter` and cross-filtering (click a donut slice, every other widget filters) are built in and need no code.
+As built: the `grid` widget maps `cols: [{ id }]`, charts map `categoryKey` / `valueKey`, and `sort` is `[{ field: { id }, direction }]` (`components/StudioCanvas.tsx`, against the 3.0.0 types). The `button-filter` and cross-filtering (click a bar, every other widget filters) are built in and need no code.
 
-The page is in `mode="edit"`: judges can drag, resize, add widgets from the menu (including "Handshake > Deal pipeline") and the agent can add widgets. Nothing is persisted; a reload restores `initialState`. That is the intended "reset".
+The page is in `mode="edit"` from 1200 px up; narrower screens get `mode="view"` with every widget in one column. In edit mode judges can drag, resize, add widgets from the menu (including "Handshake > Deal pipeline") and the agent can add widgets. Nothing is persisted; a reload restores `initialState`. That is the intended "reset".
 
 ### 5.5 Theme
 

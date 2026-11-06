@@ -21,7 +21,7 @@ export function relTime(iso: string | null | undefined, now = Date.now()): strin
 
 // 08 section 7.11 sentences, minus the payload and actor parts a LedgerRow does not carry. Unknown causes show raw.
 const EVENT_SENTENCE: Record<string, string> = {
-  create: "Deal created from one sentence.",
+  create: "Deal created.",
   edit_terms: "Terms edited.",
   join: "Seller joined.",
   accept: "Terms accepted.",

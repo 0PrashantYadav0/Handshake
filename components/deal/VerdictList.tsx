@@ -51,7 +51,7 @@ export function VerdictList({ sub, deal, unclearFirst }: Props) {
             <div>
               <p>{c.text}</p>
               <p className="hs-help mt-1">{v.reason}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-1">{v.evidence_used.length ? v.evidence_used.map(chip) : <span className="hs-help">—</span>}</div>
+              {v.evidence_used.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1">{v.evidence_used.map(chip)}</div>}
             </div>
             <div aria-label={`Confidence ${Math.round(v.confidence * 100)} percent`}>
               <span className="tabular-nums">{pct(v.confidence)} sure</span>
