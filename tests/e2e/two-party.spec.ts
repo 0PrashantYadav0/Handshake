@@ -7,6 +7,9 @@ import { pass2fa, signContract, watchCsp } from "./flows";
 
 const status = (page: Page) => page.getByTestId("deal-status").first();
 
+// make-draft.ts writes straight to a database, so a hosted run needs that database's URL.
+test.skip(/^https:/.test(process.env.PLAYWRIGHT_BASE_URL ?? "") && !process.env.E2E_DATABASE_URL, "needs E2E_DATABASE_URL, the hosted database");
+
 test("both parties sign with device keys; the contract verifies in the browser", async ({ page: buyer, browser }) => {
   const code = execFileSync("npx", ["tsx", "--tsconfig", "tsconfig.json", "tests/e2e/make-draft.ts"], {
     encoding: "utf8", env: { ...process.env, NODE_OPTIONS: "--conditions=react-server" },

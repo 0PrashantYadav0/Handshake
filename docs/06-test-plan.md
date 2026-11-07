@@ -292,7 +292,7 @@ As built, `verifyPaypalSignature` never throws and returns `{ result: 'verified'
 
 - Recorded headers + recorded raw body + recorded `webhook_id` → `result: 'verified'`.
 - Raw body with one byte changed → `'unverified'`.
-- Raw body re-serialised with `JSON.stringify(JSON.parse(body))` → `'unverified'` (key order and whitespace matter; research/paypal.md §6 "Verification by postback").
+- Raw body with its bytes changed, such as re-indented JSON → `'unverified'` (key order and whitespace matter; research/paypal.md §6 "Verification by postback"). A plain `JSON.stringify(JSON.parse(body))` is not a test of this: PayPal's bodies are already compact, and all 37 recordings come back byte-identical.
 - Different `webhook_id` → `'unverified'`.
 - `webhook_id` `WEBHOOK_ID` → `'verified'` when `NODE_ENV` is not `production`, `'unverified'` when it is.
 - `fetchCert` that throws → `'fetch_failed'`, and the same URL is not fetched again for 60 s (negative cache); `clearCertCache()` resets both caches between tests.
@@ -633,7 +633,7 @@ Each check names the test or command that proves it. Ticked on 2026-10-12 (H-3, 
 - [x] No secret in logs: `paypal-adapter.test.ts` (a failed capture or payout logs one line, without the bearer token or the body), and `ai-extract.test.ts` "no secret or seller text in logs" (a failed extraction logs only the failure kind; the AI adapter logs nothing else).
 - [x] `deal_events` cannot be updated or deleted: `audit-log.int.test.ts` "UPDATE and DELETE raise".
 - [x] Seeded deals cannot trigger PayPal calls: `tick-select.test.ts` "any status with seeded = true -> not selected", and `reconcile.int.test.ts`.
-- [x] Pages run under a strict Content-Security-Policy (K11): `hardening.test.ts` "content security policy", and the two-party e2e fails on any violation.
+- [x] Pages run under a strict Content-Security-Policy (K11): `hardening.test.ts` "content security policy", and the happy-path and two-party e2e fail on any violation. The happy path is the one that runs on the hosted URL; two-party skips there unless `E2E_DATABASE_URL` is the hosted database.
 
 ## End to end (Playwright)
 

@@ -235,7 +235,7 @@ A fresh clone runs in under ten minutes with these steps in this order.
 2. Clone and install:
 
    ```bash
-   git clone git@github.com:0PrashantYadav0/Handshake.git handshake && cd handshake
+   git clone https://github.com/0PrashantYadav0/Handshake.git handshake && cd handshake
    npm ci
    ```
 
@@ -279,7 +279,7 @@ A fresh clone runs in under ten minutes with these steps in this order.
    ANTHROPIC_API_KEY=         # key handshake-local, section 3.2
    AI_MODEL=claude-sonnet-5-5
    RESEND_API_KEY=            # empty: links print to the console
-   EMAIL_FROM=Handshake <onboarding@resend.dev>
+   EMAIL_FROM="Handshake <onboarding@resend.dev>"
    PASS_THRESHOLD=0.85
    AUTO_CAPTURE_MAX_MINOR=20000
    CRON_SECRET=               # openssl rand -base64 32
@@ -608,7 +608,7 @@ The last three days, in order, so the README's video link and the final deploy n
 
 ## 10. README outline
 
-The README is written for a judge with one browser and ten minutes; its sections, in this order, are:
+The README is written for a judge with one browser and ten minutes. This is the planned outline; `README.md` itself is the source of truth, and it also has Screenshots and Security sections and has moved on from some button names below:
 
 ```
 # Handshake: pay on proof

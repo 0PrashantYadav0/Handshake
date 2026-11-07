@@ -14,7 +14,7 @@ The server needs `DEMO_LOGIN=true` and `DEMO_SELLER_PAYPAL_EMAIL` (the demo sell
 
 ```sh
 npm run build && npm run start &                                  # or any running server
-PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party  # on https:// it skips unless E2E_DATABASE_URL is that host's database
 ```
 
 ## Runner variables
