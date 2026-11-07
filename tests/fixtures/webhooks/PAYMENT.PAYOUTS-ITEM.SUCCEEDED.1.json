@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-11-06T13:02:08.787Z",
+  "event_type": "PAYMENT.PAYOUTS-ITEM.SUCCEEDED",
+  "webhook_id": "0L053046NP863452P",
+  "headers": {
+    "paypal-transmission-id": "43b09bd8-d9e2-11f1-bdb3-ad076d7fa180",
+    "paypal-transmission-time": "2026-11-06T13:02:04Z",
+    "paypal-transmission-sig": "Urjo4T6H7WWEtEzdzgQU9W/PwgH4mmvOX8qShoXCDOAGoEoH0ibeFX5e28vhTy5+2Chmcmc24L8bEg4LwlU41wpgDPltvJAfuKOxKHf5gHdNZOuXNUqB6JtGV7OQYxLfgjW8Po840E9tOcJpLdyukMcBswz0ys/JqqYdPCfTgD9XfFBiWmWDiP/TTm5bL5/m/jZf/IdZxpoREHT80g5hBmtx9uL7yMZMjy5VyDSxOHnQVv7GmUSOGqLw5zr1I0dCqF1H8lTrO80QZzT0YdgLr2zzwBXuFeRTa/7whx4TJDSXIlLhUtPzCNc2wgg5NAwGXYvrtnLWnzxCbx1/eDS2sA==",
+    "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-9eaebfdf",
+    "paypal-auth-algo": "SHA256withRSA"
+  },
+  "raw_body": "{\"id\":\"WH-48849169YB951331Y-0DC55114WF160325V\",\"event_version\":\"1.0\",\"create_time\":\"2026-11-06T13:01:58.386Z\",\"resource_type\":\"payouts_item\",\"event_type\":\"PAYMENT.PAYOUTS-ITEM.SUCCEEDED\",\"summary\":\"A payout item has succeeded\",\"resource\":{\"transaction_id\":\"8AR28023SC656462N\",\"payout_item_fee\":{\"currency\":\"USD\",\"value\":\"0.25\"},\"transaction_status\":\"SUCCESS\",\"sender_batch_id\":\"payout-HS-KCMM-1\",\"time_processed\":\"2026-11-06T13:01:46Z\",\"activity_id\":\"4R942442HY607762P\",\"payout_item\":{\"recipient_type\":\"EMAIL\",\"amount\":{\"currency\":\"USD\",\"value\":\"18.00\"},\"note\":\"Handshake deal HS-KCMM\",\"receiver\":\"sb-qeh2p53385323@personal.example.com\",\"sender_item_id\":\"payout-HS-KCMM-1\",\"recipient_wallet\":\"PAYPAL\"},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/payments/payouts-item/D65ZQ94KYHCRN\",\"rel\":\"self\",\"method\":\"GET\",\"encType\":\"application/json\"},{\"href\":\"https://api.sandbox.paypal.com/v1/payments/payouts/LLP8NVZLWP3CN\",\"rel\":\"batch\",\"method\":\"GET\",\"encType\":\"application/json\"}],\"payout_item_id\":\"D65ZQ94KYHCRN\",\"payout_batch_id\":\"LLP8NVZLWP3CN\"},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-48849169YB951331Y-0DC55114WF160325V\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-48849169YB951331Y-0DC55114WF160325V/resend\",\"rel\":\"resend\",\"method\":\"POST\"}]}"
+}

@@ -77,6 +77,8 @@ From the hosted app on 2026-11-06. PayPal sandbox only.
 | ![Release payment and reject proof buttons on a blurry deal](docs/screenshots/14-buyer-decides.jpg) | ![AG Studio dashboard with the agent explaining why a deal was voided](docs/screenshots/2x-studio-agent.jpg) |
 | **Two agents haggle, sign and stop at PayPal** | **A prompt injection: code refuses the $95 purchase** |
 | ![Agent desk transcript ending at the PayPal approval step](docs/screenshots/16-agents-stop-at-paypal.jpg) | ![Agent desk transcript where the mandate refuses the purchase](docs/screenshots/18-agents-hijack-refused.jpg) |
+| **The honest deal ends paid** | |
+| ![Agent desk with Claude's three passing verdicts and the deal marked Paid](docs/screenshots/17-agents-deal-done.jpg) | |
 
 ## How it works
 
@@ -158,6 +160,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the 10-minute job voids the hold. |
 | 3-day honor period | PayPal honors an authorization's funds for 3 days and allows capture for up to 29. Deals here run up to 21 days, so a capture after day 3 can be declined. A decline returns the deal to the buyer for a new try. The sandbox can't fast-forward time, so this path is tested against a fixture, not live. Production would reauthorize after day 3. |
 | Long holds, measured | One sandbox hold was captured 21 days after authorization, on its original authorization id with no reauthorization (authorization `21Y15276XD1807710`, capture `56598020KB204891K`, 2026-11-05). The planned captures on days 4 and 12 were not run, so this is one data point at the longest gap, and it is sandbox only. Sandbox Payouts needed a US sandbox business account, not a feature toggle (first app: 403 `PAYOUT_NOT_AVAILABLE`; US app: `SUCCESS`, 2026-10-15). |
+| Payout retry, not finished in the sandbox | Retrying an unclaimed payout cancels the old item first, so the seller can't be paid twice. In the sandbox that cancel answered 500 `INTERNAL_SERVICE_ERROR` on all 7 answered tries over 14 hours for deal HS-RNUK (batch `C87YL9VCPFZYQ`), and on 2 of 3 other test items. The app answers 502, sends no second payout, and the deal stays `captured` with the failure shown. So the real sandbox run reached `failed` with `UNCLAIMED` but not attempt 2; the retry itself is covered only by integration tests against a fake PayPal. |
 | No shipping address | Orders use `NO_SHIPPING`, so PayPal collects no address and the seller never gets one from Handshake. Nothing ships in the demo. Production would use `GET_FROM_FILE` and show the seller that address, because PayPal Seller Protection depends on shipping to the address on the transaction. |
 | No refunds | The seller is paid right after capture and Handshake has no refund step. After that, a buyer's recourse is a PayPal dispute against the platform account. Disputes are on the production list. |
 | Ignored reviews | If a buyer ignores a review, the hold is voided at the deadline, even when the parcel arrived. That favours the buyer. Production needs a neutral reviewer for this case. |

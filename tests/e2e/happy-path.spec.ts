@@ -59,7 +59,7 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
     [popup] = await Promise.all([buyer.waitForEvent("popup", { timeout: 5_000 }), buttons.locator('[data-funding-source="paypal"]').click()]);
   }).toPass({ timeout: 60_000 });
   await approveInPopup(popup);
-  await popup.waitForEvent("close", { timeout: 60_000 });
+  if (!popup.isClosed()) await popup.waitForEvent("close", { timeout: 60_000 }); // PayPal may have closed it already
   await expect(status(buyer)).toHaveText("held", { timeout: 30_000 });
 
   // 7. Seller submits the good sample -> verdicts

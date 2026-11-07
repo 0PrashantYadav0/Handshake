@@ -122,7 +122,7 @@ export function realPaypal(env: NodeJS.ProcessEnv = process.env): PayPal {
               brandName: "Handshake",
               userAction: PaypalExperienceUserAction.PayNow,
               shippingPreference: PaypalWalletContextShippingPreference.NoShipping,
-              ...(env.APP_URL ? { returnUrl: `${env.APP_URL}/deals/${code}?pp=return`, cancelUrl: `${env.APP_URL}/deals/${code}?pp=cancel` } : {}),
+              ...(env.APP_URL ? { returnUrl: `${env.APP_URL}/deal/${code}?pp=return`, cancelUrl: `${env.APP_URL}/deal/${code}?pp=cancel` } : {}),
             } } },
           },
         });

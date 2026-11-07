@@ -24,7 +24,7 @@ async function runDesk(page: Page, scenario: "honest" | "cheat") {
     [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 5_000 }), buttons.locator('[data-funding-source="paypal"]').click()]);
   }).toPass({ timeout: 60_000 });
   await approveInPopup(popup);
-  await popup.waitForEvent("close", { timeout: 60_000 });
+  if (!popup.isClosed()) await popup.waitForEvent("close", { timeout: 60_000 }); // PayPal may have closed it already
 }
 
 test("hijacking seller: the injected budget changes nothing, and the purchase itself is refused by code", async ({ page }) => {

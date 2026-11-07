@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-11-06T13:12:59.244Z",
+  "event_type": "PAYMENT.AUTHORIZATION.CREATED",
+  "webhook_id": "0L053046NP863452P",
+  "headers": {
+    "paypal-transmission-id": "c7f1c49c-d9e3-11f1-98c7-fda345ab1d05",
+    "paypal-transmission-time": "2026-11-06T13:12:56Z",
+    "paypal-transmission-sig": "HuENRZKaVZtZHB97CaeJdStJ3eGIbK65vI124nFnbKrI72PLeYhKo6mO0qtGYr45JYCX2IqoZ8KIx/+fsyy0eQMXLpqi+VxTKaDxBmkR5jyUr0XywMha4/HmHvWcD3ckzGtrh2jwUyotTUa+pd/gNvpjIhuZAp+SWH2JXkZ4pCN/Um9Bjn1Ps1L6TY0hxYQhkCkdsx0WxRcf/n3FeYw0g2kk7+UFRACF4nMaCC9+cCoxEmITPpUIXIdXHEuwwgqVqF33hptqk53WiwuKPesAe5lARgmcE9R8A9HnQv8CVljKPZwD6u9H69i545cJFlvObngJWeZpJWrvdqfGUKalqw==",
+    "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-9eaebfdf",
+    "paypal-auth-algo": "SHA256withRSA"
+  },
+  "raw_body": "{\"id\":\"WH-89U521165V718350H-82C229648H3130739\",\"event_version\":\"1.0\",\"create_time\":\"2026-11-06T13:12:41.256Z\",\"resource_type\":\"authorization\",\"resource_version\":\"2.0\",\"event_type\":\"PAYMENT.AUTHORIZATION.CREATED\",\"summary\":\"A successful payment authorization was created for $ 18.0 USD\",\"resource\":{\"id\":\"90C30569N0086060F\",\"status\":\"CREATED\",\"amount\":{\"currency_code\":\"USD\",\"value\":\"18.00\"},\"custom_id\":\"HS-C55D\",\"seller_protection\":{\"status\":\"ELIGIBLE\",\"dispute_categories\":[\"ITEM_NOT_RECEIVED\",\"UNAUTHORIZED_TRANSACTION\"]},\"supplementary_data\":{\"related_ids\":{\"order_id\":\"59L30742T1998341N\"}},\"payee\":{\"email_address\":\"sb-lkrhh53338083@business.example.com\",\"merchant_id\":\"ZCAJM7FNQY3AL\"},\"expiration_time\":\"2026-12-05T13:12:36Z\",\"create_time\":\"2026-11-06T13:12:36Z\",\"update_time\":\"2026-11-06T13:12:36Z\",\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/90C30569N0086060F\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/90C30569N0086060F/capture\",\"rel\":\"capture\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/90C30569N0086060F/void\",\"rel\":\"void\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/payments/authorizations/90C30569N0086060F/reauthorize\",\"rel\":\"reauthorize\",\"method\":\"POST\"},{\"href\":\"https://api.sandbox.paypal.com/v2/checkout/orders/59L30742T1998341N\",\"rel\":\"up\",\"method\":\"GET\"}]},\"links\":[{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-89U521165V718350H-82C229648H3130739\",\"rel\":\"self\",\"method\":\"GET\"},{\"href\":\"https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-89U521165V718350H-82C229648H3130739/resend\",\"rel\":\"resend\",\"method\":\"POST\"}]}"
+}
