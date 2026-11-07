@@ -1,12 +1,13 @@
 // The one e2e: real UI, real PayPal sandbox, real Claude (06 "End to end", ten steps). Testids from 08 section 4.7.
 import { expect, test, type Page } from "@playwright/test";
 import { approveInPopup } from "./paypal-popup";
-import { pass2fa, signContract } from "./flows";
+import { pass2fa, signContract, watchCsp } from "./flows";
 
 const CODE = /^HS-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/;
 const status = (page: Page) => page.getByTestId("deal-status").first();
 
 test("judge happy path: sentence to released payment", async ({ page: buyer, browser }) => {
+  const csp = await watchCsp(buyer);
   // 1. Buyer persona
   await buyer.goto("/signin");
   await buyer.getByTestId("persona-buyer").click();
@@ -33,6 +34,7 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   // 4. Seller in a second context: sign in (demo 2FA), preview, join, sign
   const sellerContext = await browser.newContext();
   const seller = await sellerContext.newPage();
+  const sellerCsp = await watchCsp(seller);
   await seller.goto(`/deal/${code}`);
   await seller.getByTestId("persona-seller").click();
   await pass2fa(seller);
@@ -102,6 +104,7 @@ test("judge happy path: sentence to released payment", async ({ page: buyer, bro
   expect(pack.deal.status).toBe(final);
   expect(pack.submissions[0].verdicts).toHaveLength(3);
   expect(pack.events.length).toBeGreaterThanOrEqual(10);
+  expect([...csp, ...sellerCsp]).toEqual([]); // H-2: the policy blocks nothing the app needs, PayPal's SDK included
 
   await sellerContext.close();
 });

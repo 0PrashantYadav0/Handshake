@@ -155,7 +155,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Agent limits | The live desk runs as the Demo Buyer and is limited to 12 runs per 10 minutes per account and 60 per hour overall, because it spends model tokens. `POST /api/mcp` takes 120 requests per 10 minutes per user, however many keys the user has (JSON-RPC error -32002), and two requests over 1 MB at a time overall (503). `propose_deal` also counts against the 20 new deals above. In demo mode anyone can make an agent key for the shared demo personas; the ceiling and the PayPal approval still apply. |
 | Platform as merchant | The Handshake sandbox business account receives the capture and pays the seller through Payouts. A production build would use PayPal multiparty onboarding so the seller is the payee. |
 | Seeded history | The ledger and dashboard show about 25 seeded historical deals (`deals.seeded = true`) with events but no PayPal objects, so there is something to sort and chart. Deals you create are real sandbox deals. |
-| AG Studio trial | `/dashboard` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
+| AG Studio trial | `/dashboard/studio` runs on an AG Studio 45-day trial key. If the key's tier does not cover the AI module, Studio shows a licence banner and watermark; the features still work. |
 | Demo login | Magic-link email only reaches the account owner's address (Resend test sender), so judges use the two demo personas. The seller persona's payout address comes from `DEMO_SELLER_PAYPAL_EMAIL` and is reset each time you switch to that persona, so edits on `/me` do not stick. |
 | 21-day cap | Deals are capped at 21 days after the hold. There is no reauthorization; past the deadline the 10-minute job voids the hold. |
 | 3-day honor period | PayPal honors an authorization's funds for 3 days and allows capture for up to 29. Deals here run up to 21 days, so a capture after day 3 can be declined. A decline returns the deal to the buyer for a new try. The sandbox can't fast-forward time, so this path is tested against a fixture, not live. Production would reauthorize after day 3. |
@@ -173,7 +173,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | PayPal Orders v2 (intent `AUTHORIZE`), Payments v2 (authorize, capture, void), Payouts v1, Webhooks v1 | Hold the buyer's money at terms acceptance, capture or void it from `decide()`, pay the seller, and learn about captures, voids and payouts from webhooks. Signatures are verified in our own code (cert from `PAYPAL-CERT-URL`, CRC32, RSA-SHA256). Every write carries a `PayPal-Request-Id`; every PayPal fact is applied once, from the API response or the webhook, whichever arrives first. `@paypal/paypal-server-sdk` 2.5 for Orders and Payments, raw `fetch` for Payouts and verification, `@paypal/react-paypal-js` for the button. |
 | Claude `claude-sonnet-5-5` via `@anthropic-ai/sdk` | Three jobs, all structured outputs against hand-written JSON schemas at `effort: low`: extract `item_title`, amount, deadline and 1 to 4 checkable conditions from the sentence (subjective parts come back in `rejected[]` with a rewording); judge each condition from labelled base64 photos, the mock carrier status and the note; take one negotiation turn for an agent, whose limits code enforces. Every verdict row stores `model`, `prompt_version` and `raw_response`. |
 | AG Grid Community 36.2 | `/ledger`: every deal of the signed-in persona, sortable, filterable, with status chips and a quick filter. |
-| AG Studio 3.0 | `/dashboard`: three sources from `/api/dashboard/data`, nine widgets on the canvas, a theme bound to the app's CSS tokens, a custom `deal-pipeline` widget (click a stage to cross-filter the page), and the built-in Studio agents plus a custom `auditor` agent, all answered by `claude-sonnet-5-5` through `POST /api/studio/agent`. The one server-run tool, `explain_verdict`, reads the signed-in user's own deal and audit log; the agent cannot change a deal or move money. The prompt box appears only when `ANTHROPIC_API_KEY` is set. Prompts that work: [docs/studio-prompts.md](docs/studio-prompts.md). Loaded client-side only. |
+| AG Studio 3.0 | `/dashboard/studio`: three sources from `/api/dashboard/data`, nine widgets on the canvas, a theme bound to the app's CSS tokens, a custom `deal-pipeline` widget (click a stage to cross-filter the page), and the built-in Studio agents plus a custom `auditor` agent, all answered by `claude-sonnet-5-5` through `POST /api/studio/agent`. The one server-run tool, `explain_verdict`, reads the signed-in user's own deal and audit log; the agent cannot change a deal or move money. The prompt box appears only when `ANTHROPIC_API_KEY` is set. Prompts that work: [docs/studio-prompts.md](docs/studio-prompts.md). Loaded client-side only. |
 | Render | One Blueprint (`render.yaml`): web service, Postgres 18, a cron every 10 minutes that calls `POST /api/jobs/tick`. Paid plans so nothing sleeps during judging. |
 | Prisma 7.10 + Postgres 18 | Schema, migrations (append-only trigger on `deal_events`), photos stored as `bytea` and served through HMAC-signed URLs that expire after 10 minutes. |
 | Next.js 16, React 19, TypeScript 5.9, Tailwind CSS v4, Zod, jose, Resend | The app, validation, HS256 session cookies, magic-link email. |
@@ -198,7 +198,7 @@ See [eval/README.md](eval/README.md) for flags, challenger models and how to add
 
 ## Run it locally
 
-Needs Node 24.21.0 (`.node-version`), Docker, and for webhooks `cloudflared`. Full detail in [docs/07-setup-deployment.md](docs/07-setup-deployment.md) section 4.
+Needs Node 24 (`.node-version` pins 24.21.0; `package.json` allows up to 26), Postgres 18 and, for webhooks, `cloudflared`. The commands below use Docker for Postgres; any Postgres 18 works if `DATABASE_URL` and `TEST_DATABASE_URL` point at it. Full detail, including account setup, in [docs/07-setup-deployment.md](docs/07-setup-deployment.md) sections 3 and 4.
 
 ```bash
 git clone https://github.com/0PrashantYadav0/Handshake.git handshake && cd handshake
@@ -208,10 +208,16 @@ docker compose exec db createdb -U postgres handshake_test
 cp .env.example .env                                     # then fill it, see the table below
 npx prisma migrate dev
 npm run seed                                             # two personas + about 25 historical deals
-npm run dev                                              # http://localhost:3000, click "Continue as buyer"
+npm run dev                                              # http://localhost:3000: Start a deal, Continue as buyer, Use demo code, Continue
 ```
 
-Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point a webhook on your PayPal app at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the job by hand with `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/tick`.
+If port 3000 is taken, run `npm run dev -- -p 3011` and set `APP_URL` to match.
+
+`npm ci` prints peer-dependency warnings and an audit count, and Prisma suggests an upgrade. Versions are pinned on purpose, so skip `npm audit fix --force` and `npm i prisma@latest`.
+
+Without PayPal and Anthropic keys the app still starts, and demo sign-in, `/ledger`, `/agents` and `/dashboard` load. Extracting terms needs `ANTHROPIC_API_KEY` (it answers 503 without one), and holds need the PayPal app.
+
+Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point a webhook on your PayPal app at `https://<words>.trycloudflare.com/api/webhooks/paypal`. Run the job by hand with `curl -fsS -X POST -H "Authorization: Bearer <CRON_SECRET from .env>" http://localhost:3000/api/jobs/tick`.
 
 `instrumentation.ts` checks these at server start with `lib/env.ts`. `next dev` only warns about a missing or malformed one; `next start` (production) refuses to serve and answers 500 everywhere, so a local production run needs every required name filled, even with placeholders. `npm run check-env` runs the same check without starting the server, then tries the PayPal, Anthropic and Resend keys against their services (`NODE_ENV=production npm run check-env` for the Render rules); it prints names and verdicts, never values.
 
@@ -219,16 +225,16 @@ Webhooks locally: `cloudflared tunnel --url http://localhost:3000`, then point a
 | --- | --- |
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/handshake` |
 | `APP_URL` | `http://localhost:3000` |
-| `SESSION_SECRET`, `FILE_URL_SECRET`, `CRON_SECRET` | Random strings, at least 32 characters each |
-| `DATA_KEYS` | Field encryption keyring: one secret of at least 32 characters, or `k2:<secret>,k1:<secret>` (the first encrypts; any listed key decrypts). Never change a key in place: prepend a new one, deploy, run `npm run reseal` |
+| `SESSION_SECRET`, `FILE_URL_SECRET`, `CRON_SECRET` | Random strings, at least 32 characters each (`openssl rand -base64 32`) |
+| `DATA_KEYS` | Field encryption keyring: `k1:<secret>` with a secret of at least 32 characters, or `k2:<secret>,k1:<secret>` (the first encrypts; any listed key decrypts). Never change a key in place: prepend a new one, deploy, run `npm run reseal` |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | A sandbox REST app (type Merchant) from developer.paypal.com; the public id is the same client id |
 | `PAYPAL_API_BASE` | `https://api-m.sandbox.paypal.com` |
 | `PAYPAL_WEBHOOK_ID` | The webhook on that app, subscribed to the order, authorization, capture and payout events. May be empty in development, required in production |
 | `ANTHROPIC_API_KEY`, `AI_MODEL` | Anthropic Console key; `claude-sonnet-5-5` (the default when unset) |
-| `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` is always required. `RESEND_API_KEY` may be empty in development, where magic links print to the server console; it is required in production (`lib/env.ts` refuses to boot without it) |
+| `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` is always required: `"Handshake <onboarding@resend.dev>"`, with the quotes in `.env`. `RESEND_API_KEY` may be empty in development, where magic links print to the server console; it is required in production (`lib/env.ts` refuses to boot without it) |
 | `PASS_THRESHOLD`, `AUTO_CAPTURE_MAX_MINOR` | `0.85`, `20000` |
 | `DEMO_LOGIN`, `DEMO_SELLER_PAYPAL_EMAIL` | `true`; the sandbox personal account that receives payouts |
-| `AG_GRID_LICENSE_KEY` | AG Studio trial key; leave empty for the ledger only |
+| `AG_GRID_LICENSE_KEY` | AG Studio trial key. Optional: without it everything still works, and `/dashboard/studio` can show a licence notice |
 
 ## Deploy it
 
@@ -238,7 +244,7 @@ Everything is one Blueprint: `render.yaml` declares the web service (`npm ci && 
 
 ```bash
 npm test                               # unit: state machine, decide(), facts, webhook verification, session, carrier
-npm run test:int                       # integration against handshake_test, serial: routes, flows, payment, webhooks, tick, rate limits, Studio agent
+npm run test:int                       # integration against TEST_DATABASE_URL (default handshake_test; the name must end in _test), serial: routes, flows, payment, webhooks, tick, rate limits, Studio agent
 npx playwright install chromium        # once
 E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test happy-path
                                        # builds and starts the app, runs the judge happy path end to end (sandbox personal account 1);
@@ -246,6 +252,7 @@ E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test hap
 PLAYWRIGHT_BASE_URL=https://<host> E2E_PAYPAL_BUYER_EMAIL=... E2E_PAYPAL_BUYER_PASSWORD=... npx playwright test agents
                                        # the agent desk on real Claude and the sandbox: honest, cheating and hijacking sellers
 PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party
+                                       # against https://<host> it skips unless E2E_DATABASE_URL is that host's database, because the draft is written straight to the database
                                        # both demo personas: 2FA, join, sign on both sides, contract verified in the browser;
                                        # needs no Anthropic or PayPal key (tests/e2e/make-draft.ts)
 npm run eval                           # the judge eval, calls the real API; prints the estimated cost at the end

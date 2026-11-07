@@ -980,7 +980,7 @@ Why the lock is not held across the call: a PayPal call can take seconds, and th
 
 Transactions that make no PayPal call (`edit_terms`, `join`, `accept`, `submit_evidence` Tx A, Tx V, `cancel` without a hold, most webhook facts, `tick` deadline voids after the call) are single transactions: lock, validate, write status and event, commit. A throw anywhere rolls the whole transaction back, so there is never a status change without its event or an event without its status change.
 
-The verdict request's time budget: Tx A under 0.1 s, carrier and `hashCheck()` 0 s, `ai.judge` at most 17 s per attempt inside a 19 s signal (D4; 9 s with one retry if the eval's p95 is under 8 s), Tx V under 0.1 s, capture at most 10 s (SDK `timeout: 10_000`), Tx B under 0.1 s, payout at most 10 s (`AbortSignal.timeout(10_000)`). Typical total is 6 to 12 s; the worst case is about 40 s, and the UI waits 45 s (B5). Render documents no request timeout (research/stack.md, "5. Render", "(d) Request timeout", UNVERIFIED); spike 4 in section 12 measures it.
+The verdict request's time budget: Tx A under 0.1 s, carrier and `hashCheck()` 0 s, `ai.judge` at most 17 s per attempt inside a 19 s signal (D4; 9 s with one retry if the eval's p95 is under 8 s), Tx V under 0.1 s, capture at most 10 s (SDK `timeout: 10_000`), Tx B under 0.1 s, payout at most 10 s (`AbortSignal.timeout(10_000)`). Typical total is 6 to 12 s; the worst case is about 40 s, and the UI waits 45 s (B5). Render documents no request timeout (research/stack.md, "5. Render", "(d) Request timeout"); spike 4 in section 12 measured a 40 s response answering 200.
 
 ## 9. Security
 
