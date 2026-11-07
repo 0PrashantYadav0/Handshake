@@ -134,9 +134,19 @@ async function signContract(base: string, jar: Jar, code: string): Promise<DealV
   if (!pair) keys.set(jar.who, (pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])));
   const signature = bytesToB64url(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(signingMessage(hash))));
   const jwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
-  const { code: totp } = (await must(api(base, jar, "GET", "/api/auth/2fa/demo-code"), `${jar.who} demo code`)) as { code: string };
+  const totp = await demoCode(base, jar.cookie);
   const body = { terms_version: v.terms_version, contract_hash: hash, signature, public_key: { x: jwk.x, y: jwk.y }, totp };
   return (await must(api(base, jar, "POST", `/api/deals/${code}/accept`, body), `${jar.who} sign`)) as unknown as DealView;
+}
+
+/** Each 30 s code works once (replay guard), so after a recent sign-in the server answers 409 until the next window. */
+async function demoCode(base: string, cookie: string): Promise<string> {
+  for (let tries = 0; ; tries++) {
+    const res = await fetch(`${base}/api/auth/2fa/demo-code`, { headers: { cookie } });
+    if (res.ok) return ((await res.json()) as { code: string }).code;
+    if (res.status !== 409 || tries === 13) throw new Error(`demo code -> ${res.status} ${(await res.text()).slice(0, 200)}`);
+    await new Promise((r) => setTimeout(r, 5_000));
+  }
 }
 
 async function signIn(base: string, persona: "buyer" | "seller"): Promise<Jar> {
@@ -144,7 +154,7 @@ async function signIn(base: string, persona: "buyer" | "seller"): Promise<Jar> {
   const cookie = /hs_session=[^;]+/.exec(res.headers.get("set-cookie") ?? "")?.[0];
   if (!res.ok || !cookie) throw new Error(`sign in ${persona} -> ${res.status} ${(await res.text()).slice(0, 200)} (is DEMO_LOGIN=true on the server?)`);
   // Second factor (trust spec §4): the personas' code comes from the demo endpoint; verifying swaps the partial cookie for a full one.
-  const { code } = (await (await fetch(`${base}/api/auth/2fa/demo-code`, { headers: { cookie } })).json()) as { code: string };
+  const code = await demoCode(base, cookie);
   const v = await fetch(`${base}/api/auth/2fa/verify`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ code }) });
   const full = /hs_session=[^;]+/.exec(v.headers.get("set-cookie") ?? "")?.[0];
   if (!v.ok || !full) throw new Error(`2FA ${persona} -> ${v.status} ${(await v.text()).slice(0, 200)}`);
@@ -280,14 +290,17 @@ const run: Record<Scenario, (f: Flags) => Promise<string>> = {
     const files = f.fixture ? [{ name: "PAYMENT.CAPTURE.COMPLETED.0.json", text: readFileSync(f.fixture, "utf8") }] : readdirSync(dir).map((name) => ({ name, text: readFileSync(join(dir, name), "utf8") }));
     const picked = pickFixture(files, captureId);
     let eventId: string;
+    let answer: string | undefined;
     if (picked) {
       eventId = String(JSON.parse(picked.fixture.raw_body).id);
       const headers = Object.fromEntries(Object.entries(picked.fixture.headers).filter((kv): kv is [string, string] => !!kv[1]));
       const deliveries = before.webhook_events.some((w) => w.paypal_event_id === eventId) ? 1 : 2; // never stored yet: the first POST is the first delivery
       for (let i = 0; i < deliveries; i++) {
         const res = await fetch(`${f.base}/api/webhooks/paypal`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: picked.fixture.raw_body });
-        console.log(`replay ${i + 1} of ${picked.name} (event ${eventId}) -> ${res.status} ${(await res.text()).slice(0, 120)}`);
+        const text = await res.text();
+        console.log(`replay ${i + 1} of ${picked.name} (event ${eventId}) -> ${res.status} ${text.slice(0, 120)}`);
         if (res.status !== 200) throw new Error(`replay answered ${res.status}`);
+        answer = (JSON.parse(text) as { outcome?: string }).outcome;
       }
     } else {
       const row = before.webhook_events.find((w) => w.event_type === "PAYMENT.CAPTURE.COMPLETED");
@@ -299,7 +312,9 @@ const run: Record<Scenario, (f: Flags) => Promise<string>> = {
     const after = await pack();
     const rows = after.webhook_events.filter((w) => w.paypal_event_id === eventId);
     console.log(`after: ${after.webhook_events.length} webhook_events, ${after.events.length} deal_events, ${after.payouts.length} payouts`);
-    if (rows.length !== 1 || !rows[0].processed_at) throw new Error(`expected one processed webhook_events row for ${eventId}, got ${rows.length}`);
+    // The pack lists a delivery only when a deal event names it (lib/deal/pack.ts), and a capture the API saw first has none, so a fixture replay is judged by the server's answer.
+    if (picked && answer !== "already_processed") throw new Error(`expected already_processed for ${eventId}, got ${answer} (the fixture's webhook id must still be registered at PayPal)`);
+    if (rows.length > 1 || (!picked && !rows[0]?.processed_at)) throw new Error(`expected one processed webhook_events row for ${eventId}, got ${rows.length}`);
     if (after.events.length !== before.events.length) throw new Error(`deal_events grew from ${before.events.length} to ${after.events.length}`);
     if (after.payouts.length !== 1) throw new Error(`expected one payout, got ${after.payouts.length}`);
     return `${code} second delivery of ${eventId} was a no-op`;
