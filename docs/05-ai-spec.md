@@ -1352,7 +1352,7 @@ The verdict runs inside the `POST /api/deals/{code}/evidence` request. The 19 s 
 | `decide()`, verdict rows, event write | under 0.1 s | 02 section 8 |
 | PayPal capture or void, then payout on `COMPLETED` | at most 10 s each (SDK `timeout: 10_000`; payout `AbortSignal.timeout(10_000)`) | 02 section 8; outside this document |
 
-Whether Render's proxy allows a 40 s response is UNVERIFIED (research/stack.md "5. Render", "(d) Request timeout") and is spike 4 in `02-system-design.md` section 12. If it does not, the deal is still safe: a cut connection after the model call leaves the deal in `proof_submitted` or `captured`, and `tick` (B7) or the PayPal webhooks (C3) finish it.
+Render's proxy allowed a 40 s response when measured (spike 4 in `02-system-design.md` section 12: 200 in 40,450 ms). If a connection is ever cut, the deal is still safe: a cut connection after the model call leaves the deal in `proof_submitted` or `captured`, and `tick` (B7) or the PayPal webhooks (C3) finish it.
 
 Anthropic publishes no absolute latency numbers; Haiku 5.5 is "Fastest", Sonnet 5.5 "Fast", Opus 5.5 "Moderate", and lowering `effort` is the main lever (research "Summary" items 3 and 9). If the baseline eval shows p95 under about 8 s, the verdict settings change to `timeout: 9_000` with one retry inside the same 19 s signal to absorb transient 529s (research "8 > Why maxRetries: 0 on job 2"); that change bumps nothing but the constants.
 
