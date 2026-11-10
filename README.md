@@ -13,7 +13,7 @@ Built for the PayPal AI Hackathon 2026. Sandbox only, no real money moves.
 | | |
 | --- | --- |
 | Hosted demo | https://handshake-ba2g.onrender.com |
-| Video (under 3 min) | <!-- TODO(T-47): YouTube URL --> `https://youtube.com/<id>` |
+| Video (under 3 min) | https://youtu.be/eMuh51YjGhY |
 | Licence | MIT, see [LICENSE](LICENSE) |
 
 ## Try it as a judge
