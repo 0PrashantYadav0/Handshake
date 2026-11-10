@@ -131,7 +131,7 @@ Interactive tour: open [docs/overview.html](docs/overview.html) in a browser (ar
 
 ## Security
 
-Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md).
+Design: [docs/security-design.md](docs/security-design.md).
 
 - **Two-step sign-in for everyone.** An email link that works once (opening it is harmless; its "Continue" button spends it), then a 6-digit code from an authenticator app (TOTP, RFC 6238). Enrollment is required before anything else; ten single-use recovery codes back it up. Five wrong codes lock the account for 10 minutes, counted in Postgres. "Sign out everywhere" on `/security` ends every session.
 - **Step-up.** Signing a contract, changing the payout email, revoking a signing key and making new recovery codes each need a fresh code.
@@ -179,6 +179,7 @@ Design: [docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md](docs/su
 | Next.js 16, React 19, TypeScript 5.9, Tailwind CSS v4, Zod, jose, Resend | The app, validation, HS256 session cookies, magic-link email. |
 | Caveat (SIL OFL 1.1, `public/demo/fonts/OFL.txt`) | The composed deal-code photo in the demo kit. |
 | MCP (Model Context Protocol) | `POST /api/mcp` serves nine tools over Streamable HTTP with JSON responses, so any MCP client can run a deal under an agent key: [docs/agents.md](docs/agents.md). |
+| Postman | `postman/handshake.postman_collection.json`: the HTTP API as a runnable collection, with tests on every request (sign-in with 2FA, a deal from one sentence, an agent over MCP refused above its ceiling). See [Try the API in Postman](#try-the-api-in-postman). |
 | Claude Code | The coding agent that built the app from the specs in `docs/`. |
 
 ## Evaluation results
@@ -257,10 +258,28 @@ PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test two-party
                                        # needs no Anthropic or PayPal key (tests/e2e/make-draft.ts)
 npm run eval                           # the judge eval, calls the real API; prints the estimated cost at the end
 npm run sandbox -- SB-1 --base <url>   # sandbox scenarios SB-1, SB-6, SB-7, SB-8, SB-11 against a running app
-npm run reseal                         # after prepending a new kid:secret to DATA_KEYS: re-seals contract data with it (trust spec §5)
+npm run reseal                         # after prepending a new kid:secret to DATA_KEYS: re-seals contract data with it ([security design](docs/security-design.md) §5)
 npm run reseal -- --seal-plaintext-events  # once, on a database with rows from before encryption
 npm run lint && npm run typecheck
 ```
+
+### Try the API in Postman
+
+Import `postman/handshake.postman_collection.json` into Postman (**Import**, then pick the file) and run it with **Run collection**, or run it from a terminal:
+
+```bash
+npm run api:postman                                   # against the hosted demo
+npm run api:postman -- --env-var baseUrl=http://localhost:3001   # against a local app
+```
+
+It runs 21 requests with 27 checks, in four folders:
+
+1. **Public:** health, `/api/status` (the cron ran in the last 30 minutes, with no errors, and verified webhooks have arrived), and the tick refused without the cron secret.
+2. **Sign in:** the demo seller, refused until the second factor is passed, then a demo 2FA code.
+3. **A deal from one sentence:** Claude extracts the terms, and cancelling the draft voids it in the audit trail.
+4. **An AI agent over MCP:** an agent key with a $20 ceiling, nine tools and none that moves money, a $95 deal refused with `mandate_exceeded`, and the key dead once revoked.
+
+Each run makes two Claude calls, about two cents. The PayPal approval popup and photo uploads need the web app.
 
 Details: [tests/e2e/README.md](tests/e2e/README.md) (`PLAYWRIGHT_BASE_URL` to run against a deployed host), [scripts/sandbox/README.md](scripts/sandbox/README.md) (`--dry`, `--wait`, `--full`, `--upload`), [eval/README.md](eval/README.md). CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit and integration tests and the build on every push.
 

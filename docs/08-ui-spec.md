@@ -4,7 +4,7 @@ This document fixes the pages, layouts, states, button labels and copy of the Ha
 
 As of 2026-10-09.
 
-Decisions this document implements: G1 (pages), G2 (Tailwind v4, no component library, visual direction chosen at build time with the frontend-design skill), G3 (AG Grid Community ledger, AG Studio dashboard), F3 (demo personas), F4 (non-party preview), F5 (demo kit). State, command, endpoint and error names are spelled exactly as in [decisions.md](decisions.md). Requirements referenced as FR-n / NFR-n are from [brief/01-requirements.md](brief/01-requirements.md). External facts are cited from [research/stack.md](research/stack.md), [research/paypal.md](research/paypal.md), [research/claude-api.md](research/claude-api.md) and [research/ag-grid.md](research/ag-grid.md).
+Decisions this document implements: G1 (pages), G2 (Tailwind v4, no component library, visual direction chosen at build time with the frontend-design skill), G3 (AG Grid Community ledger, AG Studio dashboard), F3 (demo personas), F4 (non-party preview), F5 (demo kit). State, command, endpoint and error names are spelled exactly as in [decisions.md](decisions.md). Requirements referenced as FR-n / NFR-n are from [01-requirements.md](01-requirements.md). External facts are cited from [research/stack.md](research/stack.md), [research/paypal.md](research/paypal.md), [research/claude-api.md](research/claude-api.md) and [research/ag-grid.md](research/ag-grid.md).
 
 What this document does not decide: fonts, exact colours, spacing scale, icon set, radius, shadows. The frontend-design skill decides those at build time within the constraints in section 1.
 

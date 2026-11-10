@@ -2,7 +2,7 @@
 
 This document fixes the request, response, errors and side effects of every HTTP endpoint in `docs/decisions.md` H1, so routes, pages and tests can be built from it without further design. As of 2026-10-09.
 
-Related documents: [decisions.md](decisions.md) (authoritative names), [research/paypal.md](research/paypal.md), [research/stack.md](research/stack.md), [research/ag-grid.md](research/ag-grid.md), [research/claude-api.md](research/claude-api.md). The original brief tab is [brief/04-api-specification.md](brief/04-api-specification.md); where this document differs, this document wins.
+Related documents: [decisions.md](decisions.md) (authoritative names), [research/paypal.md](research/paypal.md), [research/stack.md](research/stack.md), [research/ag-grid.md](research/ag-grid.md), [research/claude-api.md](research/claude-api.md). Where this differs from the original brief, this document wins.
 
 ## 1. Conventions
 

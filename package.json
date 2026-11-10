@@ -18,7 +18,8 @@
     "reseal": "tsx scripts/reseal.ts",
     "eval": "tsx eval/run.ts",
     "sandbox": "tsx scripts/sandbox/scenario.ts",
-    "check-env": "tsx scripts/check-env.ts"
+    "check-env": "tsx scripts/check-env.ts",
+    "api:postman": "npx -y newman@6 run postman/handshake.postman_collection.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.132.1",

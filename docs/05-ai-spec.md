@@ -2,7 +2,7 @@
 
 This document decides exactly what Claude sees, what it must return, how its output is checked, and how fixed code turns that output into a money decision, for Handshake's two model jobs.
 
-As of 2026-10-09. Names follow [decisions.md](decisions.md) (section D for the AI, D9 for the decision function). External API facts come from [research/claude-api.md](research/claude-api.md); the section heading or source label is quoted wherever one is relied on. The original brief is [brief/05-ai-specification.md](brief/05-ai-specification.md); where this document differs, this document wins.
+As of 2026-10-09. Names follow [decisions.md](decisions.md) (section D for the AI, D9 for the decision function). External API facts come from [research/claude-api.md](research/claude-api.md); the section heading or source label is quoted wherever one is relied on. Where this differs from the original brief, this document wins.
 
 ## 1. The two jobs and the hard rule
 

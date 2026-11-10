@@ -1,6 +1,6 @@
 # Handshake documentation
 
-This folder is the source of truth for Handshake: a developer or coding agent builds the whole product from these documents plus `research/`, and never needs to look anything else up (B9). The original brief under `brief/` is historical; where it differs from a document here, the document here wins.
+This folder is the source of truth for Handshake: a developer or coding agent builds the whole product from these documents plus `research/`, and never needs to look anything else up (B9).
 
 This index was updated on 2026-11-06. Every name (state, command, endpoint, table, column, env var) is spelled as in [decisions.md](decisions.md).
 
@@ -22,14 +22,12 @@ This index was updated on 2026-11-06. Every name (state, command, endpoint, tabl
 | [09-ag-studio.md](09-ag-studio.md) | The AG Grid ledger, the AG Studio dashboard (data route, sources, widgets, theme, custom widget), the optional Claude agent, licence timing, hours and cut order for the sponsor prize | When building `/ledger` or `/dashboard`, and on 2026-11-02 for the trial key |
 | [agents.md](agents.md) | Agent keys and the mandate, the MCP server and its tools, the live desk's three scenarios | When touching `lib/agents/`, `/api/mcp` or `/agents` |
 | [studio-prompts.md](studio-prompts.md) | Prompts to type into the dashboard agent, and what each one does | When demonstrating or testing the Studio agent |
-| [superpowers/specs/2026-10-11-trust-and-accounts-design.md](superpowers/specs/2026-10-11-trust-and-accounts-design.md) | The trust and accounts design, cited elsewhere as "trust spec" | When touching sign-in, 2FA, contract signatures, field encryption or payout addresses |
-| [superpowers/plans/2026-10-11-trust-and-accounts.md](superpowers/plans/2026-10-11-trust-and-accounts.md) | The implementation plan for that design, task by task | Only to see how it was built |
+| [security-design.md](security-design.md) | The trust and accounts design, cited elsewhere as "trust spec" | When touching sign-in, 2FA, contract signatures, field encryption or payout addresses |
 | [screenshots/](screenshots/) | Nothing new: captures of the hosted app, shown in the root `README.md` | When replacing a screenshot |
 | [dependencies.md](dependencies.md) | The runtime and every package at an exact version, the install, config files, known traps, outside accounts and limits, licence compatibility | When scaffolding the repo, and before any `npm i` |
 | [research/paypal.md](research/paypal.md) | Primary-source facts on Orders v2 `AUTHORIZE`, capture, void, reauthorize, idempotency, Payouts, webhooks and verification, the server and browser SDKs, sandbox setup, open risks | When any PayPal behaviour is in question; quote its section when relying on it |
 | [research/claude-api.md](research/claude-api.md) | Primary-source facts on model choice, the TypeScript SDK, structured outputs, images, thinking and effort, injection, caching, latency, rate limits and cost, open risks | When any Claude API behaviour is in question |
 | [research/ag-grid.md](research/ag-grid.md) | Primary-source facts on AG Studio vs AG Grid, licensing and the trial, the React quick start, custom widgets, the Agent Framework, the ledger grid, bundle size, open risks | When building the ledger or dashboard, or handling the licence key |
 | [research/stack.md](research/stack.md) | Primary-source facts on Node, Next.js 16, Prisma 7, Postgres `bytea`, Render plans and Blueprints, sessions, Resend, signed URLs, image downscale, test and CI config, local dev, open risks | When any hosting, framework or tooling behaviour is in question |
-| [brief/](brief/README.md) | The original eight-tab brief exported from the Claude Doc on 2026-10-09 | Only to understand why a decision was changed; it is superseded wherever a document above differs |
 
 Reading order for a fresh start: `overview.html`, `decisions.md`, `hackathon.md`, `plan.md`, then the numbered documents 01 to 09 as each task needs them, with `dependencies.md` before the first `npm ci` and `research/` whenever a document cites it.
