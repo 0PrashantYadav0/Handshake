@@ -1,6 +1,6 @@
 # Handshake: decision log
 
-As of 2026-10-09. This file is the authoritative list of decisions taken after the original brief (`docs/brief/`) was written and the research (`docs/research/`) was done. Where a working document in `docs/` differs from the brief, the reason is here. **Every named thing (state, command, endpoint, table, column, env var) is spelled here the way it must be spelled everywhere else.**
+As of 2026-10-09. This file is the authoritative list of decisions taken after the original brief (a Claude Doc, not kept in the repo) was written and the research (`docs/research/`) was done. Where a working document in `docs/` differs from the brief, the reason is here. **Every named thing (state, command, endpoint, table, column, env var) is spelled here the way it must be spelled everywhere else.**
 
 ## A. Hackathon constraints (details: `docs/hackathon.md`)
 
@@ -187,7 +187,7 @@ decide(verdicts, deal):
 - **J4.** Local: Postgres via Docker Compose; `cloudflared` quick tunnel for webhooks. CI: GitHub Actions with a Postgres service runs lint, typecheck, unit and integration tests, and build on every push. Playwright runs locally before each deploy.
 - **J5.** Work is tracked as GitHub issues in milestones W1 to W5; each issue carries acceptance criteria and the test command that proves it. Code starts only after the docs in `docs/` and the plan are reviewed.
 
-## K. Trust and accounts (2026-10-11; details: `docs/superpowers/specs/2026-10-11-trust-and-accounts-design.md`)
+## K. Trust and accounts (2026-10-11; details: `docs/security-design.md`)
 
 - **K1.** Two-factor sign-in for every account: email link, then TOTP (RFC 6238, SHA-1, 6 digits, 30 s, one step of drift). Enrollment is mandatory; ten recovery codes stored as SHA-256. A used step is recorded so a code works once. Five wrong codes per 10 minutes lock the account, counted atomically in Postgres before each check.
 - **K2.** Partial sessions reach only `/api/auth/2fa/*` and the 2FA pages. Every request checks the session against `users.session_version`; "Sign out everywhere" bumps it.

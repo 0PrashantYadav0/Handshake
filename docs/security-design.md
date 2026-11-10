@@ -1,6 +1,6 @@
 # Trust and accounts: design (2026-10-11)
 
-Status: approved by the user's request of 2026-10-11 ("create plan first and then work on it"). Plan: `docs/superpowers/plans/2026-10-11-trust-and-accounts.md`. Tickets: GitHub issues labelled `trust`.
+Status: approved by the user's request of 2026-10-11 ("create plan first and then work on it"). Tickets: GitHub issues labelled `trust`.
 
 ## 1. What the user asked for
 

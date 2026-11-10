@@ -2,7 +2,7 @@
 
 This document fixes every table, column, constraint, enum and migration of Handshake's Postgres database, the complete `prisma/schema.prisma`, the seed, the evidence-pack query plan and the photo storage budget. As of 2026-10-09.
 
-Names come from [decisions.md](decisions.md) section I and are spelled here exactly as they must appear in code. Platform facts come from [research/stack.md](research/stack.md) (section 3 "Prisma 7.10" and section 4 "Postgres bytea"). The original brief is [brief/03-database-schema.md](brief/03-database-schema.md); the section "Changes from the brief" lists every departure and its reason. The state machine these tables serve is decisions C1 to C6; the module that owns every write is `lib/deal/` (decisions B2).
+Names come from [decisions.md](decisions.md) section I and are spelled here exactly as they must appear in code. Platform facts come from [research/stack.md](research/stack.md) (section 3 "Prisma 7.10" and section 4 "Postgres bytea"). The section "Changes from the brief" lists every departure and its reason. The state machine these tables serve is decisions C1 to C6; the module that owns every write is `lib/deal/` (decisions B2).
 
 ## Conventions
 
@@ -886,7 +886,7 @@ Seeded deals store no photos, so the seed costs nothing here. The global `omit` 
 
 ## Changes from the brief
 
-Every departure from [brief/03-database-schema.md](brief/03-database-schema.md), with the decision that caused it.
+Every departure from the original brief's schema, with the decision that caused it.
 
 | Brief | Now | Why |
 | --- | --- | --- |

@@ -1,0 +1,828 @@
+{
+  "info": {
+    "name": "Handshake API",
+    "description": "Handshake: pay on proof. PayPal holds the money, Claude checks the proof, fixed code decides.\n\nThis collection runs against the hosted sandbox demo by default (`baseUrl`). It signs in as the shared demo seller, creates a deal from one sentence and cancels it, then makes an agent key and drives the MCP server: the agent is refused a deal over its ceiling, and its key stops working once revoked.\n\nRun it in Postman (Collection > Run) or from a terminal: `npm run api:postman`. Each run makes two Claude calls (about two cents) and leaves two voided drafts on the demo seller's ledger.\n\nNot covered here, because they need a browser or a secret: the PayPal approval popup (use the web app), photo uploads, and `POST /api/jobs/tick` with the cron secret (only the refusal without it is checked).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://handshake-ba2g.onrender.com"
+    },
+    {
+      "key": "persona",
+      "value": "seller"
+    },
+    {
+      "key": "totp",
+      "value": ""
+    },
+    {
+      "key": "tries",
+      "value": "0"
+    },
+    {
+      "key": "dealCode",
+      "value": ""
+    },
+    {
+      "key": "agentKeyId",
+      "value": ""
+    },
+    {
+      "key": "agentToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Public",
+      "item": [
+        {
+          "name": "Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 ok\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().ok).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Status: cron and webhooks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const s = pm.response.json();",
+                  "      pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "      pm.test(\"the tick ran in the last 30 minutes\", () => pm.expect(s.tick.minutes_ago).to.be.below(30));",
+                  "      pm.test(\"its last run had no errors\", () => pm.expect(s.tick.errors_last_run).to.eql(0));",
+                  "      pm.test(\"verified PayPal webhooks have arrived\", () => pm.expect(s.webhooks.verified).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "status"
+              ]
+            },
+            "description": "When the 10-minute background job last ran, and how many PayPal webhooks arrived with a verified signature."
+          }
+        },
+        {
+          "name": "Tick without the cron secret is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-the-secret"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/jobs/tick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "tick"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Sign in (demo persona and 2FA)",
+      "item": [
+        {
+          "name": "Choose a demo persona",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, second factor required\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().mfa).to.eql(\"required\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"persona\": \"{{persona}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/demo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "demo"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A partial session can't read deals yet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"refused: mfa_required\", () => { pm.expect(pm.response.code).to.be.oneOf([401, 403]); pm.expect(pm.response.json().error.code).to.eql(\"mfa_required\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/deals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "deals"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get a demo 2FA code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const tries = Number(pm.collectionVariables.get(\"tries\") || 0);",
+                  "if (pm.response.code !== 200 && tries < 4) {",
+                  "    pm.collectionVariables.set(\"tries\", tries + 1);",
+                  "    setTimeout(() => {}, 12000);",
+                  "    pm.execution.setNextRequest(pm.info.requestName);",
+                  "    return;",
+                  "}",
+                  "pm.collectionVariables.set(\"tries\", 0);",
+                  "pm.test(\"a 6-digit code\", () => pm.expect(pm.response.json().code).to.match(/^\\d{6}$/));",
+                  "pm.collectionVariables.set(\"totp\", pm.response.json().code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/2fa/demo-code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "2fa",
+                "demo-code"
+              ]
+            },
+            "description": "The demo accounts' second factor is public: this returns the next unused 6-digit code."
+          }
+        },
+        {
+          "name": "Verify the code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, full session\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{totp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/2fa/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "2fa",
+                "verify"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Who am I",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"the demo account, 2FA on\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().user.two_factor).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. A deal from one sentence",
+      "item": [
+        {
+          "name": "Create a deal (Claude extracts the terms)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "      pm.test(\"201 draft\", () => { pm.response.to.have.status(201); pm.expect(d.status).to.eql(\"draft\"); });",
+                  "      pm.test(\"$18.00\", () => pm.expect(d.amount_minor).to.eql(1800));",
+                  "      pm.test(\"checkable conditions, including the deal code\", () => {",
+                  "          pm.expect(d.conditions.length).to.be.within(2, 5);",
+                  "          pm.expect(d.conditions.some((c) => /deal code/i.test(c.text))).to.eql(true);",
+                  "      });",
+                  "      pm.collectionVariables.set(\"dealCode\", d.code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"I'll pay $18 for the blue ceramic mug if it arrives within 5 days, matches the listing photos and tracking shows delivered.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/deals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "deals"
+              ]
+            },
+            "description": "Claude turns the sentence into conditions a photo or tracking number can prove. The server adds the handwritten deal-code condition."
+          }
+        },
+        {
+          "name": "Read the deal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, same code\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().code).to.eql(pm.collectionVariables.get(\"dealCode\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/deals/{{dealCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "deals",
+                "{{dealCode}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel it (no money was held)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"voided: a cancelled draft ends voided\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql(\"voided\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/deals/{{dealCode}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "deals",
+                "{{dealCode}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Its audit trail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const e = pm.response.json();",
+                  "      pm.test(\"200, created then voided by the cancel\", () => {",
+                  "          pm.response.to.have.status(200);",
+                  "          pm.expect(e.length).to.be.at.least(2);",
+                  "          pm.expect(e[e.length - 1].to_status).to.eql(\"voided\");",
+                  "      });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/deals/{{dealCode}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "deals",
+                "{{dealCode}}",
+                "events"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. An AI agent over MCP",
+      "item": [
+        {
+          "name": "Get a demo code for step-up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const tries = Number(pm.collectionVariables.get(\"tries\") || 0);",
+                  "if (pm.response.code !== 200 && tries < 4) {",
+                  "    pm.collectionVariables.set(\"tries\", tries + 1);",
+                  "    setTimeout(() => {}, 12000);",
+                  "    pm.execution.setNextRequest(pm.info.requestName);",
+                  "    return;",
+                  "}",
+                  "pm.collectionVariables.set(\"tries\", 0);",
+                  "pm.test(\"a 6-digit code\", () => pm.expect(pm.response.json().code).to.match(/^\\d{6}$/));",
+                  "pm.collectionVariables.set(\"totp\", pm.response.json().code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/2fa/demo-code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "2fa",
+                "demo-code"
+              ]
+            },
+            "description": "The demo accounts' second factor is public: this returns the next unused 6-digit code."
+          }
+        },
+        {
+          "name": "Make an agent key with a $20 ceiling",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 with a token\", () => { pm.response.to.have.status(201); pm.expect(pm.response.json().token).to.match(/^hsk_/); });",
+                  "      pm.collectionVariables.set(\"agentKeyId\", pm.response.json().id);",
+                  "      pm.collectionVariables.set(\"agentToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Postman\",\n  \"max_usd\": 20,\n  \"totp\": \"{{totp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/keys",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agents",
+                "keys"
+              ]
+            },
+            "description": "Making a key needs a fresh second-factor code. The ceiling is enforced in code on every deal the agent proposes."
+          }
+        },
+        {
+          "name": "MCP initialize",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"server info\", () => pm.expect(pm.response.json().result.serverInfo.name).to.eql(\"handshake\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-06-18\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mcp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "MCP tools/list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const names = pm.response.json().result.tools.map((t) => t.name);",
+                  "      pm.test(\"nine tools\", () => pm.expect(names.length).to.eql(9));",
+                  "      pm.test(\"no tool approves money\", () => pm.expect(names.filter((n) => /approve|capture|release|payout/.test(n))).to.eql([]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mcp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "MCP get_mandate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const out = JSON.parse(pm.response.json().result.content[0].text);",
+                  "      pm.test(\"$20 ceiling, PayPal approval is for a person\", () => {",
+                  "          pm.expect(out.ceiling_per_deal).to.include(\"20\");",
+                  "          pm.expect(out.only_a_person_can.join(\" \")).to.include(\"PayPal\");",
+                  "      });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"get_mandate\",\n    \"arguments\": {}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mcp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "MCP propose_deal over the ceiling is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json().result;",
+                  "      const out = JSON.parse(r.content[0].text);",
+                  "      pm.test(\"refused by code: mandate_exceeded\", () => { pm.expect(r.isError).to.eql(true); pm.expect(out.error).to.eql(\"mandate_exceeded\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"propose_deal\",\n    \"arguments\": {\n      \"sentence\": \"I'll pay $95 for the vintage film camera if it arrives within 5 days, matches the listing photos and tracking shows delivered.\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mcp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "MCP without a key is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/list\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mcp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Revoke the agent key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/keys/{{agentKeyId}}/revoke",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agents",
+                "keys",
+                "{{agentKeyId}}",
+                "revoke"
+              ]
+            }
+          }
+        },
+        {
+          "name": "MCP with the revoked key is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/list\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "mcp"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

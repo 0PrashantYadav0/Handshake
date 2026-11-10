@@ -2,7 +2,7 @@
 
 This document decides what Handshake must do for the PayPal AI Hackathon, for whom, in what priority, and what a judge must see on the hosted demo.
 
-As of 2026-10-09. Supersedes [brief/01-requirements.md](brief/01-requirements.md) where they differ; every name follows [decisions.md](decisions.md). Rules and dates are in [hackathon.md](hackathon.md).
+As of 2026-10-09. Supersedes the original brief (a Claude Doc, not kept in the repo) where they differ; every name follows [decisions.md](decisions.md). Rules and dates are in [hackathon.md](hackathon.md).
 
 Handshake lets two strangers agree a deal in one sentence, holds the buyer's money through a PayPal authorization, and releases it only when AI-checked proof matches the terms and a fixed rule in code says so.
 
